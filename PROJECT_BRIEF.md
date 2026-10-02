@@ -86,7 +86,7 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | API | Baca laporan, riwayat instrumen, data live | Implementasi tersedia; kontrak masih dalam tahap transisi |
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Belum diimplementasikan |
-| Ekspor latar belakang | PDF otomatis setelah refresh worker; job ekspor mandiri dan artefak per versi | PDF refresh tersedia sebagai berkas lokal; ekspor mandiri/artefak API belum tersedia |
+| Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
 | Frontend pengganti | Next.js + TypeScript | Direncanakan; belum diimplementasikan |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
@@ -215,6 +215,7 @@ Pemindahan folder menjadi struktur `backend/` dan `web/` dilakukan saat memberi 
 | `sbn_history` | Riwayat SBN per tanggal sumber |
 | `refresh_jobs` | Status dan percobaan job refresh |
 | `refresh_job_events` | Riwayat peristiwa job |
+| `report_artifacts` | Metadata artefak PDF terkait versi laporan |
 | `schema_migrations` | Catatan migrasi schema yang diterapkan |
 
 `DATABASE_URL` menentukan penggunaan PostgreSQL. Tanpa konfigurasi tersebut, repository laporan/riwayat menggunakan JSON lokal. Jika PostgreSQL telah dikonfigurasi tetapi gagal diakses, sistem tidak beralih diam-diam ke JSON. Antrean job memerlukan PostgreSQL.
@@ -231,6 +232,9 @@ Pemindahan folder menjadi struktur `backend/` dan `web/` dilakukan saat memberi 
 | `GET /api/v1/market/live` | Data live dengan cache 30 detik per proses API | Token baca |
 | `POST /api/v1/refresh-jobs` | Meminta refresh melalui antrean | Token operator |
 | `GET /api/v1/jobs/{job_id}` | Membaca status dan peristiwa job | Token baca |
+| `POST /api/v1/reports/{report_id}/exports` | Meminta PDF untuk versi tertentu | Token baca |
+| `GET /api/v1/reports/{report_id}/exports/pdf` | Mengunduh PDF untuk versi tertentu | Token baca |
+| `GET /api/v1/artifacts/{artifact_id}` | Mengunduh artefak berdasarkan ID | Token baca |
 
 Token dikirim melalui `Authorization: Bearer ...`. Token baca dan operator adalah kredensial terpisah. Mekanisme ini belum merupakan login pengguna atau otorisasi per individu. Token server harus tetap di sisi server ketika frontend browser baru dikembangkan.
 
@@ -249,7 +253,7 @@ Operasional yang dituju mencakup:
 - Deployment yang dapat diulang, dependensi terkunci, dan pemeriksaan otomatis sebelum rilis.
 - Pengelolaan akses pengguna, rahasia konfigurasi, serta pencatatan aktivitas bila lingkup penggunaan berkembang.
 
-Antrean mendukung deduplikasi job aktif, pengambilan job dengan row lock, maksimal tiga percobaan, token kepemilikan, heartbeat 30 detik, lease dua menit, dan penguncian kepemilikan saat publikasi. Pemulihan job menggunakan lease yang kedaluwarsa. Jeda retry belum tersedia. Saat PostgreSQL aktif, refresh Streamlit, CLI live, dan API masuk ke antrean. Mode JSON lokal tetap menerbitkan langsung untuk pengembangan.
+Antrean mendukung deduplikasi job aktif per jenis/versi, pengambilan job dengan row lock, maksimal tiga percobaan, token kepemilikan, heartbeat 30 detik, lease dua menit, dan penguncian kepemilikan saat publikasi/ekspor. Pemulihan job menggunakan lease yang kedaluwarsa. Jeda retry belum tersedia. Saat PostgreSQL aktif, refresh Streamlit, CLI live, dan API masuk ke antrean. Mode JSON lokal tetap menerbitkan langsung untuk pengembangan.
 
 Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Pemulihan setelah crash masih dapat menerbitkan versi tambahan; idempotensi publikasi dan jeda retry menjadi pekerjaan lanjutan.
 
@@ -262,7 +266,7 @@ Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor
 | 1. Fondasi bersama | Perhitungan/publikasi terpisah dari tampilan | Sudah diterapkan; perlu terus dijaga | Semua jalur memakai aturan perhitungan dan validasi yang konsisten |
 | 2. Repository | Laporan aktif dan versi di PostgreSQL | Sudah diterapkan | Impor, kegagalan publikasi, dan pemulihan penyimpanan tervalidasi |
 | 3. API | Kontrak baca dan akses backend yang stabil | Implementasi awal tersedia | Kontrak, autentikasi, serta kesetaraan angka diverifikasi melalui integrasi |
-| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; worker membuat PDF lokal setelah refresh | Integrasi terverifikasi, scheduler, ekspor mandiri/artefak, serta pemulihan tersedia |
+| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; job ekspor dan endpoint unduh tersedia | Integrasi terverifikasi, scheduler, penyimpanan artefak persisten, serta pemulihan tersedia |
 | 5. Frontend baru | Next.js mencapai kesetaraan fitur MVP | Belum dimulai | Alur baca, detail, status, tema, dan unduhan diterima pengguna |
 | 6. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
 | 7. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |

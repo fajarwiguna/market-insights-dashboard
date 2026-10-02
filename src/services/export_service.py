@@ -35,13 +35,15 @@ def build_report_pdf(report_json: str, sbn_json: str) -> tuple[bytes, str]:
         )
 
 
-def save_report_pdf(report: dict, sbn_history: list[dict], report_dir: Path) -> Path:
+def save_report_pdf(
+    report: dict, sbn_history: list[dict], report_dir: Path, *, storage_prefix: str = ""
+) -> tuple[Path, str]:
     """Buat dan simpan PDF untuk laporan yang baru diterbitkan."""
     payload, filename = build_report_pdf(
         json.dumps(report, ensure_ascii=False, default=str),
         json.dumps(sbn_history, ensure_ascii=False, default=str),
     )
-    destination = Path(report_dir) / filename
+    destination = Path(report_dir) / f"{storage_prefix}{filename}"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(payload)
-    return destination
+    return destination, filename

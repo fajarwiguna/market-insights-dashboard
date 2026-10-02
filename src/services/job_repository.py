@@ -29,14 +29,21 @@ class PostgresJobRepository:
         return psycopg.connect(self.database_url, row_factory=dict_row)
 
     def enqueue_refresh(self) -> dict:
+        return self._enqueue("refresh")
+
+    def enqueue_export(self, report_id: str) -> dict:
+        return self._enqueue("export_pdf", report_id=report_id)
+
+    def _enqueue(self, job_type: str, *, report_id: str | None = None) -> dict:
         job_id = uuid.uuid4()
         with self._connect() as connection:
             row = connection.execute(
-                """INSERT INTO refresh_jobs (job_id, job_type, status)
-                   VALUES (%s, 'refresh', 'queued')
-                   ON CONFLICT (job_type) WHERE status IN ('queued', 'running') DO NOTHING
+                """INSERT INTO refresh_jobs (job_id, job_type, status, report_id)
+                   VALUES (%s, %s, 'queued', %s)
+                   ON CONFLICT (job_type, (COALESCE(report_id, '')))
+                   WHERE status IN ('queued', 'running') DO NOTHING
                    RETURNING job_id::text, job_type, status, attempts, max_attempts, dates, report_id, error_code""",
-                (job_id,),
+                (job_id, job_type, report_id),
             ).fetchone()
             if row:
                 connection.execute(
@@ -47,11 +54,52 @@ class PostgresJobRepository:
             else:
                 active = connection.execute(
                     """SELECT job_id::text, job_type, status, attempts, max_attempts, dates, report_id, error_code
-                       FROM refresh_jobs WHERE job_type = 'refresh' AND status IN ('queued', 'running')"""
+                       FROM refresh_jobs WHERE job_type = %s AND report_id IS NOT DISTINCT FROM %s
+                         AND status IN ('queued', 'running')""",
+                    (job_type, report_id),
                 ).fetchone()
         if active is None:
-            raise RuntimeError("Job refresh gagal dibuat atau ditemukan.")
+            raise RuntimeError(f"Job {job_type} gagal dibuat atau ditemukan.")
         return self.get_job(active["job_id"])
+
+    def get_artifact(self, report_id: str) -> dict | None:
+        with self._connect() as connection:
+            return connection.execute(
+                """SELECT artifact_id::text, report_id, artifact_type, file_name,
+                          storage_key, dates
+                   FROM report_artifacts WHERE report_id = %s AND artifact_type = 'pdf'""",
+                (report_id,),
+            ).fetchone()
+
+    def get_artifact_by_id(self, artifact_id: str) -> dict | None:
+        try:
+            normalized_id = uuid.UUID(str(artifact_id))
+        except (ValueError, TypeError, AttributeError):
+            return None
+        with self._connect() as connection:
+            return connection.execute(
+                """SELECT artifact_id::text, report_id, artifact_type, file_name,
+                          storage_key, dates
+                   FROM report_artifacts WHERE artifact_id = %s""",
+                (normalized_id,),
+            ).fetchone()
+
+    def record_pdf_artifact(self, report_id: str, file_name: str, storage_key: str) -> dict:
+        artifact_id = uuid.uuid4()
+        with self._connect() as connection:
+            row = connection.execute(
+                """INSERT INTO report_artifacts
+                       (artifact_id, report_id, artifact_type, file_name, storage_key)
+                   VALUES (%s, %s, 'pdf', %s, %s)
+                   ON CONFLICT (report_id, artifact_type) DO UPDATE
+                       SET file_name = EXCLUDED.file_name,
+                           storage_key = EXCLUDED.storage_key,
+                           dates = now()
+                   RETURNING artifact_id::text, report_id, artifact_type, file_name,
+                             storage_key, dates""",
+                (artifact_id, report_id, file_name, storage_key),
+            ).fetchone()
+        return row
 
     def get_job(self, job_id: str) -> dict | None:
         try:
@@ -102,7 +150,7 @@ class PostgresJobRepository:
                 )
 
             row = connection.execute(
-                """SELECT job_id, job_type, attempts, max_attempts FROM refresh_jobs
+                """SELECT job_id, job_type, report_id, attempts, max_attempts FROM refresh_jobs
                    WHERE status = 'queued' ORDER BY dates, job_id LIMIT 1 FOR UPDATE SKIP LOCKED"""
             ).fetchone()
             if row is None:
@@ -121,7 +169,8 @@ class PostgresJobRepository:
                 (row["job_id"], attempt),
             )
             return {"job_id": str(row["job_id"]), "job_type": row["job_type"],
-                    "attempt": attempt, "owner_token": str(owner_token)}
+                    "report_id": row["report_id"], "attempt": attempt,
+                    "owner_token": str(owner_token)}
 
     def heartbeat(self, job_id: str, owner_token: str) -> bool:
         """Perpanjang lease hanya untuk worker yang masih memiliki job."""
@@ -135,8 +184,8 @@ class PostgresJobRepository:
         return row is not None
 
     @contextmanager
-    def publication_guard(self, job_id: str, owner_token: str):
-        """Tahan row lock selama publish agar lease tidak dapat direbut di tengah commit."""
+    def ownership_guard(self, job_id: str, owner_token: str):
+        """Tahan row lock selama efek samping agar lease tidak direbut di tengah proses."""
         with self._connect() as connection:
             row = connection.execute(
                 """SELECT job_id FROM refresh_jobs
@@ -147,6 +196,10 @@ class PostgresJobRepository:
             if row is None:
                 raise RuntimeError("Worker kehilangan kepemilikan job refresh.")
             yield
+
+    def publication_guard(self, job_id: str, owner_token: str):
+        """Alias bernama khusus untuk menjaga kompatibilitas pemanggil pipeline."""
+        return self.ownership_guard(job_id, owner_token)
 
     def complete(self, job_id: str, owner_token: str, report_id: str | None) -> bool:
         return self._transition(job_id, owner_token, "succeeded", report_id=report_id)

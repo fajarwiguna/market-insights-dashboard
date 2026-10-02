@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from services.job_repository import PostgresJobRepository
 from services import export_service, history_service
-from services.report_service import run_live_pipeline
+from services import report_service
 
 
 _logger = logging.getLogger("market_report.worker")
@@ -23,7 +23,7 @@ def process_one(repository: PostgresJobRepository) -> bool:
         return False
     job_id = job["job_id"]
     owner_token = job["owner_token"]
-    _logger.info("Memproses refresh job %s (percobaan %s)", job_id, job["attempt"])
+    _logger.info("Memproses job %s jenis %s (percobaan %s)", job_id, job["job_type"], job["attempt"])
     stop_heartbeat = threading.Event()
     lease_lost = threading.Event()
 
@@ -42,21 +42,40 @@ def process_one(repository: PostgresJobRepository) -> bool:
     heartbeat_thread = threading.Thread(target=keep_lease_alive, daemon=True)
     heartbeat_thread.start()
     try:
-        report = run_live_pipeline(
-            publication_guard=lambda: repository.publication_guard(job_id, owner_token)
-        )
+        if job["job_type"] == "refresh":
+            report = report_service.run_live_pipeline(
+                publication_guard=lambda: repository.publication_guard(job_id, owner_token)
+            )
+        elif job["job_type"] == "export_pdf":
+            report = report_service.load_report_version(job.get("report_id"))
+            if report is None:
+                raise RuntimeError("Versi laporan untuk ekspor tidak ditemukan.")
+        else:
+            raise RuntimeError(f"Jenis job tidak didukung: {job['job_type']}")
     except Exception as error:
-        _logger.exception("Refresh job %s gagal", job_id)
+        _logger.exception("Job %s gagal", job_id)
         if not lease_lost.is_set():
             repository.fail(job_id, owner_token, error)
     else:
         try:
             project_root = Path(__file__).resolve().parents[2]
             history = history_service.load_sbn_history()
-            pdf_path = export_service.save_report_pdf(report, history, project_root / "reports")
-            _logger.info("PDF laporan %s disimpan ke %s", report.get("report_id"), pdf_path)
+            with repository.ownership_guard(job_id, owner_token):
+                pdf_path, download_name = export_service.save_report_pdf(
+                    report, history, project_root / "reports",
+                    storage_prefix=f"{job_id}_",
+                )
+                artifact = repository.record_pdf_artifact(
+                    report["report_id"], download_name, pdf_path.name
+                )
+            _logger.info("PDF laporan %s disimpan sebagai artefak %s", report.get("report_id"), artifact["artifact_id"])
         except Exception:
-            # Laporan sudah terbit. Kegagalan PDF dicatat tanpa mengulang publikasi report.
+            if job["job_type"] == "export_pdf":
+                _logger.exception("Ekspor PDF untuk laporan %s gagal", report.get("report_id"))
+                if not lease_lost.is_set():
+                    repository.fail(job_id, owner_token, RuntimeError("pdf_export_failed"))
+                return True
+            # Laporan sudah terbit. Kegagalan PDF tidak mengulang publikasi report.
             _logger.exception("Gagal membuat PDF untuk laporan %s", report.get("report_id"))
         if repository.complete(job_id, owner_token, report.get("report_id")):
             _logger.info("Refresh job %s selesai, report_id=%s", job_id, report.get("report_id"))

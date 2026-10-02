@@ -89,6 +89,9 @@ python -m uvicorn api.main:app --app-dir src --host 127.0.0.1 --port 8000
 - `GET http://127.0.0.1:8000/api/v1/market/live` — kutipan live dengan cache 30 detik per proses.
 - `POST http://127.0.0.1:8000/api/v1/refresh-jobs` — antrekan refresh (Bearer `API_OPERATOR_TOKEN`).
 - `GET http://127.0.0.1:8000/api/v1/jobs/{job_id}` — status dan rangkaian event job.
+- `POST http://127.0.0.1:8000/api/v1/reports/{report_id}/exports` — antrekan ekspor PDF versi tertentu.
+- `GET http://127.0.0.1:8000/api/v1/reports/{report_id}/exports/pdf` — unduh PDF versi laporan.
+- `GET http://127.0.0.1:8000/api/v1/artifacts/{artifact_id}` — unduh artefak menggunakan ID artefak.
 - `GET http://127.0.0.1:8000/health` — status proses API.
 - `GET http://127.0.0.1:8000/docs` — dokumentasi interaktif.
 
@@ -112,6 +115,8 @@ memperpanjang lease setiap 30 detik, dan memulihkan job setelah lease dua menit 
 Worker lama yang kehilangan kepemilikan tidak dapat menerbitkan laporan.
 Setelah report terbit, worker juga mencoba menyimpan PDF laporan ke `reports/`; kegagalan
 PDF dicatat di log dan tidak membatalkan laporan yang sudah berhasil diterbitkan.
+Ekspor versi tertentu dapat diminta melalui endpoint API; worker memprosesnya dan menyimpan
+metadata artefak di PostgreSQL. API mengunduh berkas dari direktori `reports/` bersama.
 Saat `DATABASE_URL` diatur, tombol refresh dashboard dan perintah CLI live memasukkan job
 ke antrean ini. Jalankan worker agar permintaan diproses; setelah status berhasil, muat ulang
 dashboard untuk melihat laporan terbaru. Mode tanpa PostgreSQL mempertahankan refresh lokal.
