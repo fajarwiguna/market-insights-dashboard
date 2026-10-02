@@ -37,6 +37,24 @@ python -m pip install -r requirements.txt
 
 Dependencies utama: `streamlit`, `yfinance`, `pandas`, `matplotlib`, `reportlab`, `beautifulsoup4`, `requests`.
 
+### Penyimpanan laporan dan riwayat versi
+
+Secara default, aplikasi tetap memakai JSON lokal. Setiap laporan yang diterbitkan disimpan
+sebagai versi di `data/report_data_versions/`, sedangkan `data/report_data.json` menunjuk
+versi aktif. Untuk mulai memakai PostgreSQL, jalankan migrasi schema
+`migrations/001_report_versions.sql`, atur `DATABASE_URL`, lalu impor data lokal dengan:
+
+```powershell
+$env:DATABASE_URL = "postgresql://user:password@localhost:5432/market_report"
+python src/migrate_reports_to_postgres.py
+python -m streamlit run src/app.py
+```
+
+`DATABASE_URL` dipakai oleh layanan laporan untuk membaca dan menerbitkan versi. Tanpa
+variabel tersebut, layanan memakai repository JSON. Lakukan backup data JSON sebelum impor;
+skrip mempertahankan semua versi arsip yang memiliki ID dan menjadikan laporan aktif lokal
+sebagai versi aktif terakhir.
+
 ---
 
 ## 2. Menjalankan Dashboard (Streamlit)

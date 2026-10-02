@@ -206,4 +206,3 @@ Sebelum peralihan, wajib tersedia:
 
 Rollback frontend dilakukan dengan mengembalikan alamat utama ke Streamlit. Keduanya tetap memakai API dan data yang sama, sehingga rollback tidak membutuhkan penyalinan data balik.
 
-**Paket implementasi pertama sebaiknya mencakup tahap 1: satu pipeline bersama, kontrak data, pemisahan demo, dan pengujian inti.** Paket ini langsung mengurangi risiko MVP sekaligus menjadi fondasi backend FastAPI dan frontend Next.js.

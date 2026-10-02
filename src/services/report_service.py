@@ -5,6 +5,8 @@ import logging
 import math
 from pathlib import Path
 
+from services.report_repository import JsonReportRepository, configured_report_repository
+
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 _REPORT_PATH = _DATA_DIR / "report_data.json"
@@ -13,13 +15,25 @@ _DEMO_REPORT_PATH = _DATA_DIR / "demo_report_data.json"
 _logger = logging.getLogger(__name__)
 
 
+def _repository(path: Path | None = None):
+    if path is not None:
+        return JsonReportRepository(path)
+    return configured_report_repository(path or _REPORT_PATH)
+
+
 def load_report(path: Path | None = None) -> dict | None:
     """Baca laporan aktif terakhir yang sudah diterbitkan."""
-    report_path = path or _REPORT_PATH
-    if not report_path.exists():
-        return None
-    with report_path.open(encoding="utf-8") as source:
-        return json.load(source)
+    return _repository(path).get_active()
+
+
+def load_report_version(report_id: str, path: Path | None = None) -> dict | None:
+    """Baca versi laporan berdasarkan ID tetap."""
+    return _repository(path).get_version(report_id)
+
+
+def list_report_versions(limit: int = 30, path: Path | None = None) -> list[dict]:
+    """Daftar versi laporan terbaru yang tersimpan."""
+    return _repository(path).list_versions(limit)
 
 
 def load_snapshot(path: Path | None = None) -> dict:
@@ -66,15 +80,15 @@ def validate_report(report: dict) -> None:
 def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
                      snapshot_path: Path | None = None) -> dict:
     """Bangun dan validasi laporan dari payload snapshot yang diberikan, lalu terbitkan."""
-    from calculate import build_report_data, persist_json_data, persist_report_data
+    from calculate import build_report_data, persist_json_data
 
     report = build_report_data(snapshot)
     report["schema_version"] = 1
     report["_source_snapshot"] = snapshot
     validate_report(report)
 
-    # File laporan adalah satu-satunya penanda data aktif dan ditulis atomik.
-    persist_report_data(report, report_path or _REPORT_PATH)
+    # Repository menyimpan versi immutable, lalu mengganti laporan aktif atomik.
+    report = _repository(report_path).publish(report)
 
     # Snapshot terpisah hanya menjadi salinan diagnostik; UI membaca salinan
     # yang tertanam pada laporan aktif agar kedua tampilan memakai versi sama.
