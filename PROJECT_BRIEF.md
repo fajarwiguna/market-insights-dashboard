@@ -87,7 +87,7 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend pengganti | Next.js + TypeScript | Kerangka dashboard baca-saja tersedia di `web/`; belum dibuild atau disetarakan fiturnya |
+| Frontend pengganti | Next.js + TypeScript | Kerangka dashboard baca-saja tersedia di `web/`; production build dan pemeriksaan TypeScript berhasil. Kesetaraan fitur MVP belum tercapai |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.

@@ -1,6 +1,6 @@
 **Dokumen kerja sementara untuk migrasi bertahap ke FastAPI + Next.js.** Peta struktur proyek akhir pada bagian 2 menjadi acuan saat pemindahan kode. Simpan dokumen ini sampai semua tahap migrasi selesai dan struktur akhir diverifikasi; setelah itu pindahkan ringkasan yang masih diperlukan ke dokumentasi permanen dan hapus berkas ini sesuai arahan pemilik proyek.
 
-Status implementasi berubah sejak rancangan awal: fondasi layanan, PostgreSQL, API, antrean refresh, dan worker telah dibuat. Lihat `PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
+Status implementasi berubah sejak rancangan awal: fondasi layanan, PostgreSQL, API, antrean refresh, dan worker telah dibuat. Kerangka Next.js baca-saja kini tersedia di `web/`; production build dan pemeriksaan TypeScript berhasil pada Node.js 24.21.0. Ini memverifikasi scaffold, belum membuktikan kesetaraan fitur dengan Streamlit. Lihat `PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
 
 Asumsi kerja: aplikasi digunakan oleh tim internal, sebagian besar aktivitas berupa membaca laporan, dan pembaruan data dilakukan oleh operator atau scheduler. Rancangan ini menjadi peta migrasi; implementasi berjalan bertahap.
 
