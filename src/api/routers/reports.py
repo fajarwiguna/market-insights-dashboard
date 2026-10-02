@@ -9,6 +9,7 @@ from pathlib import Path
 from api.dependencies import require_read_access
 from api.schemas import JobResponse, ReportResponse
 from config import report_artifact_directory
+from domain.market_analysis import build_impacts, build_insights, build_summary
 from services import report_service
 from services.job_repository import PostgresJobRepository
 
@@ -28,7 +29,16 @@ def _read_report(report_id: str | None = None) -> dict:
             raise HTTPException(status_code=404, detail="Laporan aktif belum tersedia.")
         raise HTTPException(status_code=404, detail="Versi laporan tidak ditemukan.")
     # Snapshot provider tertanam hanya untuk menjaga konsistensi internal UI.
-    return {key: value for key, value in report.items() if not key.startswith("_")}
+    public_report = {key: value for key, value in report.items() if not key.startswith("_")}
+    # Teks analisis dibuat backend agar dashboard baru dan Streamlit memakai
+    # aturan bisnis yang sama. Hilangkan penanda tebal lama; UI mengatur gaya sendiri.
+    public_report["summary"] = build_summary(public_report)
+    public_report["insights"] = [
+        {**item, "text": item.get("text", "").replace("<b>", "").replace("</b>", "")}
+        for item in build_insights(public_report)
+    ]
+    public_report["impacts"] = build_impacts(public_report)
+    return public_report
 
 
 @router.get("/latest", response_model=ReportResponse, summary="Baca laporan aktif")

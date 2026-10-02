@@ -114,12 +114,86 @@ function MarketReferences({ report }: { report: MarketReport }) {
     { label: "Spread SBN 10Y – UST 10Y", value: typeof spread === "number" ? `${numberFormat.format(spread)} bp` : "—" },
   ];
   return (
-    <section className="reference-panel" aria-label="Indikator acuan">
+    <section className="reference-panel" id="references" aria-label="Indikator acuan">
       <div><p className="eyebrow">MONETARY & SPREAD</p><h2>Indikator acuan</h2></div>
       <div className="reference-items">
         {items.map((item) => <div className="reference-item" key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}
       </div>
     </section>
+  );
+}
+
+const glossary = [
+  ["USD/IDR", "Jumlah Rupiah untuk membeli 1 dolar AS. Kenaikan angka berarti Rupiah melemah."],
+  ["DXY", "Indeks kekuatan dolar AS terhadap sejumlah mata uang utama dunia."],
+  ["Yield", "Imbal hasil tahunan obligasi. Yield naik biasanya berarti harga obligasi turun."],
+  ["Spread", "Selisih imbal hasil SBN dan UST pada tenor yang sama."],
+  ["BI Rate", "Suku bunga acuan Bank Indonesia yang menjadi salah satu patokan bunga kredit dan deposito."],
+  ["INDONIA", "Suku bunga transaksi pinjam-meminjam Rupiah antarbank untuk tenor semalam."],
+  ["IHSG", "Indeks yang menggambarkan pergerakan harga saham di Bursa Efek Indonesia."],
+  ["Poin basis (bp)", "Satuan perubahan suku bunga. 1 bp = 0,01%; 25 bp = 0,25%."],
+  ["SBN", "Surat Berharga Negara, yaitu surat utang yang diterbitkan pemerintah Indonesia."],
+  ["UST", "Surat utang pemerintah Amerika Serikat yang sering menjadi acuan pasar global."],
+  ["JISDOR", "Kurs referensi dolar AS terhadap Rupiah yang diterbitkan Bank Indonesia."],
+];
+
+function ReaderGuide({ report }: { report: MarketReport }) {
+  const insights = report.insights ?? [];
+  const impacts = report.impacts ?? [];
+  const sources = report.sources ?? [];
+  const phei = report.phei_meta;
+
+  return (
+    <>
+      <section className="reader-section" id="insights" aria-labelledby="insights-heading">
+        <div className="section-heading"><div><p className="eyebrow">RINGKASAN & ANALISIS</p><h2 id="insights-heading">Insight Hari Ini</h2></div></div>
+        <p className="summary-copy">{report.summary || "Data hari ini belum lengkap untuk menyusun ringkasan otomatis."}</p>
+        {insights.length ? <div className="insight-grid">{insights.map((item, index) => (
+          <article className={`insight-card tone-${item.tone || "flat"}`} key={`${item.title || "insight"}-${index}`}>
+            <h3>{item.title || "Sorotan pasar"}</h3><p>{item.text || "—"}</p>
+            {item.dampak && <small><strong>Artinya:</strong> {item.dampak}</small>}
+          </article>
+        ))}</div> : <p className="empty-section">Belum ada sorotan untuk laporan ini.</p>}
+      </section>
+
+      <section className="reader-section" id="impacts" aria-labelledby="impacts-heading">
+        <div className="section-heading"><div><p className="eyebrow">KONTEKS PEMBACA</p><h2 id="impacts-heading">Apa Artinya untuk Anda</h2></div></div>
+        {impacts.length ? <div className="impact-grid">{impacts.map((item, index) => (
+          <article className="impact-card" key={`${item.title || "impact"}-${index}`}><h3>{item.title || "Dampak praktis"}</h3><p>{item.text || "—"}</p></article>
+        ))}</div> : <p className="empty-section">Dampak praktis belum tersedia untuk laporan ini.</p>}
+      </section>
+
+      <section className="reader-section" id="sources" aria-labelledby="sources-heading">
+        <div className="section-heading"><div><p className="eyebrow">VERIFIKASI DATA</p><h2 id="sources-heading">Sumber Data & Metode</h2></div><p>Periksa asal angka dan tanggal observasinya.</p></div>
+        {sources.length ? <div className="source-list">{sources.map((source, index) => (
+          <details className="source-detail" key={`${source.section || "source"}-${index}`}>
+            <summary>{source.section || "Sumber data"}{source.items?.length ? <span>{source.items.length} instrumen</span> : null}</summary>
+            <div className="source-content">
+              {source.primary && <p><strong>Sumber utama:</strong> {source.primary}</p>}
+              {source.url && /^https?:\/\//i.test(source.url) && <p><strong>Tautan:</strong> <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a></p>}
+              {source.as_of_label && <p><strong>Per tanggal:</strong> {source.as_of_label}</p>}
+              {source.page_title && <p><strong>Judul halaman:</strong> {source.page_title}</p>}
+              {source.fetched_at && <p><strong>Diambil pada:</strong> {formatPublishedAt(source.fetched_at)}</p>}
+              {source.backup && <p><strong>Sumber pembanding:</strong> {source.backup}{source.backup_as_of ? ` (per ${source.backup_as_of})` : ""}</p>}
+              {source.note && <p><strong>Catatan:</strong> {source.note}</p>}
+              {!!source.items?.length && <ul>{source.items.map((item, itemIndex) => <li key={`${item.field || "field"}-${itemIndex}`}>
+                <code>{item.field || "Instrumen"}</code> · {item.source || source.primary || "sumber tidak dicatat"}
+                {item.as_of ? ` · per ${item.as_of}` : ""}{item.series ? ` · seri ${item.series}` : ""}{item.ttm ? ` · tenor ${item.ttm} tahun` : ""}
+              </li>)}</ul>}
+            </div>
+          </details>
+        ))}</div> : <p className="empty-section">Metadata sumber belum tersedia pada laporan ini.</p>}
+        {phei?.as_of_label && <p className="phei-note">Kurva imbal hasil PHEI yang dipakai bertanggal <strong>{phei.as_of_label}</strong>{phei.source_name ? ` · ${phei.source_name}` : ""}{phei.url ? <> · <a href={phei.url} target="_blank" rel="noreferrer">Lihat sumber</a></> : null}</p>}
+      </section>
+
+      <section className="reader-section" id="glossary" aria-labelledby="glossary-heading">
+        <div className="section-heading"><div><p className="eyebrow">PANDUAN PEMBACA</p><h2 id="glossary-heading">Glosarium & Cara Membaca</h2></div></div>
+        <div className="glossary-wrap"><table><thead><tr><th>Istilah</th><th>Arti sederhana</th></tr></thead><tbody>
+          {glossary.map(([term, meaning]) => <tr key={term}><th scope="row">{term}</th><td>{meaning}</td></tr>)}
+        </tbody></table></div>
+        <p className="guide-note"><strong>Cara membaca:</strong> perubahan harian dibandingkan dengan penutupan hari perdagangan sebelumnya. Arti “naik” bergantung pada indikator: kurs USD/IDR naik berarti Rupiah melemah, sedangkan indeks saham naik berarti pasar saham menguat. Tanggal data bisa berbeda antar sumber.</p>
+      </section>
+    </>
   );
 }
 
@@ -142,7 +216,11 @@ export function Dashboard({ report }: { report: MarketReport }) {
         <nav className="side-nav" aria-label="Navigasi dashboard">
           <a className="nav-link nav-active" href="#overview"><span>◫</span> Ringkasan</a>
           {groups.map((group) => <a className="nav-link" href={`#${group.key}`} key={group.key}><span>◦</span>{group.title}</a>)}
+          <a className="nav-link" href="#insights"><span>✳</span> Insight</a>
+          <a className="nav-link" href="#impacts"><span>⌁</span> Dampak</a>
           <a className="nav-link" href="#references"><span>⌁</span> Indikator acuan</a>
+          <a className="nav-link" href="#sources"><span>◎</span> Sumber</a>
+          <a className="nav-link" href="#glossary"><span>?</span> Glosarium</a>
         </nav>
         <div className="sidebar-bottom"><span className="sidebar-orb" />
           <p>Daily Market Report</p><small>Informasi pasar harian</small>
@@ -167,6 +245,8 @@ export function Dashboard({ report }: { report: MarketReport }) {
           </div>
           <div className="welcome-art" aria-hidden="true"><span className="art-line line-one" /><span className="art-line line-two" /><span className="art-line line-three" /><span className="art-point" /></div>
         </section>
+
+        <ReaderGuide report={report} />
 
         <section className="metrics-grid" aria-label="Angka utama">
           {featured.map((item) => <MetricCard key={item.title} title={item.title} section={item.section} metric={findMetric(report, item.section, item.fragments)} />)}

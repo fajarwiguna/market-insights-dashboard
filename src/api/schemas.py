@@ -21,6 +21,10 @@ class ReportResponse(BaseModel):
     indices: dict[str, dict[str, Any]] = Field(default_factory=dict)
     yields: dict[str, dict[str, Any]] = Field(default_factory=dict)
     commodities: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    summary: str | None = None
+    insights: list[dict[str, Any]] = Field(default_factory=list)
+    impacts: list[dict[str, Any]] = Field(default_factory=list)
+    sources: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class HistoryPoint(BaseModel):

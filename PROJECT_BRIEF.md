@@ -87,7 +87,7 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend pengganti | Next.js + TypeScript | Kerangka dashboard baca-saja tersedia di `web/`; production build dan pemeriksaan TypeScript berhasil. Kesetaraan fitur MVP belum tercapai |
+| Frontend pengganti | Next.js + TypeScript | Dashboard baca di `web/` kini menampilkan ringkasan, insight, dampak praktis, indikator, detail pasar, sumber, dan glosarium dari API. Production build serta pemeriksaan sintaks Python berhasil; kesetaraan dan integrasi runtime belum diverifikasi |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.
@@ -268,7 +268,7 @@ Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor
 | 2. Repository | Laporan aktif dan versi di PostgreSQL | Sudah diterapkan | Impor, kegagalan publikasi, dan pemulihan penyimpanan tervalidasi |
 | 3. API | Kontrak baca dan akses backend yang stabil | Implementasi awal tersedia | Kontrak, autentikasi, serta kesetaraan angka diverifikasi melalui integrasi |
 | 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; scheduler, job ekspor, dan endpoint unduh tersedia | Integrasi terverifikasi, jadwal bisnis, penyimpanan artefak persisten, serta pemulihan tersedia |
-| 5. Frontend baru | Next.js mencapai kesetaraan fitur MVP | Tahap awal: dashboard baca laporan aktif | Alur baca, detail, status, tema, dan unduhan diterima pengguna |
+| 5. Frontend baru | Next.js mencapai kesetaraan fitur MVP | Dashboard baca dengan ringkasan, insight, dampak, detail, sumber, dan glosarium; build berhasil | Integrasi API dengan data representatif dan penerimaan alur baca diverifikasi; grafik, tema, serta unduhan masih perlu dipindahkan |
 | 6. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
 | 7. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |
 
