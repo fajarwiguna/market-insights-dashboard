@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import uuid
 from contextlib import contextmanager
+from datetime import datetime
 
 
 class PostgresJobRepository:
@@ -33,6 +34,55 @@ class PostgresJobRepository:
 
     def enqueue_export(self, report_id: str) -> dict:
         return self._enqueue("export_pdf", report_id=report_id)
+
+    def enqueue_scheduled_refresh(self, schedule_name: str, scheduled_for: datetime) -> dict:
+        """Buat satu job per slot jadwal secara atomik dan aman untuk beberapa scheduler."""
+        if scheduled_for.tzinfo is None:
+            raise ValueError("Waktu jadwal harus memiliki timezone.")
+        job_id = None
+        created = False
+        with self._connect() as connection:
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"{schedule_name}:{scheduled_for.isoformat()}",),
+            )
+            scheduled = connection.execute(
+                "SELECT job_id FROM refresh_schedule_runs WHERE schedule_name = %s AND dates = %s",
+                (schedule_name, scheduled_for),
+            ).fetchone()
+            if scheduled:
+                job_id = scheduled["job_id"]
+            else:
+                row = connection.execute(
+                    """INSERT INTO refresh_jobs (job_id, job_type, status, report_id)
+                       VALUES (%s, 'refresh', 'queued', NULL)
+                       ON CONFLICT (job_type, (COALESCE(report_id, '')))
+                       WHERE status IN ('queued', 'running') DO NOTHING
+                       RETURNING job_id""",
+                    (uuid.uuid4(),),
+                ).fetchone()
+                if row:
+                    job_id = row["job_id"]
+                    created = True
+                    connection.execute(
+                        "INSERT INTO refresh_job_events (job_id, status, details) VALUES (%s, 'queued', '{}'::jsonb)",
+                        (job_id,),
+                    )
+                else:
+                    active = connection.execute(
+                        """SELECT job_id FROM refresh_jobs WHERE job_type = 'refresh'
+                           AND report_id IS NULL AND status IN ('queued', 'running')"""
+                    ).fetchone()
+                    if active is None:
+                        raise RuntimeError("Tidak dapat menemukan atau membuat job refresh terjadwal.")
+                    job_id = active["job_id"]
+
+                connection.execute(
+                    """INSERT INTO refresh_schedule_runs (schedule_name, dates, job_id)
+                       VALUES (%s, %s, %s)""",
+                    (schedule_name, scheduled_for, job_id),
+                )
+        return {"scheduled": created, "job": self.get_job(str(job_id))}
 
     def _enqueue(self, job_type: str, *, report_id: str | None = None) -> dict:
         job_id = uuid.uuid4()

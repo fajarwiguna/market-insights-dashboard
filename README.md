@@ -121,6 +121,21 @@ Saat `DATABASE_URL` diatur, tombol refresh dashboard dan perintah CLI live memas
 ke antrean ini. Jalankan worker agar permintaan diproses; setelah status berhasil, muat ulang
 dashboard untuk melihat laporan terbaru. Mode tanpa PostgreSQL mempertahankan refresh lokal.
 
+### Scheduler refresh
+
+Isi `REFRESH_TIMES` di `.env` dengan satu atau lebih jam lokal format `HH:MM`, dipisahkan
+koma, misalnya `16:30`. Zona waktu default `Asia/Jakarta` dan dapat diubah melalui
+`REFRESH_TIMEZONE`. Jalankan scheduler sebagai proses terpisah dari worker:
+
+```powershell
+python src/scheduler/main.py
+```
+
+Scheduler mencatat setiap slot secara persisten di PostgreSQL, sehingga restart dan beberapa
+instans scheduler tidak mengantrekan slot yang sama berulang kali. Slot yang terlewat masih
+dapat dimasukkan dalam jendela `REFRESH_CATCHUP_MINUTES` (default 10). Untuk deployment,
+jalankan scheduler dan worker sebagai proses layanan terpisah yang otomatis aktif kembali.
+
 ---
 
 ## 2. Menjalankan Dashboard (Streamlit)

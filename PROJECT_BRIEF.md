@@ -85,7 +85,7 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | Laporan berversi | Laporan aktif, ID laporan, arsip versi | Tersedia melalui repository JSON/PostgreSQL |
 | API | Baca laporan, riwayat instrumen, data live | Implementasi tersedia; kontrak masih dalam tahap transisi |
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
-| Scheduler terpusat | Menjadwalkan refresh melalui antrean | Belum diimplementasikan |
+| Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
 | Frontend pengganti | Next.js + TypeScript | Direncanakan; belum diimplementasikan |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
@@ -216,6 +216,7 @@ Pemindahan folder menjadi struktur `backend/` dan `web/` dilakukan saat memberi 
 | `refresh_jobs` | Status dan percobaan job refresh |
 | `refresh_job_events` | Riwayat peristiwa job |
 | `report_artifacts` | Metadata artefak PDF terkait versi laporan |
+| `refresh_schedule_runs` | Slot scheduler yang sudah diproses dan job terkait |
 | `schema_migrations` | Catatan migrasi schema yang diterapkan |
 
 `DATABASE_URL` menentukan penggunaan PostgreSQL. Tanpa konfigurasi tersebut, repository laporan/riwayat menggunakan JSON lokal. Jika PostgreSQL telah dikonfigurasi tetapi gagal diakses, sistem tidak beralih diam-diam ke JSON. Antrean job memerlukan PostgreSQL.
@@ -266,14 +267,14 @@ Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor
 | 1. Fondasi bersama | Perhitungan/publikasi terpisah dari tampilan | Sudah diterapkan; perlu terus dijaga | Semua jalur memakai aturan perhitungan dan validasi yang konsisten |
 | 2. Repository | Laporan aktif dan versi di PostgreSQL | Sudah diterapkan | Impor, kegagalan publikasi, dan pemulihan penyimpanan tervalidasi |
 | 3. API | Kontrak baca dan akses backend yang stabil | Implementasi awal tersedia | Kontrak, autentikasi, serta kesetaraan angka diverifikasi melalui integrasi |
-| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; job ekspor dan endpoint unduh tersedia | Integrasi terverifikasi, scheduler, penyimpanan artefak persisten, serta pemulihan tersedia |
+| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; scheduler, job ekspor, dan endpoint unduh tersedia | Integrasi terverifikasi, jadwal bisnis, penyimpanan artefak persisten, serta pemulihan tersedia |
 | 5. Frontend baru | Next.js mencapai kesetaraan fitur MVP | Belum dimulai | Alur baca, detail, status, tema, dan unduhan diterima pengguna |
 | 6. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
 | 7. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |
 
 Penguatan kualitas, keamanan, dan pengujian dilakukan sepanjang tahap; tidak seluruhnya ditunda sampai tahap terakhir.
 
-**Prioritas implementasi berikutnya:** memverifikasi perilaku antrean melalui API, Streamlit, dan worker; setelah itu menambah scheduler dan job ekspor sesuai kontrak yang sama. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
+**Prioritas implementasi berikutnya:** memverifikasi perilaku antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; setelah itu menguatkan penyimpanan artefak untuk deployment multi-host. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
 
 Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditetapkan.
 
