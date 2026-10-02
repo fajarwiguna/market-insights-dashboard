@@ -1,6 +1,6 @@
 **Dokumen kerja sementara untuk migrasi bertahap ke FastAPI + Next.js.** Peta struktur proyek akhir pada bagian 2 menjadi acuan saat pemindahan kode. Simpan dokumen ini sampai semua tahap migrasi selesai dan struktur akhir diverifikasi; setelah itu pindahkan ringkasan yang masih diperlukan ke dokumentasi permanen dan hapus berkas ini sesuai arahan pemilik proyek.
 
-Status implementasi berubah sejak rancangan awal: fondasi layanan, PostgreSQL, API, antrean refresh, dan worker telah dibuat. Dashboard Next.js baca-saja di `web/` menampilkan ringkasan, insight, dampak praktis, indikator, tabel detail, sumber, dan glosarium. API menggunakan fungsi analisis domain yang sama dengan Streamlit agar interpretasi tidak diduplikasi di frontend. Production build, pemeriksaan TypeScript, dan pemeriksaan sintaks endpoint berhasil; integrasi runtime dengan data representatif belum diverifikasi. Grafik, tema, dan unduhan masih masuk pekerjaan fitur berikutnya. Lihat `PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
+Status implementasi berubah sejak rancangan awal: fondasi layanan, PostgreSQL, API, antrean refresh, dan worker telah dibuat. Dashboard Next.js di `web/` mencakup ringkasan, insight, dampak praktis, indikator, tabel, sumber, glosarium, grafik riwayat, pengaturan tema/teks, serta alur ekspor PDF per versi melalui worker. API memakai fungsi analisis domain yang sama dengan Streamlit; token API tetap berada di server melalui route handler Next.js. Production build dan pemeriksaan TypeScript berhasil. Integrasi runtime dengan data/worker representatif belum diverifikasi. Monitor live dan refresh operator belum dipindahkan. Lihat `PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
 
 Asumsi kerja: aplikasi digunakan oleh tim internal, sebagian besar aktivitas berupa membaca laporan, dan pembaruan data dilakukan oleh operator atau scheduler. Rancangan ini menjadi peta migrasi; implementasi berjalan bertahap.
 
@@ -186,9 +186,10 @@ Pembacaan awal laporan menggunakan server component. Grafik, filter, tema, dan p
 | **2 — Konsistensi penyimpanan** | Repository, PostgreSQL, migrasi data lokal, versi laporan | Snapshot dan observasi aktif konsisten; kegagalan tidak mengganti laporan aktif |
 | **3 — FastAPI** | Endpoint baca, schema, otorisasi, pengujian kontrak | API dan Streamlit menghasilkan angka sama untuk `report_id` yang sama |
 | **4 — Worker** | Pembaruan terpisah, scheduler, status job, ekspor | Refresh tetap berjalan tanpa halaman terbuka dan dapat pulih setelah worker berhenti |
-| **5 — Next.js versi baca** | Ringkasan, KPI, tabel, sumber, dan tampilan responsif | Tampilan baru setara dengan fitur baca MVP |
-| **6 — Fitur interaktif** | Grafik live, refresh operator, PDF, tema | Seluruh alur utama lulus pengujian menyeluruh |
+| **5 — Next.js versi baca** | Ringkasan, KPI, tabel, sumber, glosarium, grafik riwayat, tema/teks, dan ekspor PDF per versi | Integrasi dengan data representatif, worker ekspor, tampilan responsif, dan alur baca diterima pengguna |
+| **6 — Fitur operasional** | Grafik live, refresh operator, dan polling status job | Izin operator, fallback sumber, serta keseluruhan alur live tervalidasi |
 | **7 — Peralihan** | Pilot pengguna, pemantauan, pengalihan alamat utama | Frontend baru memenuhi kriteria penerimaan dan jalur kembali tersedia |
+| **8 — Penguatan production** | Deployment, observabilitas, backup, akses, dan pemulihan | Kriteria operasional dan keamanan yang disepakati terpenuhi |
 
 Pada tahap 3–4, Streamlit diarahkan ke layanan yang sama, lalu ke API. Setelah itu, hanya worker yang menerbitkan pembaruan. Ini mencegah frontend lama dan baru menjadi dua penulis yang memiliki aturan berbeda.
 

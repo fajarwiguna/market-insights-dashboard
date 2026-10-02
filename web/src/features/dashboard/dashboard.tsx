@@ -1,5 +1,8 @@
-import type { InstrumentReading, MarketReport } from "@/lib/api/types";
+import type { HistoryPoint, InstrumentReading, MarketReport } from "@/lib/api/types";
 import { StatusPill } from "@/components/status-pill";
+import { AppearanceControls } from "@/components/appearance-controls";
+import { ExportReportButton } from "@/components/export-report-button";
+import { HistoryCharts } from "@/features/dashboard/history-charts";
 
 type MarketGroup = {
   key: "fx" | "indices" | "yields" | "commodities";
@@ -197,7 +200,7 @@ function ReaderGuide({ report }: { report: MarketReport }) {
   );
 }
 
-export function Dashboard({ report }: { report: MarketReport }) {
+export function Dashboard({ report, histories = {} }: { report: MarketReport; histories?: Record<string, HistoryPoint[]> }) {
   const featured = [
     { title: "Rupiah", section: "fx" as const, fragments: ["USD/IDR"] },
     { title: "IHSG", section: "indices" as const, fragments: ["IHSG"] },
@@ -218,6 +221,7 @@ export function Dashboard({ report }: { report: MarketReport }) {
           {groups.map((group) => <a className="nav-link" href={`#${group.key}`} key={group.key}><span>◦</span>{group.title}</a>)}
           <a className="nav-link" href="#insights"><span>✳</span> Insight</a>
           <a className="nav-link" href="#impacts"><span>⌁</span> Dampak</a>
+          <a className="nav-link" href="#history"><span>⌁</span> Grafik</a>
           <a className="nav-link" href="#references"><span>⌁</span> Indikator acuan</a>
           <a className="nav-link" href="#sources"><span>◎</span> Sumber</a>
           <a className="nav-link" href="#glossary"><span>?</span> Glosarium</a>
@@ -228,14 +232,14 @@ export function Dashboard({ report }: { report: MarketReport }) {
       </aside>
 
       <main className="main-content" id="overview">
-        <header className="topbar"><span>DAILY MARKET INTELLIGENCE</span><StatusPill demo={report.is_demo} /></header>
+        <header className="topbar"><span>DAILY MARKET INTELLIGENCE</span><div className="topbar-actions"><StatusPill demo={report.is_demo} /><AppearanceControls /></div></header>
         <section className="page-intro">
           <div><p className="eyebrow">PASAR KEUANGAN · INDONESIA & GLOBAL</p>
             <h1>Market <span>Today</span></h1>
             <p className="intro-copy">Ringkasan pergerakan pasar dalam satu tampilan.</p>
           </div>
           <div className="report-date"><span>TANGGAL LAPORAN</span><strong>{report.report_date || report.report_date_iso || "—"}</strong>
-            <small>Dipublikasikan {formatPublishedAt(published)}</small></div>
+            <small>Dipublikasikan {formatPublishedAt(published)}</small><ExportReportButton reportId={report.report_id} /></div>
         </section>
 
         <section className="welcome-panel">
@@ -253,6 +257,7 @@ export function Dashboard({ report }: { report: MarketReport }) {
         </section>
 
         <MarketReferences report={report} />
+        {!report.is_demo && <HistoryCharts histories={histories} />}
         <div className="market-sections">
           {groups.map((group) => <DataTable key={group.key} group={group} report={report} />)}
         </div>

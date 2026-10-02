@@ -8,6 +8,8 @@ export type InstrumentReading = {
   [key: string]: unknown;
 };
 
+export type HistoryPoint = { dates: string; close: number };
+
 export type MarketReport = {
   report_id?: string | null;
   schema_version?: number;

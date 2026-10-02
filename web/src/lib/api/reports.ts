@@ -1,10 +1,33 @@
 import "server-only";
 
-import type { MarketReport } from "@/lib/api/types";
+import type { HistoryPoint, MarketReport } from "@/lib/api/types";
 
 export type LatestReportResult =
   | { kind: "available"; report: MarketReport }
   | { kind: "unavailable"; message: string };
+
+export async function getInstrumentHistory(instrumentId: string): Promise<HistoryPoint[]> {
+  const baseUrl = process.env.DAILY_MARKET_API_URL?.replace(/\/+$/, "");
+  const token = process.env.API_READ_TOKEN;
+  if (!baseUrl || !token) return [];
+
+  try {
+    const response = await fetch(`${baseUrl}/instruments/${encodeURIComponent(instrumentId)}/history`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return [];
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== "object" || !("points" in payload) || !Array.isArray(payload.points)) return [];
+    return payload.points.filter((point): point is HistoryPoint =>
+      !!point && typeof point === "object" && "dates" in point && typeof point.dates === "string" &&
+      "close" in point && typeof point.close === "number" && Number.isFinite(point.close)
+    );
+  } catch {
+    return [];
+  }
+}
 
 export async function getLatestReport(): Promise<LatestReportResult> {
   const baseUrl = process.env.DAILY_MARKET_API_URL?.replace(/\/+$/, "");
