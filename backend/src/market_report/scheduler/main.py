@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from market_report.config import load_environment
-from market_report.services.job_repository import PostgresJobRepository
+from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
 
 _logger = logging.getLogger("market_report.scheduler")

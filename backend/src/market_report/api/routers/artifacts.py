@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 
 from market_report.api.dependencies import require_read_access
 from market_report.config import report_artifact_directory
-from market_report.services.job_repository import PostgresJobRepository
+from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
 
 logger = logging.getLogger(__name__)

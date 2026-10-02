@@ -77,7 +77,7 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 Struktur tujuan menggunakan `backend/` untuk aplikasi Python modular, `frontend/` untuk
 Next.js, `docs/` untuk dokumentasi permanen, `tools/` untuk utilitas pengembang, dan `runtime/`
 untuk keluaran lokal. `legacy/streamlit/` serta `src/app.py` dipertahankan hanya selama masa
-transisi. Ini adalah target bertahap; saat ini direktori source Next.js masih bernama `web/`.
+transisi. Direktori source Next.js saat ini bernama `frontend/`.
 Rincian pemetaan dan tahapan pemindahan ada di [`project_migration.md`](../project_migration.md).
 
 ## 6. Lingkup fungsional dan kondisi saat ini
@@ -95,7 +95,7 @@ Rincian pemetaan dan tahapan pemindahan ada di [`project_migration.md`](../proje
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend pengganti | Next.js + TypeScript | Dashboard di direktori target `frontend/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Source saat ini masih berada di `web/`; production build berhasil, integrasi runtime dan penerimaan pengguna belum diverifikasi |
+| Frontend pengganti | Next.js + TypeScript | Dashboard di `frontend/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Production build berhasil, integrasi runtime dan penerimaan pengguna belum diverifikasi |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.
@@ -197,7 +197,8 @@ Streamlit masih memanggil layanan Python secara langsung. API dan worker menggun
 | `src/app.py` | Entry point kompatibilitas dashboard Streamlit |
 | `legacy/streamlit/` | Aplikasi lama serta komponen, tema, dan halamannya |
 | `backend/src/market_report/domain/` | Logika dan analisis pasar |
-| `backend/src/market_report/services/` | Alur laporan, repository, riwayat, live, ekspor, dan job |
+| `backend/src/market_report/services/` | Alur laporan, riwayat, live, ekspor, dan refresh |
+| `backend/src/market_report/infrastructure/repositories/` | Repository JSON dan PostgreSQL untuk laporan, riwayat, job, serta artefak |
 | `backend/src/market_report/presentation/` | Format angka dan komponen grafik/presentasi |
 | `backend/src/market_report/api/` | Endpoint, schema respons, dan autentikasi API |
 | `backend/src/market_report/worker/` | Pemrosesan antrean refresh |

@@ -140,17 +140,15 @@ jalankan scheduler dan worker sebagai proses layanan terpisah yang otomatis akti
 
 ### Frontend Next.js (tahap transisi)
 
-Frontend Next.js sedang dikembangkan berdampingan dengan Streamlit. Nama direktori tujuan
-adalah `frontend/`; saat ini kode masih berada di `web/`. Sampai pemindahan direktori dilakukan,
-gunakan jalur `web/` pada perintah di bawah. Halaman
-dashboard membaca laporan aktif melalui API. Gunakan Node.js 20.9 atau lebih baru, lalu
+Frontend Next.js berada di `frontend/` dan berjalan berdampingan dengan Streamlit selama masa
+transisi. Halaman dashboard membaca laporan aktif melalui API. Gunakan Node.js 20.9 atau lebih baru, lalu
 siapkan konfigurasi berdasarkan `.env.example` di direktori proyek untuk FastAPI dan worker.
-Untuk Next.js, salin `web/.env.example` menjadi `web/.env.local`; Next.js memuat konfigurasi
-frontend dari direktori saat ini. Nilai `API_READ_TOKEN` di `web/.env.local` harus sama
+Untuk Next.js, salin `frontend/.env.example` menjadi `frontend/.env.local`; Next.js memuat konfigurasi
+frontend dari direktori saat ini. Nilai `API_READ_TOKEN` di `frontend/.env.local` harus sama
 dengan yang ada di `.env` utama. Rahasia ini hanya dipakai server dan tidak masuk ke browser:
 
 ```powershell
-cd web
+cd frontend
 npm install
 npm run dev
 ```
@@ -389,11 +387,10 @@ Tambahkan di sidebar interval auto-rerun (contoh setiap 30 menit) dengan fragmen
 
 ---
 
-## 6. Struktur direktori target
+## 6. Struktur direktori
 
-Berikut arah struktur yang direncanakan. Pemindahan fisik dilakukan bertahap; saat ini source
-Next.js masih berada di `web/`, sedangkan nama targetnya `frontend/`. Lihat
-[`project_migration.md`](project_migration.md) untuk peta migrasi sementara.
+Berikut struktur saat ini beserta komponen transisi. Lihat [`project_migration.md`](project_migration.md)
+untuk target pemisahan lebih lanjut dan peta migrasi sementara.
 
 ```
 daily_market_report/
@@ -408,7 +405,7 @@ daily_market_report/
 ├── legacy/streamlit/          ← aplikasi lama, komponen, gaya, dan ikon
 ├── tests/                     ← pemeriksaan pipeline, PDF, live, dan UI lama
 ├── tools/                     ← alat pemeriksaan lokal
-├── frontend/                  ← nama tujuan; saat ini masih berada di web/
+├── frontend/                  ← aplikasi Next.js
 ├── data/, charts/, reports/   ← data dan hasil lokal selama transisi
 ├── requirements.txt           ← backend + Streamlit untuk pengembangan lokal
 ├── project_migration.md       ← peta migrasi sementara

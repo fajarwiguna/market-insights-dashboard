@@ -10,8 +10,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from market_report.config import load_environment
-from market_report.services.history_repository import JsonSbnHistoryRepository, PostgresSbnHistoryRepository
-from market_report.services.report_repository import JsonReportRepository, PostgresReportRepository
+from market_report.infrastructure.repositories.history_repository import (
+    JsonSbnHistoryRepository,
+    PostgresSbnHistoryRepository,
+)
+from market_report.infrastructure.repositories.report_repository import (
+    JsonReportRepository,
+    PostgresReportRepository,
+)
 
 
 def _split_sql_statements(sql: str) -> list[str]:

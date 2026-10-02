@@ -13,7 +13,7 @@ def worker_refresh_enabled() -> bool:
 def request_refresh() -> dict:
     """Antrekan refresh pada PostgreSQL; gunakan pipeline langsung untuk mode JSON lokal."""
     if worker_refresh_enabled():
-        from market_report.services.job_repository import PostgresJobRepository
+        from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
         return {"mode": "queued", "job": PostgresJobRepository.from_environment().enqueue_refresh()}
 
@@ -23,6 +23,6 @@ def request_refresh() -> dict:
 
 
 def get_refresh_job(job_id: str) -> dict | None:
-    from market_report.services.job_repository import PostgresJobRepository
+    from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
     return PostgresJobRepository.from_environment().get_job(job_id)

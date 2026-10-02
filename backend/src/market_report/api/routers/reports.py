@@ -11,7 +11,7 @@ from market_report.api.schemas import JobResponse, ReportResponse
 from market_report.config import report_artifact_directory
 from market_report.domain.market_analysis import build_impacts, build_insights, build_summary
 from market_report.services import report_service
-from market_report.services.job_repository import PostgresJobRepository
+from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
 
 logger = logging.getLogger(__name__)

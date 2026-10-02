@@ -1,6 +1,6 @@
 **Dokumen kerja sementara untuk migrasi bertahap ke FastAPI + Next.js.** Peta struktur proyek akhir pada bagian 2 menjadi acuan saat pemindahan kode. Simpan dokumen ini sampai semua tahap migrasi selesai dan struktur akhir diverifikasi; setelah itu pindahkan ringkasan yang masih diperlukan ke dokumentasi permanen dan hapus berkas ini sesuai arahan pemilik proyek.
 
-Status implementasi berubah sejak rancangan awal: backend sekarang memakai package Python `market_report` pada `backend/src/market_report/`, dengan konfigurasi setuptools di `backend/pyproject.toml` dan dependensi backend tersendiri. Migrasi SQL tetap berada di `backend/migrations/`; Streamlit lama ada di `legacy/streamlit/` dan `src/app.py` tetap menjadi entry point kompatibilitas. Direktori tujuan frontend bernama `frontend/`; source Next.js saat ini masih berada di `web/` sampai pemindahan tahap akhir dilakukan. Dashboard mencakup ringkasan, insight, dampak praktis, indikator, tabel, sumber, glosarium, grafik riwayat, pengaturan tema/teks, ekspor PDF per versi, monitor live, dan refresh melalui worker. API memakai fungsi analisis domain yang sama dengan Streamlit; token baca/operator tetap berada di server melalui route handler Next.js. Refresh frontend memakai sesi operator bertanda tangan dengan cookie HttpOnly; kata sandi operator dan secret sesi merupakan konfigurasi server terpisah. Riwayat SBN kini disimpan bersama versi laporan baru untuk pembuatan PDF. Tes pipeline, PDF, live, smoke test Streamlit, compileall, instalasi editable package, dan health check API berhasil setelah pengemasan backend. Uji alur runtime worker, pembatasan login, serta kontrol akses pada lingkungan deployment belum diverifikasi. Lihat `docs/PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
+Status implementasi berubah sejak rancangan awal: backend sekarang memakai package Python `market_report` pada `backend/src/market_report/`, dengan konfigurasi setuptools di `backend/pyproject.toml` dan dependensi backend tersendiri. Migrasi SQL tetap berada di `backend/migrations/`; Streamlit lama ada di `legacy/streamlit/` dan `src/app.py` tetap menjadi entry point kompatibilitas. Frontend Next.js berada di `frontend/` dan mencakup ringkasan, insight, dampak praktis, indikator, tabel, sumber, glosarium, grafik riwayat, pengaturan tema/teks, ekspor PDF per versi, monitor live, dan refresh melalui worker. API memakai fungsi analisis domain yang sama dengan Streamlit; token baca/operator tetap berada di server melalui route handler Next.js. Refresh frontend memakai sesi operator bertanda tangan dengan cookie HttpOnly; kata sandi operator dan secret sesi merupakan konfigurasi server terpisah. Riwayat SBN kini disimpan bersama versi laporan baru untuk pembuatan PDF. Tes pipeline, PDF, live, smoke test Streamlit, compileall, instalasi editable package, dan health check API berhasil setelah pengemasan backend. Uji alur runtime worker, pembatasan login, serta kontrol akses pada lingkungan deployment belum diverifikasi. Lihat `docs/PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
 
 Asumsi kerja: aplikasi digunakan oleh tim internal, sebagian besar aktivitas berupa membaca laporan, dan pembaruan data dilakukan oleh operator atau scheduler. Rancangan ini menjadi peta migrasi; implementasi berjalan bertahap.
 
@@ -39,7 +39,7 @@ FastAPI mendukung pemisahan endpoint melalui router modular. Next.js dapat memis
 
 **2. Struktur proyek yang dituju**
 
-Susunan berikut adalah target akhir, bukan gambaran direktori yang seluruhnya sudah tersedia. Direktori Next.js akan bernama `frontend/`; source yang sekarang ada di `web/` dipindahkan saat tahap perapihan akhir. Backend tetap satu aplikasi Python modular. Pecah tanggung jawab di dalam package secara bertahap, dan pertahankan jalur kompatibilitas Streamlit sampai penggantinya dinyatakan siap.
+Susunan berikut adalah target akhir, bukan gambaran direktori yang seluruhnya sudah tersedia. Backend tetap satu aplikasi Python modular. Pecah tanggung jawab di dalam package secara bertahap, dan pertahankan jalur kompatibilitas Streamlit sampai penggantinya dinyatakan siap.
 
 ```
 daily_market_report/
@@ -52,14 +52,13 @@ daily_market_report/
 │       ├── domain/
 │       ├── application/
 │       ├── infrastructure/
-│       │   ├── providers/
-│       │   ├── repositories/
-│       │   └── rendering/
+│       │   ├── providers/      # adapter Yahoo/PHEI/BI pada tahap berikutnya
+│       │   └── repositories/  # repository JSON dan PostgreSQL
 │       ├── scheduler/
 │       ├── worker/
 │       ├── cli/
 │       └── config.py
-├── frontend/                 # Next.js; saat ini source masih berada di web/
+├── frontend/                 # aplikasi Next.js
 │   ├── public/
 │   └── src/
 │       ├── app/
@@ -92,8 +91,8 @@ Pemetaan kode sekarang:
 | `backend/src/market_report/domain/market_analysis.py` | Pisahkan perhitungan/penilaian dari format angka dan HTML |
 | `backend/src/market_report/calculate.py` | Jadikan pembentukan laporan fungsi tanpa penulisan berkas |
 | `backend/src/market_report/fetch_data.py` | Pecah menjadi adapter Yahoo, PHEI, BI, dan sumber cadangan |
-| `backend/src/market_report/services/report_service.py` | Menjadi alur publikasi laporan bersama |
-| `backend/src/market_report/services/history_service.py` | Menyimpan observasi melalui repository |
+| `backend/src/market_report/services/report_service.py` | Alur publikasi laporan; repository kini di `infrastructure/repositories/` |
+| `backend/src/market_report/services/history_service.py` | Alur riwayat; repository kini di `infrastructure/repositories/` |
 | `backend/src/market_report/report_pdf.py` dan pembuat grafik | Tetap Python; dipanggil oleh layanan ekspor |
 | `legacy/streamlit/` | Menampung frontend Streamlit selama transisi; dilepas setelah pengganti diverifikasi |
 | `src/app.py` | Entry point kompatibilitas untuk menjalankan dashboard lama |

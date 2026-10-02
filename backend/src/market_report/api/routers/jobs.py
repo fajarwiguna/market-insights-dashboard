@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from market_report.api.dependencies import require_operator_access, require_read_access
 from market_report.api.schemas import JobResponse
-from market_report.services.job_repository import PostgresJobRepository
+from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
 
 logger = logging.getLogger(__name__)

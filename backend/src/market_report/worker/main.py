@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from market_report.services.job_repository import PostgresJobRepository
+from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 from market_report.services import export_service, history_service
 from market_report.services import report_service
 from market_report.config import report_artifact_directory

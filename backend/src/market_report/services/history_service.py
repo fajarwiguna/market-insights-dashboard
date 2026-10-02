@@ -3,7 +3,10 @@
 from datetime import datetime
 from pathlib import Path
 
-from market_report.services.history_repository import JsonSbnHistoryRepository, configured_history_repository
+from market_report.infrastructure.repositories.history_repository import (
+    JsonSbnHistoryRepository,
+    configured_history_repository,
+)
 
 
 _HISTORY_PATH = Path(__file__).resolve().parents[4] / "data" / "history_sbn.json"

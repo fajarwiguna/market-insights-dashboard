@@ -6,7 +6,10 @@ import math
 from contextlib import nullcontext
 from pathlib import Path
 
-from market_report.services.report_repository import JsonReportRepository, configured_report_repository
+from market_report.infrastructure.repositories.report_repository import (
+    JsonReportRepository,
+    configured_report_repository,
+)
 
 
 _DATA_DIR = Path(__file__).resolve().parents[4] / "data"
