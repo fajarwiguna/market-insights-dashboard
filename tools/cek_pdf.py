@@ -2,7 +2,7 @@
 Alat bantu developer: cetak teks per halaman dari PDF laporan.
 
 Dipakai untuk memeriksa hasil redesign tampilan tanpa harus membuka PDF.
-Jalankan:  python tools_cek_pdf.py
+Jalankan:  python tools/cek_pdf.py
 """
 from __future__ import annotations
 import base64
@@ -13,8 +13,8 @@ import sys
 import zlib
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT / "src"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
 
 from report_pdf import build_pdf                     # noqa: E402
 

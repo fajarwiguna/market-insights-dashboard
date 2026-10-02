@@ -85,7 +85,7 @@ def apply_schema_migrations(database_url: str) -> None:
     """Jalankan migrasi schema yang idempotent sebelum memindahkan data."""
     import psycopg
 
-    migrations_dir = Path(__file__).resolve().parents[1] / "migrations"
+    migrations_dir = Path(__file__).resolve().parent / "migrations"
     with psycopg.connect(database_url) as connection:
         connection.execute(
             """CREATE TABLE IF NOT EXISTS schema_migrations (

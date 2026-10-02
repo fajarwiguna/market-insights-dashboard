@@ -186,15 +186,15 @@ Streamlit masih memanggil layanan Python secara langsung. API dan worker menggun
 
 | Lokasi | Tanggung jawab |
 |---|---|
-| `src/app.py` | Entry point dashboard Streamlit |
-| `src/frontend/` | Komponen, tema, dan halaman Streamlit |
-| `src/domain/` | Logika dan analisis pasar |
-| `src/services/` | Alur laporan, repository, riwayat, live, ekspor, dan job |
-| `src/presentation/` | Format angka dan komponen grafik/presentasi |
-| `src/api/` | Endpoint, schema respons, dan autentikasi API |
-| `src/worker/` | Pemrosesan antrean refresh |
-| `src/fetch_data.py`, `src/calculate.py` | Pengambilan sumber dan pembentukan laporan |
-| `migrations/` | Migrasi schema PostgreSQL |
+| `src/app.py` | Entry point kompatibilitas dashboard Streamlit |
+| `legacy/streamlit/` | Aplikasi lama serta komponen, tema, dan halamannya |
+| `backend/domain/` | Logika dan analisis pasar |
+| `backend/services/` | Alur laporan, repository, riwayat, live, ekspor, dan job |
+| `backend/presentation/` | Format angka dan komponen grafik/presentasi |
+| `backend/api/` | Endpoint, schema respons, dan autentikasi API |
+| `backend/worker/` | Pemrosesan antrean refresh |
+| `backend/fetch_data.py`, `backend/calculate.py` | Pengambilan sumber dan pembentukan laporan |
+| `backend/migrations/` | Migrasi schema PostgreSQL |
 | `tests/` | Pengujian yang tersedia |
 | `data/`, `charts/`, `reports/` | Data lokal dan keluaran pipeline |
 
@@ -258,7 +258,7 @@ Antrean mendukung deduplikasi job aktif per jenis/versi, pengambilan job dengan 
 
 Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Pemulihan setelah crash masih dapat menerbitkan versi tambahan; idempotensi publikasi dan jeda retry menjadi pekerjaan lanjutan.
 
-Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru.
+Skrip `backend/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru.
 
 ## 13. Roadmap dan urutan prioritas
 
@@ -337,9 +337,10 @@ Ketergantungan utama meliputi akses database, ketersediaan penyedia data, format
 
 ### Dokumen pendamping
 
-- [README.md](README.md): instalasi, menjalankan aplikasi, konfigurasi, dan penggunaan teknis.
-- [project_migration.md](project_migration.md): dokumen migrasi sementara. Peta struktur kode akhir mengacu pada bagian struktur proyek di dalamnya. Dokumen ini tetap dipakai selama migrasi, lalu dipindahkan/dirangkum ke acuan permanen dan dihapus hanya setelah tahap migrasi selesai serta struktur akhir telah diverifikasi.
-- [src/](src/): implementasi berjalan sebagai rujukan perilaku aplikasi.
-- [migrations/](migrations/): riwayat perubahan schema database.
+- [README.md](../README.md): instalasi, menjalankan aplikasi, konfigurasi, dan penggunaan teknis.
+- [project_migration.md](../project_migration.md): dokumen migrasi sementara. Peta struktur kode akhir mengacu pada bagian struktur proyek di dalamnya. Dokumen ini tetap dipakai selama migrasi, lalu dipindahkan/dirangkum ke acuan permanen dan dihapus hanya setelah tahap migrasi selesai serta struktur akhir telah diverifikasi.
+- [src/](../src/): entry point kompatibilitas dan ikon Streamlit.
+- [backend/](../backend/): layanan API, domain, worker, scheduler, dan migrasi.
+- [legacy/streamlit/](../legacy/streamlit/): dashboard Streamlit selama transisi.
 
 Brief ini merupakan acuan holistik produk. README menjadi panduan menjalankan proyek, sedangkan rancangan migrasi memberikan detail arah teknis.

@@ -1,4 +1,4 @@
-"""Entrypoint FastAPI; jalankan dengan uvicorn api.main:app --app-dir src."""
+"""Entrypoint FastAPI; jalankan dengan uvicorn api.main:app --app-dir backend."""
 
 from fastapi import FastAPI
 

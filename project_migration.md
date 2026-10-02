@@ -1,6 +1,6 @@
 **Dokumen kerja sementara untuk migrasi bertahap ke FastAPI + Next.js.** Peta struktur proyek akhir pada bagian 2 menjadi acuan saat pemindahan kode. Simpan dokumen ini sampai semua tahap migrasi selesai dan struktur akhir diverifikasi; setelah itu pindahkan ringkasan yang masih diperlukan ke dokumentasi permanen dan hapus berkas ini sesuai arahan pemilik proyek.
 
-Status implementasi berubah sejak rancangan awal: fondasi layanan, PostgreSQL, API, antrean refresh, dan worker telah dibuat. Dashboard Next.js di `web/` mencakup ringkasan, insight, dampak praktis, indikator, tabel, sumber, glosarium, grafik riwayat, pengaturan tema/teks, ekspor PDF per versi, monitor live, dan refresh melalui worker. API memakai fungsi analisis domain yang sama dengan Streamlit; token baca/operator tetap berada di server melalui route handler Next.js. Refresh web memakai sesi operator bertanda tangan dengan cookie HttpOnly; kata sandi operator dan secret sesi merupakan konfigurasi server terpisah. Riwayat SBN kini disimpan bersama versi laporan baru untuk pembuatan PDF. Production build dan pemeriksaan TypeScript berhasil. Uji alur runtime API/worker, pembatasan login, serta kontrol akses pada lingkungan deployment belum diverifikasi. Lihat `PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
+Status implementasi berubah sejak rancangan awal: modul API, domain, layanan, worker, scheduler, dan migrasi schema kini dihimpun di `backend/`; import Python masih memakai layout transisi dan belum menjadi package terpasang. Streamlit lama berada di `legacy/streamlit/`, dengan `src/app.py` sebagai entry point kompatibilitas. Dashboard Next.js di `web/` mencakup ringkasan, insight, dampak praktis, indikator, tabel, sumber, glosarium, grafik riwayat, pengaturan tema/teks, ekspor PDF per versi, monitor live, dan refresh melalui worker. API memakai fungsi analisis domain yang sama dengan Streamlit; token baca/operator tetap berada di server melalui route handler Next.js. Refresh web memakai sesi operator bertanda tangan dengan cookie HttpOnly; kata sandi operator dan secret sesi merupakan konfigurasi server terpisah. Riwayat SBN kini disimpan bersama versi laporan baru untuk pembuatan PDF. Production build, pemeriksaan TypeScript, tes pipeline, PDF, live, dan smoke test Streamlit berhasil. Uji alur runtime worker, pembatasan login, serta kontrol akses pada lingkungan deployment belum diverifikasi. Lihat `docs/PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
 
 Asumsi kerja: aplikasi digunakan oleh tim internal, sebagian besar aktivitas berupa membaca laporan, dan pembaruan data dilakukan oleh operator atau scheduler. Rancangan ini menjadi peta migrasi; implementasi berjalan bertahap.
 
@@ -90,8 +90,8 @@ Pemetaan kode sekarang:
 | `services/report_service.py` | Menjadi alur publikasi laporan bersama |
 | `services/history_service.py` | Menyimpan observasi melalui repository |
 | `report_pdf.py` dan pembuat grafik | Tetap Python; dipanggil oleh layanan ekspor |
-| `frontend/` | Dipertahankan sebagai frontend Streamlit selama transisi |
-| `app.py` | Menjadi pemanggil layanan atau API dengan tanggung jawab tampilan |
+| `legacy/streamlit/` | Menampung frontend Streamlit selama transisi; dilepas setelah pengganti diverifikasi |
+| `src/app.py` | Entry point kompatibilitas untuk menjalankan dashboard lama |
 
 **3\. Kontrak data sebelum frontend baru**
 

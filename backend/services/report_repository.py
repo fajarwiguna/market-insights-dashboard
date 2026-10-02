@@ -57,7 +57,7 @@ class JsonReportRepository:
 
 
 class PostgresReportRepository:
-    """Repository PostgreSQL; memerlukan schema dari migrations/001_report_versions.sql."""
+    """Repository PostgreSQL; memerlukan schema dari backend/migrations/001_report_versions.sql."""
 
     def __init__(self, database_url: str):
         if not database_url:

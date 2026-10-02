@@ -59,7 +59,8 @@ def process_one(repository: PostgresJobRepository) -> bool:
             repository.fail(job_id, owner_token, error)
     else:
         try:
-            history = report.get("_sbn_history") or history_service.load_sbn_history()
+            version_history = report.get("_sbn_history")
+            history = version_history if isinstance(version_history, list) else history_service.load_sbn_history()
             with repository.ownership_guard(job_id, owner_token):
                 pdf_path, download_name = export_service.save_report_pdf(
                     report, history, report_artifact_directory(),

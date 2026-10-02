@@ -131,7 +131,7 @@ def generate_rate_differential_chart(
     if not (dates and sbn_series and ust_series):
         raise ValueError(
             "Data untuk grafik belum tersedia. Jalankan pipeline lebih dulu "
-            "(python src/run_pipeline.py) atau teruskan sbn_series/ust_series/dates."
+            "(python backend/run_pipeline.py) atau teruskan sbn_series/ust_series/dates."
         )
     sbn_series = list(sbn_series)
     while len(sbn_series) < len(ust_series):   # samakan panjang dengan deret UST

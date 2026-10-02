@@ -16,7 +16,7 @@ Streamlit Dashboard  +  PDF Report
 
 ## Acuan proyek
 
-- [Project Brief](PROJECT_BRIEF.md): tujuan produk, pengguna, fitur, data, pengalaman pengguna, operasional, roadmap, dan kriteria keberhasilan.
+- [Project Brief](docs/PROJECT_BRIEF.md): tujuan produk, pengguna, fitur, data, pengalaman pengguna, operasional, roadmap, dan kriteria keberhasilan.
 - [Rancangan migrasi](project_migration.md): arah arsitektur dan rencana migrasi bertahap.
 
 README ini berisi panduan instalasi dan penggunaan teknis. Kondisi produk serta progres pengembangan dirangkum dalam Project Brief.
@@ -53,11 +53,11 @@ PostgreSQL, salin `.env.example` menjadi `.env`, isi kredensial database, lalu i
 lokal dengan:
 
 ```powershell
-python src/migrate_reports_to_postgres.py
+python backend/migrate_reports_to_postgres.py
 python -m streamlit run src/app.py
 ```
 
-Skrip migrasi menerapkan schema pada berkas `migrations/` secara otomatis. `DATABASE_URL`
+Skrip migrasi menerapkan schema pada berkas `backend/migrations/` secara otomatis. `DATABASE_URL`
 dipakai oleh layanan laporan untuk membaca dan menerbitkan versi. Tanpa
 variabel tersebut, layanan memakai repository JSON. Lakukan backup data JSON sebelum impor;
 skrip mempertahankan semua versi arsip yang memiliki ID, mengimpor hingga 30 titik riwayat
@@ -67,7 +67,7 @@ Seluruh kolom tanggal pada tabel PostgreSQL memakai nama `dates`.
 Untuk menerapkan perubahan schema tanpa mengimpor ulang snapshot lokal, jalankan:
 
 ```powershell
-python src/apply_schema_migrations.py
+python backend/apply_schema_migrations.py
 ```
 
 Perintah ini aman dijalankan berulang. `migrate_reports_to_postgres.py` tetap dipakai
@@ -80,7 +80,7 @@ FastAPI dapat dijalankan berdampingan dengan Streamlit. API memuat konfigurasi `
 sama dan membaca repository laporan yang sama:
 
 ```powershell
-python -m uvicorn api.main:app --app-dir src --host 127.0.0.1 --port 8000
+python -m uvicorn api.main:app --app-dir backend --host 127.0.0.1 --port 8000
 ```
 
 - `GET http://127.0.0.1:8000/api/v1/reports/latest` — laporan aktif.
@@ -107,7 +107,7 @@ token di server pemanggil, bukan di kode browser. Endpoint refresh memakai token
 Jalankan worker dalam terminal/proses terpisah:
 
 ```powershell
-python src/worker/main.py
+python backend/worker/main.py
 ```
 
 Worker memproses satu refresh pada satu waktu, mencoba ulang kegagalan hingga tiga kali,
@@ -130,7 +130,7 @@ koma, misalnya `16:30`. Zona waktu default `Asia/Jakarta` dan dapat diubah melal
 `REFRESH_TIMEZONE`. Jalankan scheduler sebagai proses terpisah dari worker:
 
 ```powershell
-python src/scheduler/main.py
+python backend/scheduler/main.py
 ```
 
 Scheduler mencatat setiap slot secara persisten di PostgreSQL, sehingga restart dan beberapa
@@ -214,7 +214,7 @@ diikutkan agar tidak ada panel putih tertinggal di tengah mode gelap.
 Untuk memastikan, jalankan:
 
 ```bash
-python tools_cek_kontras.py   # mengukur rasio kontras WCAG di kedua mode
+python tools/cek_kontras.py   # mengukur rasio kontras WCAG di kedua mode
 ```
 
 ---
@@ -325,13 +325,13 @@ Setelah live fetch, file berikut ikut ter-update:
 
 ```bash
 # Demo (angka sample)
-python src/run_pipeline.py --demo
+python backend/run_pipeline.py --demo
 
 # PostgreSQL: masukkan refresh ke antrean worker
-python src/run_pipeline.py
+python backend/run_pipeline.py
 
 # Mode JSON lokal saja: pakai snapshot yang sudah ada (cepat, offline)
-python src/run_pipeline.py --no-fetch
+python backend/run_pipeline.py --no-fetch
 ```
 
 Dalam mode PostgreSQL, perintah live mengantrekan refresh lalu keluar; worker harus
@@ -361,7 +361,7 @@ crontab -e
 Contoh: update setiap hari kerja jam **16:30 WIB** (setelah pasar tutup):
 
 ```cron
-30 16 * * 1-5  cd /path/ke/daily_market_report && /usr/bin/python3 src/run_pipeline.py >> logs/pipeline.log 2>&1
+30 16 * * 1-5  cd /path/ke/daily_market_report && /usr/bin/python3 backend/run_pipeline.py >> logs/pipeline.log 2>&1
 ```
 
 Lalu buka dashboard kapan saja — data sudah terisi dari cron, jadi tidak perlu klik apa pun di sidebar.
@@ -372,7 +372,7 @@ Lalu buka dashboard kapan saja — data sudah terisi dari cron, jadi tidak perlu
 2. Trigger: Daily, jam 16:30.
 3. Action: Start a program  
    - Program: `python`  
-   - Arguments: `src/run_pipeline.py`  
+   - Arguments: `backend/run_pipeline.py`
    - Start in: folder `daily_market_report`
 
 ### Opsi C — Auto-refresh di dalam Streamlit (opsional)
@@ -391,35 +391,29 @@ Tambahkan di sidebar interval auto-rerun (contoh setiap 30 menit) dengan fragmen
 
 ```
 daily_market_report/
-├── requirements.txt
-├── README.md                 ← file ini
-├── .gitignore                ← mengecualikan cache, data lokal, grafik, dan PDF hasil generate
+├── docs/PROJECT_BRIEF.md     ← tujuan produk, lingkup, status, dan roadmap
+├── backend/                   ← API, domain, layanan, worker, scheduler, dan migrasi
+│   ├── api/
+│   ├── calculate.py, fetch_data.py
+│   ├── domain/
+│   ├── migrations/            ← migrasi schema PostgreSQL berurutan
+│   ├── presentation/
+│   ├── report_pdf.py, run_pipeline.py
+│   ├── scheduler/
+│   ├── services/
+│   └── worker/
 ├── src/
-│   ├── app.py                ← Streamlit dashboard (tampilan utama)
-│   ├── fetch_data.py         ← ambil data (yfinance, PHEI, BI)
-│   ├── calculate.py          ← hitung change % / bp / spread
-│   ├── charts.py             ← Rate Differential + FX chart
-│   ├── report_pdf.py         ← generate PDF (+ ringkasan bahasa sederhana)
-│   ├── run_pipeline.py       ← entry point CLI
-│   ├── domain/               ← pencarian instrumen dan analisis pasar
-│   ├── services/             ← pipeline laporan, data live, riwayat, dan ekspor PDF
-│   ├── presentation/         ← format angka, metadata, warna, dan grafik
-│   └── frontend/             ← tema, komponen, sidebar, header, aset CSS, dan tampilan per bagian
-├── tests/
-│   ├── smoke_app.py          ← uji cepat: render dashboard & cek bagian halaman
-│   ├── test_live.py          ← uji logika angka langsung (overlay, riwayat, grafik)
-│   ├── test_pipeline.py      ← uji validasi, penerbitan snapshot, dan pemisahan demo
-│   └── test_pdf.py           ← uji PDF: isi PDF = angka yang tampil di dashboard
-├── data/
-│   ├── snapshot.json         ← raw fetch terakhir (lokal, tidak dilacak Git)
-│   ├── report_data.json      ← data siap tampil di dashboard (lokal, tidak dilacak Git)
-│   └── history_sbn.json      ← riwayat SBN 10Y berdasarkan tanggal publikasi (lokal)
-├── charts/
-│   └── *.png                 ← grafik hasil generate (lokal, tidak dilacak Git)
-└── reports/
-    └── *.pdf                 ← arsip PDF hasil generate (lokal, tidak dilacak Git)
+│   ├── app.py                ← entry point kompatibilitas Streamlit
+│   └── image.png             ← ikon Streamlit selama transisi
+├── legacy/streamlit/          ← aplikasi dan komponen Streamlit lama
+├── tests/                     ← pemeriksaan pipeline, PDF, live, dan UI lama
+├── tools/                     ← alat pemeriksaan lokal
+├── web/                       ← frontend Next.js
+├── data/, charts/, reports/   ← data dan hasil lokal selama transisi
+├── requirements.txt
+├── project_migration.md       ← peta migrasi sementara
+└── README.md
 ```
-
 Data pasar, riwayat, grafik, dan laporan PDF adalah keluaran lokal yang dikecualikan
 oleh `.gitignore`. Simpan salinan di lokasi lain bila ingin mengarsipkannya atau
 memindahkannya ke komputer lain.
@@ -431,11 +425,11 @@ python tests/smoke_app.py   # render dashboard & cek isi halaman  → HASIL: PAS
 python tests/test_live.py   # cek logika angka langsung & grafik  → HASIL: PASS
 python tests/test_pipeline.py # cek penerbitan snapshot & isolasi demo → HASIL: PASS
 python tests/test_pdf.py    # cek isi PDF = angka yang tampil      → HASIL: PASS
-python tools_cek_pdf.py     # cetak teks PDF per halaman (untuk cek tampilan)
-python tools_cek_kontras.py # ukur kontras teks di mode terang & gelap
+python tools/cek_pdf.py     # cetak teks PDF per halaman (untuk cek tampilan)
+python tools/cek_kontras.py # ukur kontras teks di mode terang & gelap
 ```
 
-`tools_cek_kontras.py` menjalankan dashboard sungguhan di browser, membuka
+`tools/cek_kontras.py` menjalankan dashboard sungguhan di browser, membuka
 bagian **Sumber Data**, lalu mengukur rasio kontras WCAG tiap teks terhadap
 latar induknya pada kedua mode. Ini menangkap kasus "teks putih di atas
 panel putih" yang tidak terlihat dari screenshot biasa.
@@ -464,7 +458,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 
 ## 8. Tips operasional
 
-1. **Setelah pasar tutup** (sekitar 16:00–17:00 WIB) → klik **🔄 Perbarui data dari sumber (live)** di sidebar, atau jalankan `python src/run_pipeline.py`.
+1. **Setelah pasar tutup** (sekitar 16:00–17:00 WIB) → klik **🔄 Perbarui data dari sumber (live)** di sidebar, atau jalankan `python backend/run_pipeline.py`.
 2. Siang hari / presentasi → biarkan dashboard memakai snapshot terakhir (tidak perlu klik perbarui data) agar cepat dan stabil.
 3. Jika PHEI atau BI lambat/error, pipeline tetap jalan dengan data yfinance; yield SBN bisa kosong sampai scraper sukses lagi.
 4. PDF terbaru bisa di-download langsung dari tombol di bawah dashboard.
@@ -479,7 +473,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 | Data pasar kosong / pembaruan ditolak | Periksa pesan error dan `data/snapshot.json`; pastikan terminal memiliki akses internet ke Yahoo Finance dan PHEI, lalu klik **🔄 Perbarui data dari sumber (live)** lagi. Pembaruan dengan kurang dari dua instrumen berhasil ditolak agar tidak menimpa laporan yang ada. |
 | Hanya sebagian instrumen yang muncul | Sumber berbeda dapat gagal secara terpisah. Cek bagian **Sumber Data & Metode** dan `data/snapshot.json`, lalu coba pembaruan lagi. |
 | BI Rate / INDONIA / JISDOR tampak lama | Jika halaman BI tidak merespons, pipeline memakai angka cadangan; periksa tanggal pada bagian Sumber Data & Metode. |
-| Perlu melihat data contoh | Jalankan `python src/run_pipeline.py --demo` hanya untuk demonstrasi lokal. Mode demo mengganti `data/report_data.json`. |
+| Perlu melihat data contoh | Jalankan `python backend/run_pipeline.py --demo` hanya untuk demonstrasi lokal. Mode demo mengganti `data/report_data.json`. |
 | Pembaruan data gagal | Cek koneksi dan akses jaringan ke sumber; coba lagi. Dashboard mempertahankan laporan terakhir yang berhasil disimpan. |
 | Tampilan terasa berubah / tidak nyaman dibaca | Klik tombol **🎨** di pojok kanan bawah → **↺ Kembalikan tampilan asli**, atau refresh halaman (pengaturan tampilan tidak disimpan) |
 | Perlu memastikan tampilan tidak rusak setelah diubah | Jalankan `python tests/smoke_app.py` (harus berakhir `HASIL: PASS`) |
@@ -498,7 +492,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 Setiap hari (manual atau cron)
         │
         ▼
-python src/run_pipeline.py     ← fetch live + calculate + chart + PDF
+python backend/run_pipeline.py     ← fetch live + calculate + chart + PDF
         │
         ▼
 data/report_data.json ter-update

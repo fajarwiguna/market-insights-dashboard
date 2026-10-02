@@ -7,7 +7,7 @@ tidak sejalan dengan mode tampilan, teksnya bisa putih di atas putih.
 
 Skrip ini menjalankan dashboard sungguhan, membuka bagian "Sumber Data",
 lalu MENGUKUR rasio kontras WCAG tiap teks terhadap latar induknya di kedua
-mode. Jalankan:  python tools_cek_kontras.py
+mode. Jalankan:  python tools/cek_kontras.py
 """
 from __future__ import annotations
 import subprocess
@@ -15,7 +15,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 PORT = 8599
 URL = f"http://localhost:{PORT}"
 
