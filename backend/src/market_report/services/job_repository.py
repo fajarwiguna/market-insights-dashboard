@@ -275,7 +275,7 @@ class PostgresJobRepository:
             )
             connection.execute(
                 """INSERT INTO refresh_job_events (job_id, status, details)
-                   VALUES (%s, %s, jsonb_build_object('error_code', %s))""",
+                   VALUES (%s, %s, jsonb_build_object('error_code', %s::text))""",
                 (job_uuid, status, code),
             )
         return True

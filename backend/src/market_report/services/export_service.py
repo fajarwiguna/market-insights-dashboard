@@ -6,6 +6,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from market_report.presentation.charts import make_fx_chart, make_rate_diff_chart

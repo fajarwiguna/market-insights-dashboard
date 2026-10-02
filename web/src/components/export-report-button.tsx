@@ -8,6 +8,15 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function downloadFromUrl(url: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.hidden = true;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 export function ExportReportButton({ reportId }: { reportId?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -18,6 +27,26 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
     setBusy(true);
     setMessage("Memasukkan PDF ke antrean…");
     try {
+      const pdfUrl = `/api/reports/${encodeURIComponent(reportId)}/pdf`;
+      const existingPdf = await fetch(pdfUrl, { cache: "no-store" });
+      if (existingPdf.ok) {
+        const blobUrl = URL.createObjectURL(await existingPdf.blob());
+        const disposition = existingPdf.headers.get("content-disposition");
+        const filename = disposition?.match(/filename="?([^";]+)"?/i)?.[1];
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename || `Daily_Market_Update_${reportId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000);
+        setMessage("PDF siap diunduh.");
+        return;
+      }
+      if (existingPdf.status !== 404) {
+        throw new Error("PDF belum dapat diperiksa. Pastikan API laporan tersedia.");
+      }
+
       const queued = await fetch(`/api/reports/${encodeURIComponent(reportId)}/exports`, { method: "POST" });
       if (!queued.ok) throw new Error("Ekspor gagal dimulai. Pastikan API, PostgreSQL, dan worker tersedia.");
       const job = await queued.json() as ExportJob;
@@ -30,7 +59,7 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
         const current = await response.json() as ExportJob;
         if (current.status === "succeeded") {
           setMessage("PDF siap diunduh.");
-          window.location.assign(`/api/reports/${encodeURIComponent(reportId)}/pdf`);
+          downloadFromUrl(pdfUrl);
           return;
         }
         if (current.status === "failed" || current.status === "dead") {

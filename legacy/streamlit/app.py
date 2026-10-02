@@ -67,7 +67,7 @@ _DEFAULT_HISTORI_SBN = HISTORI_SBN
 
 st.set_page_config(
     page_title="Market Today | Daily Report",
-    page_icon="src/image.png",
+    page_icon=str(LEGACY_ROOT / "frontend" / "assets" / "image.png"),
     layout="wide",
     initial_sidebar_state="expanded",
 )

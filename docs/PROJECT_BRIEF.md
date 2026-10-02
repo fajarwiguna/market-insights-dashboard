@@ -72,6 +72,14 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | Konsistensi penerbitan | Pipeline bersama, validasi laporan, dan penyimpanan versi |
 | Keberlanjutan pengembangan | Pemisahan domain, layanan, repository, API, dan frontend |
 
+### Arah struktur teknis
+
+Struktur tujuan menggunakan `backend/` untuk aplikasi Python modular, `frontend/` untuk
+Next.js, `docs/` untuk dokumentasi permanen, `tools/` untuk utilitas pengembang, dan `runtime/`
+untuk keluaran lokal. `legacy/streamlit/` serta `src/app.py` dipertahankan hanya selama masa
+transisi. Ini adalah target bertahap; saat ini direktori source Next.js masih bernama `web/`.
+Rincian pemetaan dan tahapan pemindahan ada di [`project_migration.md`](../project_migration.md).
+
 ## 6. Lingkup fungsional dan kondisi saat ini
 
 | Area | Cakupan | Kondisi |
@@ -87,7 +95,7 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend pengganti | Next.js + TypeScript | Dashboard `web/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Production build berhasil; integrasi runtime dan penerimaan pengguna belum diverifikasi |
+| Frontend pengganti | Next.js + TypeScript | Dashboard di direktori target `frontend/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Source saat ini masih berada di `web/`; production build berhasil, integrasi runtime dan penerimaan pengguna belum diverifikasi |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.
