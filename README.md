@@ -2,11 +2,14 @@
 
 ## Preview
 
-![Preview landing page Market Today](docs/images/dashboard-preview.png)
+| Landing Page - Ringkasan Pasar | Landing Page - Detail Tren & PDF |
+| :---: | :---: |
+| ![Preview Landing Page 1](docs/images/landing-page-1.png) | ![Preview Landing Page 2](docs/images/landing-page-2.png) |
 
-Gambar menggunakan data simulasi untuk memperlihatkan tampilan aplikasi; nilainya bukan data pasar aktual.
+*Gambar menggunakan data simulasi untuk memperlihatkan tampilan aplikasi; nilainya bukan data pasar aktual.*
 
 Pipeline otomatis untuk **Market Today** (FX, indices, yield SBN/SBSN, BI Rate, spread, chart Rate Differential).
+
 
 ```
 Market Data (yfinance + PHEI + BI)
