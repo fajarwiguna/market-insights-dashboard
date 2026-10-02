@@ -21,3 +21,28 @@ class ReportResponse(BaseModel):
     indices: dict[str, dict[str, Any]] = Field(default_factory=dict)
     yields: dict[str, dict[str, Any]] = Field(default_factory=dict)
     commodities: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+
+class HistoryPoint(BaseModel):
+    dates: str
+    close: float
+
+
+class InstrumentHistoryResponse(BaseModel):
+    instrument_id: str
+    points: list[HistoryPoint]
+
+
+class LiveQuote(BaseModel):
+    status: str
+    last: float | None = None
+    prev: float | None = None
+    change_pct: float | None = None
+    dates: str | None = None
+    source: str | None = None
+
+
+class LiveMarketResponse(BaseModel):
+    fetched_at: str | None = None
+    status: str
+    quotes: dict[str, LiveQuote]

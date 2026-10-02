@@ -1,6 +1,8 @@
 """Pengambilan harga terkini dan penggabungan dengan snapshot harian."""
 
 import json
+import threading
+import time
 
 from domain.market_analysis import market_facts
 from domain.market_data import find_key
@@ -13,6 +15,23 @@ LIVE_SPOT = {
     "yields": {"US Treasury 10 Tahun": "^TNX", "US Treasury 5 Tahun": "^FVX"},
     "commodities": {"Gold (USD/oz)": "GC=F", "Brent Crude": "BZ=F", "WTI Crude": "CL=F"},
 }
+
+_LIVE_CACHE_LOCK = threading.Lock()
+_LIVE_CACHE_DATA: dict = {}
+_LIVE_CACHE_TIME = 0.0
+
+
+def fetch_live_prices_cached(ttl_seconds: int = 30) -> dict:
+    """Cache harga intraday per proses supaya API tidak mengulang fetch untuk tiap request."""
+    global _LIVE_CACHE_DATA, _LIVE_CACHE_TIME
+    with _LIVE_CACHE_LOCK:
+        if _LIVE_CACHE_DATA and time.monotonic() - _LIVE_CACHE_TIME < ttl_seconds:
+            return json.loads(json.dumps(_LIVE_CACHE_DATA))
+        _LIVE_CACHE_DATA = fetch_live_prices()
+        _LIVE_CACHE_TIME = time.monotonic()
+        return json.loads(json.dumps(_LIVE_CACHE_DATA))
+
+
 def fetch_live_prices() -> dict:
     """
     Ambil harga terkini dari Yahoo Finance untuk instrumen pada LIVE_SPOT.

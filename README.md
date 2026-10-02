@@ -68,8 +68,14 @@ python -m uvicorn api.main:app --app-dir src --host 127.0.0.1 --port 8000
 
 - `GET http://127.0.0.1:8000/api/v1/reports/latest` — laporan aktif.
 - `GET http://127.0.0.1:8000/api/v1/reports/{report_id}` — versi tertentu.
+- `GET http://127.0.0.1:8000/api/v1/instruments/{instrument_id}/history?from=2026-01-01&to=2026-12-31` — riwayat instrumen.
+- `GET http://127.0.0.1:8000/api/v1/market/live` — kutipan live dengan cache 30 detik per proses.
 - `GET http://127.0.0.1:8000/health` — status proses API.
 - `GET http://127.0.0.1:8000/docs` — dokumentasi interaktif.
+
+ID riwayat yang tersedia: `sbn-10y`, `us-10y`, `us-5y`, `usd-idr`, `eur-idr`, `cny-idr`,
+`jpy-idr`, `dxy`, `ihsg`, `dji`, `gold`, `brent`, dan `wti`. Instrumen yang dikenal tetapi
+belum memiliki seri tersimpan mengembalikan daftar titik kosong.
 
 API baca memerlukan header `Authorization: Bearer <API_READ_TOKEN>`. Isi token acak di `.env`
 (dapat dibuat dengan `python -c "import secrets; print(secrets.token_urlsafe(32))"`). Simpan
