@@ -57,11 +57,11 @@ from presentation.formatting import _waktu_lokal
 from services import export_service, history_service, report_service
 from services.live_service import LIVE_SPOT, fetch_live_prices, pasang_angka_langsung
 
-DATA_DIR = ROOT.parent / "data"
 CHART_DIR = ROOT.parent / "charts"
 REPORT_DIR = ROOT.parent / "reports"
 LIVE_TTL_DETIK = 45
-HISTORI_SBN = DATA_DIR / "history_sbn.json"
+HISTORI_SBN = ROOT.parent / "data" / "history_sbn.json"
+_DEFAULT_HISTORI_SBN = HISTORI_SBN
 
 st.set_page_config(
     page_title="Market Today | Daily Report",
@@ -90,7 +90,8 @@ def angka_langsung(nonce: int = 0) -> dict:
 
 def riwayat_sbn() -> list[dict]:
     """Riwayat imbal hasil SBN 10 tahun yang dikumpulkan aplikasi sendiri."""
-    return history_service.load_sbn_history(HISTORI_SBN)
+    path = None if HISTORI_SBN == _DEFAULT_HISTORI_SBN else HISTORI_SBN
+    return history_service.load_sbn_history(path)
 
 
 def kumpulkan_riwayat_sbn(report: dict) -> list[dict]:
@@ -100,12 +101,13 @@ def kumpulkan_riwayat_sbn(report: dict) -> list[dict]:
     menambahkan/memperbarui satu titik per tanggal setiap kali data dimuat, sehingga
     dalam beberapa hari grafik punya kurva SBN yang sebenarnya.
     """
+    path = None if HISTORI_SBN == _DEFAULT_HISTORI_SBN else HISTORI_SBN
     if report.get("is_demo"):
-        return history_service.load_sbn_history(HISTORI_SBN)
+        return history_service.load_sbn_history(path)
     sbn = market_facts(report)["sbn10"]
     nilai = sbn.get("today")
     tanggal = sbn.get("date")
-    return history_service.record_sbn_history(nilai, tanggal, HISTORI_SBN)
+    return history_service.record_sbn_history(nilai, tanggal, path)
 
 
 def render_charts(report: dict, sbn_hist: list[dict]) -> None:

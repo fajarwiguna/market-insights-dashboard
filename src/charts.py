@@ -11,7 +11,7 @@ from typing import Optional, List, Dict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from services.history_service import source_date_iso
+from services.history_service import load_sbn_history, source_date_iso
 
 CHART_DIR = Path(__file__).resolve().parent.parent / "charts"
 CHART_DIR.mkdir(exist_ok=True)
@@ -53,15 +53,11 @@ def seri_dari_snapshot(path=None, *, report: dict | None = None) -> tuple[list[s
     ust10 = _cari(yld, "treasury", "10").get("today")
     iso = str(report.get("report_date_iso") or "")
 
-    peta_sbn: dict[str, float] = {}
-    hist_sbn = DATA_DIR / "history_sbn.json"
-    if hist_sbn.exists():
-        try:
-            peta_sbn = {str(h.get("date"))[:10]: float(h["close"])
-                        for h in json.loads(hist_sbn.read_text(encoding="utf-8"))
-                        if h.get("date") is not None and h.get("close") is not None}
-        except Exception:
-            peta_sbn = {}
+    peta_sbn = {
+        str(point.get("date"))[:10]: float(point["close"])
+        for point in load_sbn_history()
+        if point.get("date") is not None and point.get("close") is not None
+    }
     sbn_date = source_date_iso(sbn_row.get("date"))
     if sbn_date is None and report.get("is_demo"):
         sbn_date = iso

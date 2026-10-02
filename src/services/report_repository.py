@@ -118,5 +118,8 @@ class PostgresReportRepository:
 
 def configured_report_repository(default_path: Path):
     """Gunakan PostgreSQL bila DATABASE_URL tersedia; selain itu gunakan JSON lokal."""
+    from config import load_environment
+
+    load_environment()
     database_url = os.environ.get("DATABASE_URL", "").strip()
     return PostgresReportRepository(database_url) if database_url else JsonReportRepository(default_path)

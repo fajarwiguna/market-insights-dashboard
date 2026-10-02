@@ -41,19 +41,20 @@ Dependencies utama: `streamlit`, `yfinance`, `pandas`, `matplotlib`, `reportlab`
 
 Secara default, aplikasi tetap memakai JSON lokal. Setiap laporan yang diterbitkan disimpan
 sebagai versi di `data/report_data_versions/`, sedangkan `data/report_data.json` menunjuk
-versi aktif. Untuk mulai memakai PostgreSQL, jalankan migrasi schema
-`migrations/001_report_versions.sql`, atur `DATABASE_URL`, lalu impor data lokal dengan:
+versi aktif. Riwayat SBN juga diarahkan ke repository yang sama. Untuk mulai memakai
+PostgreSQL, salin `.env.example` menjadi `.env`, isi kredensial database, lalu impor data
+lokal dengan:
 
 ```powershell
-$env:DATABASE_URL = "postgresql://user:password@localhost:5432/market_report"
 python src/migrate_reports_to_postgres.py
 python -m streamlit run src/app.py
 ```
 
-`DATABASE_URL` dipakai oleh layanan laporan untuk membaca dan menerbitkan versi. Tanpa
+Skrip migrasi menerapkan schema pada berkas `migrations/` secara otomatis. `DATABASE_URL`
+dipakai oleh layanan laporan untuk membaca dan menerbitkan versi. Tanpa
 variabel tersebut, layanan memakai repository JSON. Lakukan backup data JSON sebelum impor;
-skrip mempertahankan semua versi arsip yang memiliki ID dan menjadikan laporan aktif lokal
-sebagai versi aktif terakhir.
+skrip mempertahankan semua versi arsip yang memiliki ID, mengimpor hingga 30 titik riwayat
+SBN, dan menjadikan laporan aktif lokal sebagai versi aktif terakhir.
 
 ---
 

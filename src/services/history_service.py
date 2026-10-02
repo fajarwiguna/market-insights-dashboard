@@ -1,8 +1,9 @@
 """Penyimpanan riwayat harian SBN 10 tahun untuk grafik dashboard."""
 
-import json
 from datetime import datetime
 from pathlib import Path
+
+from services.history_repository import JsonSbnHistoryRepository, configured_history_repository
 
 
 _HISTORY_PATH = Path(__file__).resolve().parents[2] / "data" / "history_sbn.json"
@@ -33,39 +34,21 @@ def source_date_iso(value) -> str | None:
 
 def load_sbn_history(path: Path | None = None) -> list[dict]:
     """Baca hingga 30 titik riwayat SBN yang valid."""
-    history_path = path or _HISTORY_PATH
-    if not history_path.exists():
-        return []
-    try:
-        data = json.loads(history_path.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-    return [
-        point for point in data
-        if isinstance(point, dict) and point.get("date") and point.get("close") is not None
-    ][-30:]
+    repository = JsonSbnHistoryRepository(path) if path is not None else configured_history_repository(_HISTORY_PATH)
+    return repository.list(limit=30)
 
 
 def record_sbn_history(value, report_date: str | None = None,
                        path: Path | None = None) -> list[dict]:
     """Tambah atau perbarui satu titik SBN menurut tanggal yang diterbitkan sumber."""
-    history_path = path or _HISTORY_PATH
+    repository = JsonSbnHistoryRepository(path) if path is not None else configured_history_repository(_HISTORY_PATH)
     if value is None or not report_date:
-        return load_sbn_history(history_path)
+        return repository.list(limit=30)
 
     date = source_date_iso(report_date)
     if date is None:
-        return load_sbn_history(history_path)
-    previous = load_sbn_history(history_path)
-    updated = sorted(
-        [point for point in previous if point["date"] != date]
-        + [{"date": date, "close": float(value)}],
-        key=lambda point: point["date"],
-    )[-30:]
-    if updated != previous:
-        try:
-            history_path.parent.mkdir(parents=True, exist_ok=True)
-            history_path.write_text(json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            return previous
-    return updated
+        return repository.list(limit=30)
+    try:
+        return repository.upsert(date, float(value), limit=30)
+    except OSError:
+        return repository.list(limit=30)
