@@ -84,9 +84,9 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | PDF | Mengunduh laporan dari aplikasi; pipeline CLI | Tersedia secara sinkron |
 | Laporan berversi | Laporan aktif, ID laporan, arsip versi | Tersedia melalui repository JSON/PostgreSQL |
 | API | Baca laporan, riwayat instrumen, data live | Implementasi tersedia; kontrak masih dalam tahap transisi |
-| Antrean refresh | Membuat dan membaca status job; worker terpisah | Implementasi awal tersedia; perlu penyelesaian dan verifikasi integrasi |
+| Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Belum diimplementasikan |
-| Ekspor latar belakang | Job PDF dan penyimpanan artefak per versi | Belum diimplementasikan |
+| Ekspor latar belakang | PDF otomatis setelah refresh worker; job ekspor mandiri dan artefak per versi | PDF refresh tersedia sebagai berkas lokal; ekspor mandiri/artefak API belum tersedia |
 | Frontend pengganti | Next.js + TypeScript | Direncanakan; belum diimplementasikan |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
@@ -249,9 +249,9 @@ Operasional yang dituju mencakup:
 - Deployment yang dapat diulang, dependensi terkunci, dan pemeriksaan otomatis sebelum rilis.
 - Pengelolaan akses pengguna, rahasia konfigurasi, serta pencatatan aktivitas bila lingkup penggunaan berkembang.
 
-Antrean awal sudah mendukung deduplikasi job aktif, pengambilan job dengan row lock, maksimal tiga percobaan, dan pemulihan job berjalan yang melewati 15 menit. Namun heartbeat, identitas pemilik job untuk menolak hasil worker lama, serta jeda retry belum tersedia. Jalur refresh Streamlit/CLI masih dapat berjalan di luar antrean.
+Antrean mendukung deduplikasi job aktif, pengambilan job dengan row lock, maksimal tiga percobaan, token kepemilikan, heartbeat 30 detik, lease dua menit, dan penguncian kepemilikan saat publikasi. Pemulihan job menggunakan lease yang kedaluwarsa. Jeda retry belum tersedia. Saat PostgreSQL aktif, refresh Streamlit, CLI live, dan API masuk ke antrean. Mode JSON lokal tetap menerbitkan langsung untuk pengembangan.
 
-Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Pemulihan setelah crash masih dapat menerbitkan versi tambahan. Penyelesaian kendali konkurensi dan idempotensi menjadi prasyarat operasional berikutnya.
+Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Pemulihan setelah crash masih dapat menerbitkan versi tambahan; idempotensi publikasi dan jeda retry menjadi pekerjaan lanjutan.
 
 Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru.
 
@@ -262,14 +262,14 @@ Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor
 | 1. Fondasi bersama | Perhitungan/publikasi terpisah dari tampilan | Sudah diterapkan; perlu terus dijaga | Semua jalur memakai aturan perhitungan dan validasi yang konsisten |
 | 2. Repository | Laporan aktif dan versi di PostgreSQL | Sudah diterapkan | Impor, kegagalan publikasi, dan pemulihan penyimpanan tervalidasi |
 | 3. API | Kontrak baca dan akses backend yang stabil | Implementasi awal tersedia | Kontrak, autentikasi, serta kesetaraan angka diverifikasi melalui integrasi |
-| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: antrean refresh dan worker tersedia | Kepemilikan job aman, refresh terpusat, scheduler/ekspor serta pemulihan terverifikasi |
+| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; worker membuat PDF lokal setelah refresh | Integrasi terverifikasi, scheduler, ekspor mandiri/artefak, serta pemulihan tersedia |
 | 5. Frontend baru | Next.js mencapai kesetaraan fitur MVP | Belum dimulai | Alur baca, detail, status, tema, dan unduhan diterima pengguna |
 | 6. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
 | 7. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |
 
 Penguatan kualitas, keamanan, dan pengujian dilakukan sepanjang tahap; tidak seluruhnya ditunda sampai tahap terakhir.
 
-**Prioritas implementasi berikutnya:** menyelesaikan fondasi worker, memindahkan seluruh refresh ke jalur yang terkontrol, memindahkan pengumpulan riwayat dari render UI, dan memverifikasi API/worker sebelum frontend baru bergantung padanya. Penjadwalan dan ekspor kemudian mengikuti kontrak job yang sama.
+**Prioritas implementasi berikutnya:** memverifikasi perilaku antrean melalui API, Streamlit, dan worker; setelah itu menambah scheduler dan job ekspor sesuai kontrak yang sama. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
 
 Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditetapkan.
 
@@ -332,7 +332,7 @@ Ketergantungan utama meliputi akses database, ketersediaan penyedia data, format
 ### Dokumen pendamping
 
 - [README.md](README.md): instalasi, menjalankan aplikasi, konfigurasi, dan penggunaan teknis.
-- [project_migration.md](project_migration.md): rancangan awal migrasi bertahap dan struktur arsitektur tujuan; sebagian pernyataan status berasal dari waktu rancangan dibuat.
+- [project_migration.md](project_migration.md): dokumen migrasi sementara. Peta struktur kode akhir mengacu pada bagian struktur proyek di dalamnya. Dokumen ini tetap dipakai selama migrasi, lalu dipindahkan/dirangkum ke acuan permanen dan dihapus hanya setelah tahap migrasi selesai serta struktur akhir telah diverifikasi.
 - [src/](src/): implementasi berjalan sebagai rujukan perilaku aplikasi.
 - [migrations/](migrations/): riwayat perubahan schema database.
 

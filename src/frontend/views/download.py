@@ -44,10 +44,14 @@ def render_download(report: dict, sbn_hist: list[dict], *, pdf_builder, refresh_
     aksi = st.columns([1, 1], gap="large")
     with aksi[0]:
         if st.button("🔄 Ambil data terbaru, lalu perbarui PDF", width="stretch",
-                     help="Jalankan pipeline live; seluruh halaman dan PDF ikut ter-update."):
+                     help="Antrekan pipeline live; seluruh halaman diperbarui setelah worker selesai."):
             with st.spinner("Mengambil data terbaru dari sumber …"):
                 try:
-                    refresh_data()
+                    result = refresh_data()
+                    if result.get("mode") == "queued":
+                        st.session_state["market_refresh_job_id"] = result["job"]["job_id"]
+                        st.info("Pembaruan dimasukkan ke antrean worker. PDF dapat disusun ulang setelah laporan selesai.")
+                        return
                     st.rerun()
                 except Exception as e:
                     st.error(f"Gagal mengambil data terbaru: {e}")

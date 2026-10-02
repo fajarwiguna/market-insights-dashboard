@@ -54,7 +54,7 @@ from presentation.charts import (
     FX_QUOTE_NAMES, deret_harga, gabung_sumbu, make_fx_chart, make_rate_diff_chart,
 )
 from presentation.formatting import _waktu_lokal
-from services import export_service, history_service, report_service
+from services import export_service, history_service, refresh_service, report_service
 from services.live_service import LIVE_SPOT, fetch_live_prices, pasang_angka_langsung
 
 CHART_DIR = ROOT.parent / "charts"
@@ -139,7 +139,7 @@ def pdf_bytes(report_json: str, sbn_json: str) -> tuple[bytes, str]:
 
 def render_download(report: dict, sbn_hist: list[dict]) -> None:
     render_pdf_download(
-        report, sbn_hist, pdf_builder=pdf_bytes, refresh_data=run_live_pipeline,
+        report, sbn_hist, pdf_builder=pdf_bytes, refresh_data=refresh_service.request_refresh,
         report_dir=REPORT_DIR, escape=esc,
     )
 
@@ -148,11 +148,9 @@ def render_sources(report: dict) -> None:
     render_data_sources(report)
 
 
-def run_live_pipeline():
-    return report_service.run_live_pipeline()
-
-
-auto_fetch, show_technical = render_sidebar(run_live_pipeline, load_report, esc)
+auto_fetch, show_technical = render_sidebar(
+    refresh_service.request_refresh, refresh_service.get_refresh_job, load_report, esc
+)
 
 
 # ── Load data: pakai snapshot terakhir; ambil otomatis hanya bila belum ada
@@ -161,7 +159,12 @@ if report is None:
     if auto_fetch:
         with st.spinner("Belum ada snapshot data — mengambil data terbaru …"):
             try:
-                report = run_live_pipeline()
+                result = refresh_service.request_refresh()
+                if result["mode"] == "queued":
+                    st.session_state["market_refresh_job_id"] = result["job"]["job_id"]
+                    st.info("Pembaruan masuk antrean. Pastikan worker berjalan, lalu muat ulang halaman setelah selesai.")
+                    st.stop()
+                report = result["report"]
             except Exception as e:
                 st.error(f"Gagal mengambil data terbaru: {e}")
                 st.stop()
@@ -183,7 +186,7 @@ if not is_live:
 # dan nomor bagian: ruang putih menggantikan penanda laporan.
 # ═══════════════════════════════════════════════════════════
 snapshot = load_snapshot()                 # riwayat harian untuk mini-trend di kartu angka
-sbn_hist = kumpulkan_riwayat_sbn(report)   # riwayat SBN 10Y dikumpulkan per hari
+sbn_hist = riwayat_sbn()                  # riwayat diisi oleh pipeline, bukan saat render UI
 
 status_pasar = build_market_status(report)
 sentimen = market_sentiment(status_pasar)[0] if status_pasar else "belum dapat disimpulkan"

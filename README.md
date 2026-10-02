@@ -64,6 +64,16 @@ skrip mempertahankan semua versi arsip yang memiliki ID, mengimpor hingga 30 tit
 SBN, dan menjadikan laporan aktif lokal sebagai versi aktif terakhir.
 Seluruh kolom tanggal pada tabel PostgreSQL memakai nama `dates`.
 
+Untuk menerapkan perubahan schema tanpa mengimpor ulang snapshot lokal, jalankan:
+
+```powershell
+python src/apply_schema_migrations.py
+```
+
+Perintah ini aman dijalankan berulang. `migrate_reports_to_postgres.py` tetap dipakai
+untuk impor awal karena perintah tersebut juga dapat menjadikan snapshot lokal sebagai
+laporan aktif database.
+
 ### API dan worker (tahap transisi)
 
 FastAPI dapat dijalankan berdampingan dengan Streamlit. API memuat konfigurasi `.env` yang
@@ -97,8 +107,14 @@ Jalankan worker dalam terminal/proses terpisah:
 python src/worker/main.py
 ```
 
-Worker memproses satu refresh pada satu waktu, mencoba ulang kegagalan hingga tiga kali, dan
-memulihkan job yang berstatus `running` tanpa progres selama 15 menit.
+Worker memproses satu refresh pada satu waktu, mencoba ulang kegagalan hingga tiga kali,
+memperpanjang lease setiap 30 detik, dan memulihkan job setelah lease dua menit kedaluwarsa.
+Worker lama yang kehilangan kepemilikan tidak dapat menerbitkan laporan.
+Setelah report terbit, worker juga mencoba menyimpan PDF laporan ke `reports/`; kegagalan
+PDF dicatat di log dan tidak membatalkan laporan yang sudah berhasil diterbitkan.
+Saat `DATABASE_URL` diatur, tombol refresh dashboard dan perintah CLI live memasukkan job
+ke antrean ini. Jalankan worker agar permintaan diproses; setelah status berhasil, muat ulang
+dashboard untuk melihat laporan terbaru. Mode tanpa PostgreSQL mempertahankan refresh lokal.
 
 ---
 
@@ -262,14 +278,19 @@ Setelah live fetch, file berikut ikut ter-update:
 # Demo (angka sample)
 python src/run_pipeline.py --demo
 
-# Live fetch + hitung + chart + PDF
+# PostgreSQL: masukkan refresh ke antrean worker
 python src/run_pipeline.py
 
-# Pakai snapshot yang sudah ada (cepat, offline)
+# Mode JSON lokal saja: pakai snapshot yang sudah ada (cepat, offline)
 python src/run_pipeline.py --no-fetch
 ```
 
-Output CLI:
+Dalam mode PostgreSQL, perintah live mengantrekan refresh lalu keluar; worker harus
+berjalan terpisah. Worker menyimpan PDF laporan ke `reports/` setelah laporan berhasil
+diterbitkan. Dalam mode JSON lokal, CLI tetap menjalankan pipeline dan membuat keluaran
+secara langsung.
+
+Output CLI mode JSON lokal:
 - Console summary (USD/IDR, DXY, yield, BI Rate, spread)
 - PDF di `reports/`
 - Chart di `charts/`

@@ -3,6 +3,7 @@
 import json
 import logging
 import math
+from contextlib import nullcontext
 from pathlib import Path
 
 from services.report_repository import JsonReportRepository, configured_report_repository
@@ -99,12 +100,27 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     return report
 
 
-def run_live_pipeline() -> dict:
+def run_live_pipeline(*, publication_guard=None) -> dict:
     """Ambil sumber satu kali, bentuk laporan dari payload itu, lalu terbitkan."""
     from fetch_data import run_all
 
     snapshot = run_all(persist=False)
-    return publish_snapshot(snapshot)
+    guard = publication_guard() if publication_guard else nullcontext()
+    with guard:
+        report = publish_snapshot(snapshot)
+
+    # Riwayat SBN dikumpulkan saat pipeline menerbitkan laporan, bukan saat
+    # halaman dashboard dibuka. Kegagalan pencatatan riwayat tidak membatalkan laporan.
+    try:
+        from domain.market_analysis import market_facts
+        from services.history_service import record_sbn_history
+
+        sbn10 = market_facts(report).get("sbn10", {})
+        if sbn10.get("today") is not None:
+            record_sbn_history(sbn10["today"], sbn10.get("date"))
+    except Exception:
+        _logger.exception("Gagal memperbarui riwayat SBN setelah laporan diterbitkan")
+    return report
 
 
 def rebuild_from_saved_snapshot() -> dict:

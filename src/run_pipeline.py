@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from charts import generate_rate_differential_chart, generate_fx_bar_chart, seri_dari_snapshot
 from report_pdf import build_pdf
 from services import report_service
+from services import refresh_service
 
 
 def demo_report_data() -> dict:
@@ -78,6 +79,16 @@ def main():
         demo_path = report_service.save_demo_report(report)
         print(f"Demo data saved separately -> {demo_path}")
     else:
+        if refresh_service.worker_refresh_enabled():
+            if args.no_fetch:
+                raise SystemExit(
+                    "Mode PostgreSQL hanya menerbitkan laporan melalui worker. "
+                    "Gunakan mode JSON lokal untuk membangun ulang dari snapshot tersimpan."
+                )
+            job = refresh_service.request_refresh()["job"]
+            print(f"Refresh dimasukkan ke antrean: {job['job_id']} ({job['status']}).")
+            print("Pastikan worker berjalan; proses PDF CLI dihentikan sebelum laporan terbit.")
+            return
         if args.no_fetch:
             print("\n[1/4] Skipping fetch (using existing snapshot)")
             report = report_service.rebuild_from_saved_snapshot()

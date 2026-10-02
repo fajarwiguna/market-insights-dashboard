@@ -5,7 +5,25 @@ from datetime import datetime
 import streamlit as st
 
 
-def render_sidebar(run_live_pipeline, load_report, esc):
+def _render_job_status(job_id, get_refresh_job):
+    try:
+        job = get_refresh_job(job_id)
+    except Exception:
+        st.caption("Status refresh belum dapat dibaca.")
+        return
+    if not job:
+        st.caption("Job refresh tidak ditemukan.")
+        return
+    labels = {"queued": "Menunggu worker", "running": "Sedang memperbarui data",
+              "succeeded": "Pembaruan selesai", "failed": "Pembaruan gagal"}
+    st.caption(f"Status refresh: **{labels.get(job['status'], job['status'])}** · `{job_id[:8]}`")
+    if job["status"] == "succeeded":
+        st.success("Laporan terbaru sudah diterbitkan. Muat ulang halaman untuk menampilkan hasilnya.")
+    elif job["status"] == "failed":
+        st.error("Refresh gagal. Laporan aktif sebelumnya tetap digunakan.")
+
+
+def render_sidebar(request_refresh, get_refresh_job, load_report, esc):
     with st.sidebar:
         st.markdown("### 📈 Market Today")
         st.caption("Daily Market Report — angka pasar dengan penjelasan bahasa sederhana.")
@@ -28,13 +46,20 @@ def render_sidebar(run_live_pipeline, load_report, esc):
 
         st.divider()
         auto_fetch = st.checkbox("Ambil data otomatis bila snapshot belum ada", value=True)
+        current_job_id = st.session_state.get("market_refresh_job_id")
+        if current_job_id:
+            _render_job_status(current_job_id, get_refresh_job)
         if st.button("🔄 Perbarui data dari sumber (live)", type="primary", width="stretch"):
             with st.spinner("Mengambil data Yahoo + PHEI + Bank Indonesia …"):
                 try:
-                    run_live_pipeline()
-                    st.success("Data berhasil diperbarui.")
+                    result = request_refresh()
+                    if result["mode"] == "queued":
+                        st.session_state["market_refresh_job_id"] = result["job"]["job_id"]
+                        st.toast("Pembaruan dimasukkan ke antrean worker.")
+                    else:
+                        st.toast("Data berhasil diperbarui.")
                 except Exception as e:
-                    st.error(f"Gagal memperbarui data: {e}")
+                    st.error(f"Gagal meminta pembaruan data: {e}")
             st.rerun()
 
         st.divider()
