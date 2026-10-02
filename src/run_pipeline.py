@@ -12,7 +12,6 @@ Usage:
 
 from __future__ import annotations
 import argparse
-import json
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -20,16 +19,16 @@ from datetime import datetime
 # allow running from src/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fetch_data import run_all as fetch_all
-from calculate import build_report_data
 from charts import generate_rate_differential_chart, generate_fx_bar_chart, seri_dari_snapshot
 from report_pdf import build_pdf
+from services import report_service
 
 
 def demo_report_data() -> dict:
     """Hard-coded numbers that match the screenshot (28 Agustus 2026)."""
     return {
         "report_date": "28 Agustus 2026",
+        "report_date_iso": "2026-08-28",
         "fx": {
             "DXY": {"today": 99.21, "prev": 99.17, "change_pct": 0.04},
             "USD/IDR": {"today": 17744, "prev": 17725, "change_pct": 0.11},
@@ -58,6 +57,8 @@ def demo_report_data() -> dict:
         },
         "commodities": {},
         "source_snapshot": datetime.now().isoformat(),
+        "schema_version": 1,
+        "is_demo": True,
     }
 
 
@@ -74,24 +75,20 @@ def main():
     if args.demo:
         print("\n[DEMO MODE] Using sample numbers matching the screenshot …")
         report = demo_report_data()
-        # still write it so other modules can read
-        data_dir = Path(__file__).resolve().parent.parent / "data"
-        data_dir.mkdir(exist_ok=True)
-        with open(data_dir / "report_data.json", "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+        demo_path = report_service.save_demo_report(report)
+        print(f"Demo data saved separately -> {demo_path}")
     else:
-        if not args.no_fetch:
-            print("\n[1/4] Fetching market data …")
-            fetch_all()
-        else:
+        if args.no_fetch:
             print("\n[1/4] Skipping fetch (using existing snapshot)")
-
-        print("\n[2/4] Calculating daily changes …")
-        report = build_report_data()
+            report = report_service.rebuild_from_saved_snapshot()
+        else:
+            print("\n[1/4] Fetching market data …")
+            report = report_service.run_live_pipeline()
+        print("\n[2/4] Calculated and published validated report")
 
     print("\n[3/4] Generating charts …")
     # Grafik memakai data nyata dari snapshot laporan (bukan angka hard-coded)
-    dates, sbn, ust = seri_dari_snapshot()
+    dates, sbn, ust = seri_dari_snapshot(report=report)
     chart = generate_rate_differential_chart(
         sbn, ust, dates, title="Rate Differential — SBN 10Y vs UST 10Y",
         catatan=f"Data per {report.get('report_date', '—')} · sumber: PHEI & Yahoo Finance. 1 bp = 0,01%.",

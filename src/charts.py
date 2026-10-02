@@ -27,7 +27,7 @@ def _cari(data, *kata, exclude=()):
     return {}
 
 
-def seri_dari_snapshot(path=None) -> tuple[list[str], list[float], list[float]]:
+def seri_dari_snapshot(path=None, *, report: dict | None = None) -> tuple[list[str], list[float], list[float]]:
     """
     Deret SBN 10Y & UST 10Y dari snapshot laporan — data nyata, bukan contoh.
 
@@ -38,13 +38,14 @@ def seri_dari_snapshot(path=None) -> tuple[list[str], list[float], list[float]]:
 
     Returns: (label_tanggal, seri_sbn, seri_ust) — kosong bila snapshot belum ada.
     """
-    snap = Path(path or (DATA_DIR / "report_data.json"))
-    if not snap.exists():
-        return [], [], []
-    try:
-        report = json.loads(snap.read_text(encoding="utf-8"))
-    except Exception:
-        return [], [], []
+    if report is None:
+        snap = Path(path or (DATA_DIR / "report_data.json"))
+        if not snap.exists():
+            return [], [], []
+        try:
+            report = json.loads(snap.read_text(encoding="utf-8"))
+        except Exception:
+            return [], [], []
 
     yld = report.get("yields") or {}
     sbn_row = _cari(yld, "sbn", "10", exclude=("sbsn", "fr0"))
@@ -62,6 +63,8 @@ def seri_dari_snapshot(path=None) -> tuple[list[str], list[float], list[float]]:
         except Exception:
             peta_sbn = {}
     sbn_date = source_date_iso(sbn_row.get("date"))
+    if sbn_date is None and report.get("is_demo"):
+        sbn_date = iso
     if sbn10 is not None and sbn_date:
         peta_sbn[sbn_date] = float(sbn10)
 

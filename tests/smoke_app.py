@@ -24,12 +24,12 @@ from streamlit.testing.v1 import AppTest  # noqa: E402
 
 # Judul bagian yang wajib ada di halaman (urutannya juga diperiksa)
 SECTION_ORDER = [
-    "Intinya Hari Ini",
+    "Insight Hari Ini",
     "Apa Artinya untuk Anda",
     "Angka Kunci Hari Ini",
-    "Grafik Bergerak Langsung",
+    "Live Market Monitor",
     "Detail Pasar",
-    "Glossarium Istilah",
+    "Glossarium Istilah & Cara Membaca",
     "Unduh Laporan (PDF)",
     "Sumber Data & Metode",
 ]

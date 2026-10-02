@@ -318,22 +318,27 @@ def fetch_live_spot(simbol: Dict[str, str], range_: str = "5d") -> Dict[str, Any
     return out
 
 
-def run_all() -> Dict[str, Any]:
+def run_all(*, persist: bool = True) -> Dict[str, Any]:
+    """Ambil satu snapshot; opsi persist mempertahankan antarmuka CLI lama."""
     print("Fetching Yahoo Chart API (FX, indices, yields, commodities) …")
     market = fetch_market_snapshot()
-    _save("yfinance", market)
+    if persist:
+        _save("yfinance", market)
 
     print("Fetching FX backup (open.er-api) …")
     fx_backup = fetch_fx_backup()
-    _save("fx_backup", fx_backup)
+    if persist:
+        _save("fx_backup", fx_backup)
 
     print("Fetching PHEI yields …")
     phei = fetch_phei_yields()
-    _save("phei", phei)
+    if persist:
+        _save("phei", phei)
 
     print("Fetching BI rates …")
     bi = fetch_bi_rates()
-    _save("bi", bi)
+    if persist:
+        _save("bi", bi)
 
     snapshot = {
         "generated_at": datetime.now().isoformat(),
@@ -342,8 +347,9 @@ def run_all() -> Dict[str, Any]:
         "phei": phei,
         "bi": bi,
     }
-    _save("snapshot", snapshot)
-    print(f"Snapshot saved -> {DATA_DIR / 'snapshot.json'}")
+    if persist:
+        _save("snapshot", snapshot)
+        print(f"Snapshot saved -> {DATA_DIR / 'snapshot.json'}")
     return snapshot
 
 

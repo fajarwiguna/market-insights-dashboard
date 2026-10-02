@@ -100,10 +100,10 @@ nomor; tiap bagian ditandai pil kecil + judul besar.
 | Bagian | Isi |
 |--------|-----|
 | **Header** | Angka paling penting (Rupiah, IHSG, SBN 10Y, spread SBN–UST) + sentimen harian. |
-| **Intinya Hari Ini** | Satu paragraf ringkasan otomatis, lalu 3 kartu sorotan (angka + artinya). Sisanya dilipat di "Sorotan lain hari ini". |
+| **Insight Hari Ini** | Satu paragraf ringkasan otomatis, lalu 3 kartu sorotan (angka + artinya). Sisanya dilipat di "Sorotan lain hari ini". |
 | **Apa Artinya untuk Anda** | Dampak praktis: belanja luar negeri, cicilan/kredit, tabungan & obligasi, harga barang. |
 | **Angka Kunci Hari Ini** | 4 kartu besar (USD/IDR, IHSG, SBN 10Y, spread) + 4 kartu pendukung (DXY, UST 10Y, emas, Brent) + baris chip BI Rate / INDONIA / JISDOR. |
-| **Grafik Bergerak Langsung** | Dua grafik dengan **angka yang diambil ulang otomatis** + tombol **🔄 Perbarui sekarang**. |
+| **Grafik** | Dua grafik dengan **angka yang diambil ulang otomatis** + tombol **🔄 Perbarui sekarang**. |
 | **Detail Pasar** | Empat tabel dalam tab: Nilai Tukar, Pasar Saham, Imbal Hasil Obligasi, Komoditas. |
 | **Glossarium Istilah & Cara Membaca** | Kamus istilah + panduan membaca 30 detik (bertab). |
 | **Unduh Laporan (PDF)** | PDF disusun dari angka yang sedang tampil (tombol 📄 Unduh PDF), plus tombol ambil data terbaru & simpan arsip. |
@@ -275,6 +275,7 @@ daily_market_report/
 ├── tests/
 │   ├── smoke_app.py          ← uji cepat: render dashboard & cek bagian halaman
 │   ├── test_live.py          ← uji logika angka langsung (overlay, riwayat, grafik)
+│   ├── test_pipeline.py      ← uji validasi, penerbitan snapshot, dan pemisahan demo
 │   └── test_pdf.py           ← uji PDF: isi PDF = angka yang tampil di dashboard
 ├── data/
 │   ├── snapshot.json         ← raw fetch terakhir (lokal, tidak dilacak Git)
@@ -295,6 +296,7 @@ memindahkannya ke komputer lain.
 ```bash
 python tests/smoke_app.py   # render dashboard & cek isi halaman  → HASIL: PASS
 python tests/test_live.py   # cek logika angka langsung & grafik  → HASIL: PASS
+python tests/test_pipeline.py # cek penerbitan snapshot & isolasi demo → HASIL: PASS
 python tests/test_pdf.py    # cek isi PDF = angka yang tampil      → HASIL: PASS
 python tools_cek_pdf.py     # cetak teks PDF per halaman (untuk cek tampilan)
 python tools_cek_kontras.py # ukur kontras teks di mode terang & gelap

@@ -28,7 +28,7 @@ def _g(d: dict, *keys, default=None):
     return d
 
 
-def build_report_data(snap: Optional[Dict] = None, *, persist: bool = True) -> Dict[str, Any]:
+def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
     if snap is None:
         snap = load_snapshot()
 
@@ -270,6 +270,7 @@ def build_report_data(snap: Optional[Dict] = None, *, persist: bool = True) -> D
     hist_sbn_curve = curve  # only point-in-time from PHEI
 
     report = {
+        "schema_version": 1,
         "report_date": datetime.now().strftime("%d %B %Y"),
         "report_date_iso": datetime.now().strftime("%Y-%m-%d"),
         "generated_at": datetime.now().isoformat(),
@@ -290,21 +291,20 @@ def build_report_data(snap: Optional[Dict] = None, *, persist: bool = True) -> D
         "source_snapshot": snap.get("generated_at"),
         "is_demo": False,
     }
-    if persist:
-        persist_report_data(report)
     return report
 
 
-def persist_report_data(report: Dict[str, Any]) -> None:
-    """Simpan laporan secara atomik agar file lama tetap utuh bila penulisan gagal."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    fd, temporary_path = tempfile.mkstemp(prefix="report_data_", suffix=".tmp", dir=DATA_DIR)
+def persist_json_data(data: Any, path: Path) -> None:
+    """Simpan JSON secara atomik di direktori tujuan."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_path = tempfile.mkstemp(prefix=f"{path.stem}_", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as output:
-            json.dump(report, output, ensure_ascii=False, indent=2, default=str)
+            json.dump(data, output, ensure_ascii=False, indent=2, default=str)
             output.flush()
             os.fsync(output.fileno())
-        os.replace(temporary_path, DATA_DIR / "report_data.json")
+        os.replace(temporary_path, path)
     except Exception:
         try:
             os.unlink(temporary_path)
@@ -313,6 +313,13 @@ def persist_report_data(report: Dict[str, Any]) -> None:
         raise
 
 
+def persist_report_data(report: Dict[str, Any], path: Path | None = None) -> None:
+    """Simpan laporan aktif secara atomik agar file lama tetap utuh bila gagal."""
+    persist_json_data(report, path or DATA_DIR / "report_data.json")
+
+
 if __name__ == "__main__":
-    data = build_report_data()
+    from services.report_service import rebuild_from_saved_snapshot
+
+    data = rebuild_from_saved_snapshot()
     print(json.dumps({k: data[k] for k in ["report_date", "fx", "indices", "yields", "spread_sbn10_ust10_bp", "bi", "phei_meta"]}, indent=2, default=str))
