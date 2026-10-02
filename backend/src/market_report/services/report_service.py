@@ -10,9 +10,10 @@ from market_report.infrastructure.repositories.report_repository import (
     JsonReportRepository,
     configured_report_repository,
 )
+from market_report.config import market_data_directory
 
 
-_DATA_DIR = Path(__file__).resolve().parents[4] / "data"
+_DATA_DIR = market_data_directory()
 _REPORT_PATH = _DATA_DIR / "report_data.json"
 _SNAPSHOT_PATH = _DATA_DIR / "snapshot.json"
 _DEMO_REPORT_PATH = _DATA_DIR / "demo_report_data.json"

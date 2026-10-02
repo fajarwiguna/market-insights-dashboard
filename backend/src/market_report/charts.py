@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from market_report.services.history_service import load_sbn_history, source_date_iso
+from market_report.config import chart_directory, market_data_directory
 
-CHART_DIR = Path(__file__).resolve().parents[3] / "charts"
-CHART_DIR.mkdir(exist_ok=True)
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+CHART_DIR = chart_directory()
+CHART_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = market_data_directory()
 
 
 def _cari(data, *kata, exclude=()):
@@ -32,7 +33,7 @@ def seri_dari_snapshot(path=None, *, report: dict | None = None) -> tuple[list[s
     Deret SBN 10Y & UST 10Y dari snapshot laporan — data nyata, bukan contoh.
 
     UST memakai riwayat harian (history_ust10), SBN memakai angka PHEI terakhir
-    yang dikumpulkan per tanggal di data/history_sbn.json. Bila SBN hanya punya
+    yang dikumpulkan per tanggal di runtime/data/history_sbn.json. Bila SBN hanya punya
     satu titik, nilainya maju- dan mundur-diteruskan supaya garis tetap utuh
     (dan diberi catatan di kaki grafik).
 

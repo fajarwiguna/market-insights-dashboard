@@ -1,5 +1,11 @@
 # Daily Market Report — Dashboard & Automation
 
+## Preview
+
+![Preview landing page Market Today](docs/images/dashboard-preview.png)
+
+Gambar menggunakan data simulasi untuk memperlihatkan tampilan aplikasi; nilainya bukan data pasar aktual.
+
 Pipeline otomatis untuk **Market Today** (FX, indices, yield SBN/SBSN, BI Rate, spread, chart Rate Differential).
 
 ```
@@ -47,7 +53,7 @@ Dependencies utama: `streamlit`, `yfinance`, `pandas`, `matplotlib`, `reportlab`
 ### Penyimpanan laporan dan riwayat versi
 
 Secara default, aplikasi tetap memakai JSON lokal. Setiap laporan yang diterbitkan disimpan
-sebagai versi di `data/report_data_versions/`, sedangkan `data/report_data.json` menunjuk
+sebagai versi di `runtime/data/report_data_versions/`, sedangkan `runtime/data/report_data.json` menunjuk
 versi aktif. Riwayat SBN juga diarahkan ke repository yang sama. Untuk mulai memakai
 PostgreSQL, salin `.env.example` menjadi `.env`, isi kredensial database, lalu impor data
 lokal dengan:
@@ -113,11 +119,11 @@ python backend/src/market_report/worker/main.py
 Worker memproses satu refresh pada satu waktu, mencoba ulang kegagalan hingga tiga kali,
 memperpanjang lease setiap 30 detik, dan memulihkan job setelah lease dua menit kedaluwarsa.
 Worker lama yang kehilangan kepemilikan tidak dapat menerbitkan laporan.
-Setelah report terbit, worker juga mencoba menyimpan PDF laporan ke `reports/`; kegagalan
+Setelah report terbit, worker juga mencoba menyimpan PDF laporan ke `runtime/reports/`; kegagalan
 PDF dicatat di log dan tidak membatalkan laporan yang sudah berhasil diterbitkan.
 Ekspor versi tertentu dapat diminta melalui endpoint API; worker memprosesnya dan menyimpan
 metadata artefak di PostgreSQL. Worker dan API harus berbagi folder artefak yang sama;
-atur `REPORT_ARTIFACT_DIR` ke folder persisten bila direktori default `reports/` tidak sesuai.
+atur `REPORT_ARTIFACT_DIR` ke folder persisten bila direktori default `runtime/reports/` tidak sesuai.
 Nilai relatif dihitung dari root project.
 Saat `DATABASE_URL` diatur, tombol refresh dashboard dan perintah CLI live memasukkan job
 ke antrean ini. Jalankan worker agar permintaan diproses; setelah status berhasil, muat ulang
@@ -158,7 +164,9 @@ server Next.js untuk membaca laporan dan data live. Untuk refresh dari web, konf
 `API_OPERATOR_TOKEN`, `WEB_OPERATOR_PASSWORD`, dan `WEB_OPERATOR_SESSION_SECRET` pada
 lingkungan server Next.js. Gunakan kata sandi operator khusus minimal 16 karakter dan
 secret sesi acak minimal 32 karakter. Login web membuat cookie HttpOnly dengan masa berlaku 8 jam; token API tidak
-dikirim ke browser. Jangan menaruh rahasia ini di variabel `NEXT_PUBLIC_*` atau kode frontend.
+dikirim ke browser. Lima kegagalan login dari alamat klien dalam 15 menit memicu jeda 15 menit. Pembatas ini
+disimpan per proses Next.js, jadi gunakan satu instance sampai pembatas bersama dikonfigurasi. Reverse proxy
+harus mengisi `x-real-ip` dari alamat klien. Jangan menaruh rahasia ini di variabel `NEXT_PUBLIC_*` atau kode frontend.
 
 Monitor live memperbarui tampilan setiap 60 detik dan menggunakan snapshot laporan sebagai
 cadangan ketika sumber live tidak tersedia. Endpoint API memakai cache singkat 30 detik.
@@ -182,7 +190,7 @@ Jika menggunakan virtual environment, aktifkan dahulu seperti langkah instalasi 
 |---------|----------|
 | **Status data** | Menampilkan mode (**LIVE** / **DEMO**), tanggal laporan, dan waktu snapshot yang sedang tampil. |
 | **🔄 Perbarui data dari sumber (live)** | Mengambil data dari Yahoo, PHEI, dan BI, menghitung ulang, lalu memuat ulang halaman. Perlu koneksi internet yang mengizinkan akses ke sumber-sumber tersebut. |
-| **Ambil data otomatis bila snapshot belum ada** | Kalau `data/report_data.json` belum ada, dashboard mengambil data sendiri saat pertama dibuka. |
+| **Ambil data otomatis bila snapshot belum ada** | Kalau `runtime/data/report_data.json` belum ada, dashboard mengambil data sendiri saat pertama dibuka. |
 | **Tampilkan bagian teknis (sumber data)** | Dimatikan bila halaman hanya dipresentasikan ke pembaca non-teknis (menyembunyikan bagian Sumber Data & Metode). |
 
 ### Cara agar data selalu ter-update di dashboard
@@ -279,10 +287,10 @@ Bagian **Grafik Bergerak Langsung** memakai angka yang **diambil ulang dari Yaho
 
 Dua sumber angka sengaja dibedakan agar tidak saling bertentangan:
 
-- **Snapshot harian** (`data/report_data.json`) → header, kartu angka kunci, seluruh tabel, PDF.
+- **Snapshot harian** (`runtime/data/report_data.json`) → header, kartu angka kunci, seluruh tabel, PDF.
 - **Harga terkini** (Yahoo Finance) → grafik saja, dengan stempel waktu di kaki grafik.
 
-Riwayat SBN 10Y dikumpulkan sendiri oleh dashboard di `data/history_sbn.json` (satu titik per
+Riwayat SBN 10Y dikumpulkan sendiri oleh dashboard di `runtime/data/history_sbn.json` (satu titik per
 tanggal, maksimum 30 hari). Karena PHEI hanya menerbitkan satu angka terakhir, garis SBN di
 grafik dulu selalu datar; setelah beberapa hari dashboard dibuka, garisnya menjadi kurva sungguhan.
 
@@ -313,10 +321,10 @@ Data yang di-update:
 - Chart Rate Differential & FX Change %
 
 Setelah live fetch, file berikut ikut ter-update:
-- `data/snapshot.json` — raw data
-- `data/report_data.json` — angka siap report
-- `charts/rate_differential.png` (dari data snapshot, bukan angka contoh)
-- `reports/Daily_Market_Update_YYYYMMDD.pdf` — nama file memakai tanggal laporan; file yang diunduh
+- `runtime/data/snapshot.json` — raw data
+- `runtime/data/report_data.json` — angka siap report
+- `runtime/charts/rate_differential.png` (dari data snapshot, bukan angka contoh)
+- `runtime/reports/Daily_Market_Update_YYYYMMDD.pdf` — nama file memakai tanggal laporan; file yang diunduh
   dashboard dibuat on-the-fly dari angka yang tampil (tidak memakai file lama di folder ini)
 
 ---
@@ -335,14 +343,14 @@ python backend/src/market_report/run_pipeline.py --no-fetch
 ```
 
 Dalam mode PostgreSQL, perintah live mengantrekan refresh lalu keluar; worker harus
-berjalan terpisah. Worker menyimpan PDF laporan ke `reports/` setelah laporan berhasil
+berjalan terpisah. Worker menyimpan PDF laporan ke `runtime/reports/` setelah laporan berhasil
 diterbitkan. Dalam mode JSON lokal, CLI tetap menjalankan pipeline dan membuat keluaran
 secara langsung.
 
 Output CLI mode JSON lokal:
 - Console summary (USD/IDR, DXY, yield, BI Rate, spread)
-- PDF di `reports/`
-- Chart di `charts/`
+- PDF di `runtime/reports/`
+- Chart di `runtime/charts/`
 
 ---
 
@@ -377,12 +385,12 @@ Lalu buka dashboard kapan saja — data sudah terisi dari cron, jadi tidak perlu
 
 ### Opsi C — Auto-refresh di dalam Streamlit (opsional)
 
-Tambahkan di sidebar interval auto-rerun (contoh setiap 30 menit) dengan fragment / `st.rerun` + timer. Untuk produksi, lebih aman menjalankan cron (pipeline menyimpan snapshot ke `data/report_data.json`) lalu membiarkan dashboard menampilkan snapshot tersebut — sumber data (yfinance / PHEI) tidak dibebani permintaan berulang.
+Tambahkan di sidebar interval auto-rerun (contoh setiap 30 menit) dengan fragment / `st.rerun` + timer. Untuk produksi, lebih aman menjalankan cron (pipeline menyimpan snapshot ke `runtime/data/report_data.json`) lalu membiarkan dashboard menampilkan snapshot tersebut — sumber data (yfinance / PHEI) tidak dibebani permintaan berulang.
 
 ### Opsi D — Deploy online
 
 - **Streamlit Community Cloud**: push repo, set main file `src/app.py`.  
-  Untuk data live, gunakan tombol **🔄 Perbarui data dari sumber (live)** di sidebar atau schedule job terpisah (GitHub Actions) yang commit/update `data/report_data.json`.
+  Untuk data live, gunakan tombol **🔄 Perbarui data dari sumber (live)** di sidebar atau schedule job terpisah (GitHub Actions) yang commit/update `runtime/data/report_data.json`.
 - **Server sendiri**: `streamlit run src/app.py --server.port 8501` + reverse proxy (nginx) + cron pipeline.
 
 ---
@@ -406,7 +414,10 @@ daily_market_report/
 ├── tests/                     ← pemeriksaan pipeline, PDF, live, dan UI lama
 ├── tools/                     ← alat pemeriksaan lokal
 ├── frontend/                  ← aplikasi Next.js
-├── data/, charts/, reports/   ← data dan hasil lokal selama transisi
+├── runtime/
+│   ├── data/                  ← snapshot, versi laporan, dan riwayat lokal
+│   ├── charts/                ← grafik hasil pipeline
+│   └── reports/               ← arsip PDF lokal
 ├── requirements.txt           ← backend + Streamlit untuk pengembangan lokal
 ├── project_migration.md       ← peta migrasi sementara
 └── README.md
@@ -422,6 +433,7 @@ python tests/smoke_app.py   # render dashboard & cek isi halaman  → HASIL: PAS
 python tests/test_live.py   # cek logika angka langsung & grafik  → HASIL: PASS
 python tests/test_pipeline.py # cek penerbitan snapshot & isolasi demo → HASIL: PASS
 python tests/test_pdf.py    # cek isi PDF = angka yang tampil      → HASIL: PASS
+python -B tests/test_api_worker.py # cek kontrak API, worker & scheduler lokal
 python tools/cek_pdf.py     # cetak teks PDF per halaman (untuk cek tampilan)
 python tools/cek_kontras.py # ukur kontras teks di mode terang & gelap
 ```
@@ -459,7 +471,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 2. Siang hari / presentasi → biarkan dashboard memakai snapshot terakhir (tidak perlu klik perbarui data) agar cepat dan stabil.
 3. Jika PHEI atau BI lambat/error, pipeline tetap jalan dengan data yfinance; yield SBN bisa kosong sampai scraper sukses lagi.
 4. PDF terbaru bisa di-download langsung dari tombol di bawah dashboard.
-5. Jangan share `data/snapshot.json` ke publik jika berisi data internal; file ini hanya cache lokal.
+5. Jangan share `runtime/data/snapshot.json` ke publik jika berisi data internal; file ini hanya cache lokal.
 
 ---
 
@@ -467,10 +479,10 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 
 | Masalah | Solusi |
 |---------|--------|
-| Data pasar kosong / pembaruan ditolak | Periksa pesan error dan `data/snapshot.json`; pastikan terminal memiliki akses internet ke Yahoo Finance dan PHEI, lalu klik **🔄 Perbarui data dari sumber (live)** lagi. Pembaruan dengan kurang dari dua instrumen berhasil ditolak agar tidak menimpa laporan yang ada. |
-| Hanya sebagian instrumen yang muncul | Sumber berbeda dapat gagal secara terpisah. Cek bagian **Sumber Data & Metode** dan `data/snapshot.json`, lalu coba pembaruan lagi. |
+| Data pasar kosong / pembaruan ditolak | Periksa pesan error dan `runtime/data/snapshot.json`; pastikan terminal memiliki akses internet ke Yahoo Finance dan PHEI, lalu klik **🔄 Perbarui data dari sumber (live)** lagi. Pembaruan dengan kurang dari dua instrumen berhasil ditolak agar tidak menimpa laporan yang ada. |
+| Hanya sebagian instrumen yang muncul | Sumber berbeda dapat gagal secara terpisah. Cek bagian **Sumber Data & Metode** dan `runtime/data/snapshot.json`, lalu coba pembaruan lagi. |
 | BI Rate / INDONIA / JISDOR tampak lama | Jika halaman BI tidak merespons, pipeline memakai angka cadangan; periksa tanggal pada bagian Sumber Data & Metode. |
-| Perlu melihat data contoh | Jalankan `python backend/src/market_report/run_pipeline.py --demo` hanya untuk demonstrasi lokal. Mode demo mengganti `data/report_data.json`. |
+| Perlu melihat data contoh | Jalankan `python backend/src/market_report/run_pipeline.py --demo` hanya untuk demonstrasi lokal. Mode demo mengganti `runtime/data/report_data.json`. |
 | Pembaruan data gagal | Cek koneksi dan akses jaringan ke sumber; coba lagi. Dashboard mempertahankan laporan terakhir yang berhasil disimpan. |
 | Tampilan terasa berubah / tidak nyaman dibaca | Klik tombol **🎨** di pojok kanan bawah → **↺ Kembalikan tampilan asli**, atau refresh halaman (pengaturan tampilan tidak disimpan) |
 | Perlu memastikan tampilan tidak rusak setelah diubah | Jalankan `python tests/smoke_app.py` (harus berakhir `HASIL: PASS`) |
@@ -478,7 +490,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 | Grafik tidak berubah saat disegarkan | Klik **🔄 Perbarui sekarang** (melempar cache), atau turunkan **Segarkan otomatis** ke 30 detik. Bila lencana tetap **SNAPSHOT LAPORAN**, sumber sedang tidak terjangkau — grafik memakai angka laporan |
 | Angka grafik berbeda dari kartu/tabel | Itu memang disengaja: grafik memakai harga terkini, kartu & tabel memakai snapshot laporan agar konsisten satu hari penuh |
 | PDF yang diunduh berbeda dari layar | PDF disusun dari `report` yang sedang dirender, jadi keduanya sama. Yang berbeda hanya **Grafik Bergerak Langsung** (harga intraday) — PDF memakai snapshot. Nama file mengikuti `report_date_iso` |
-| PDF lama muncul di folder `reports/` | Itu arsip hasil run sebelumnya. Tombol 📄 selalu memakai angka terkini; arsip lain hanya disebut sebagai catatan |
+| PDF lama muncul di folder `runtime/reports/` | Itu arsip hasil run sebelumnya. Tombol 📄 selalu memakai angka terkini; arsip lain hanya disebut sebagai catatan |
 | Port 8501 dipakai | `streamlit run src/app.py --server.port 8502` |
 
 ---
@@ -492,7 +504,7 @@ Setiap hari (manual atau cron)
 python backend/src/market_report/run_pipeline.py     ← fetch live + calculate + chart + PDF
         │
         ▼
-data/report_data.json ter-update
+runtime/data/report_data.json ter-update
         │
         ▼
 streamlit run src/app.py

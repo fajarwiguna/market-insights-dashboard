@@ -206,7 +206,7 @@ Streamlit masih memanggil layanan Python secara langsung. API dan worker menggun
 | `backend/pyproject.toml`, `backend/requirements.txt` | Metadata package dan dependensi backend |
 | `backend/migrations/` | Migrasi schema PostgreSQL |
 | `tests/` | Pengujian yang tersedia |
-| `data/`, `charts/`, `reports/` | Data lokal dan keluaran pipeline |
+| `runtime/data/`, `runtime/charts/`, `runtime/reports/` | Data lokal dan keluaran pipeline |
 
 ### Arsitektur tujuan
 
@@ -253,7 +253,7 @@ Token dikirim melalui `Authorization: Bearer ...`. Token baca dan operator adala
 
 ## 12. Operasional, keamanan, dan keandalan
 
-Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, `REFRESH_TIMES`, dan `REPORT_ARTIFACT_DIR`. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi.
+Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, `REFRESH_TIMES`, dan `REPORT_ARTIFACT_DIR`. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi. Login operator membatasi lima kegagalan per alamat klien dalam jendela 15 menit, lalu menahan percobaan selama 15 menit. Penghitung ini berada di memori proses Next.js dan ditujukan untuk satu instance; sebelum menjalankan beberapa instance, pindahkan pembatasan ke penyimpanan bersama.
 
 Operasional yang dituju mencakup:
 
@@ -277,15 +277,15 @@ Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan sche
 | 1. Fondasi bersama | Perhitungan/publikasi terpisah dari tampilan | Sudah diterapkan; perlu terus dijaga | Semua jalur memakai aturan perhitungan dan validasi yang konsisten |
 | 2. Repository | Laporan aktif dan versi di PostgreSQL | Sudah diterapkan | Impor, kegagalan publikasi, dan pemulihan penyimpanan tervalidasi |
 | 3. API | Kontrak baca dan akses backend yang stabil | Implementasi awal tersedia | Kontrak, autentikasi, serta kesetaraan angka diverifikasi melalui integrasi |
-| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; scheduler, job ekspor, dan endpoint unduh tersedia | Integrasi terverifikasi, jadwal bisnis, penyimpanan artefak persisten, serta pemulihan tersedia |
+| 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; scheduler, job ekspor, dan endpoint unduh tersedia; uji lokal terisolasi untuk enqueue, alur worker, kegagalan ekspor, dan dispatch scheduler lulus | Integrasi PostgreSQL dan HTTP terverifikasi, jadwal bisnis, penyimpanan artefak persisten, serta pemulihan tersedia |
 | 5. Frontend baru | Next.js mencapai kesetaraan fitur baca MVP | Dashboard baca, grafik riwayat, tema/teks, dan alur ekspor PDF tersedia; build serta pemeriksaan TypeScript berhasil | Integrasi API dengan data representatif, worker ekspor, responsif, serta penerimaan alur baca diverifikasi |
-| 6. Fitur operasional frontend | Monitor live dan refresh operator di Next.js | Implementasi awal tersedia: polling monitor live, fallback snapshot, login sesi operator, dan refresh melalui worker | Alur API/worker, batas percobaan login, kontrol akses deployment, polling refresh, dan fallback sumber diverifikasi |
+| 6. Fitur operasional frontend | Monitor live dan refresh operator di Next.js | Implementasi monitor, fallback snapshot, sesi operator, refresh worker, dan batas login lokal tersedia | Alur API/worker, kontrol akses deployment, polling refresh, dan fallback sumber diverifikasi |
 | 7. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
 | 8. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |
 
 Penguatan kualitas, keamanan, dan pengujian dilakukan sepanjang tahap; tidak seluruhnya ditunda sampai tahap terakhir.
 
-**Prioritas implementasi berikutnya:** memverifikasi antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; membatasi percobaan login sebelum deployment; lalu menguatkan penyimpanan artefak untuk deployment multi-host. Laporan baru menyimpan riwayat SBN yang dipakai saat PDF dibuat; laporan lama belum memiliki riwayat terikat versi. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
+**Prioritas implementasi berikutnya:** memverifikasi antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; memeriksa kontrol akses deployment; lalu menguatkan penyimpanan artefak dan pembatasan login bersama untuk deployment multi-host. Laporan baru menyimpan riwayat SBN yang dipakai saat PDF dibuat; laporan lama belum memiliki riwayat terikat versi. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
 
 Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditetapkan.
 
@@ -319,7 +319,7 @@ Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditet
 
 Baseline dan target numerik belum tersedia. Target ditetapkan setelah kebutuhan operasional dan hasil pengukuran awal diketahui.
 
-Pemeriksaan sebelumnya mencakup pipeline/UI/PDF pada tahap terdahulu, pembacaan repository PostgreSQL, serta pemeriksaan sintaks migrasi/API/worker. Pengujian HTTP untuk kontrak/autentikasi dan pengujian worker menyeluruh termasuk konkurensi/pemulihan belum menjadi bukti penerimaan tahap saat ini.
+Pemeriksaan lokal mencakup pipeline/UI/PDF pada tahap terdahulu, pemeriksaan TypeScript dan lint untuk berkas frontend yang berubah, serta tujuh uji terisolasi untuk kontrak API, enqueue refresh, alur worker memakai repository tiruan, kegagalan ekspor PDF, dan dispatch scheduler. Uji worker ini tidak menulis ke database pengguna. Integrasi melalui HTTP dan PostgreSQL, konkurensi/pemulihan, serta uji rute batas login belum diverifikasi. Lint penuh frontend masih memiliki tiga temuan pada berkas lain yang sudah ada.
 
 ## 15. Ketergantungan dan keputusan terbuka
 

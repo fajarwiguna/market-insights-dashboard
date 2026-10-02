@@ -5,6 +5,55 @@ import { getServerApiConfig } from "@/lib/api/server-config";
 
 const COOKIE_NAME = "market_operator_session";
 const SESSION_HOURS = 8;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILURES = 5;
+
+type LoginAttemptState = { windowStartedAt: number; failures: number; blockedUntil: number };
+type LoginGlobal = typeof globalThis & { marketOperatorLoginAttempts?: Map<string, LoginAttemptState> };
+const loginAttempts = ((globalThis as LoginGlobal).marketOperatorLoginAttempts ??=
+  new Map<string, LoginAttemptState>());
+
+function clientKey(request: Request) {
+  // Configure the reverse proxy to overwrite x-real-ip with the connecting client address.
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim();
+  return (realIp || forwardedFor || "unknown").slice(0, 128);
+}
+
+function pruneLoginAttempts(now: number) {
+  if (loginAttempts.size < 2_000) return;
+  for (const [key, state] of loginAttempts) {
+    if (state.blockedUntil <= now && now - state.windowStartedAt >= LOGIN_WINDOW_MS) {
+      loginAttempts.delete(key);
+    }
+  }
+}
+
+export function operatorLoginRetryAfter(request: Request, now = Date.now()) {
+  const key = clientKey(request);
+  const state = loginAttempts.get(key);
+  if (!state) return 0;
+  if (state.blockedUntil > now) return Math.ceil((state.blockedUntil - now) / 1000);
+  if (now - state.windowStartedAt >= LOGIN_WINDOW_MS) loginAttempts.delete(key);
+  return 0;
+}
+
+export function recordOperatorLoginFailure(request: Request, now = Date.now()) {
+  const key = clientKey(request);
+  const current = loginAttempts.get(key);
+  const state = !current || now - current.windowStartedAt >= LOGIN_WINDOW_MS
+    ? { windowStartedAt: now, failures: 0, blockedUntil: 0 }
+    : current;
+  state.failures += 1;
+  if (state.failures >= LOGIN_MAX_FAILURES) state.blockedUntil = now + LOGIN_WINDOW_MS;
+  loginAttempts.set(key, state);
+  pruneLoginAttempts(now);
+  return operatorLoginRetryAfter(request, now);
+}
+
+export function clearOperatorLoginFailures(request: Request) {
+  loginAttempts.delete(clientKey(request));
+}
 
 function sessionSecret() {
   const secret = process.env.WEB_OPERATOR_SESSION_SECRET;

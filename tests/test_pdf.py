@@ -1,6 +1,6 @@
 """
 Unit test untuk PDF laporan — memastikan file yang diunduh dashboard berisi
-angka yang SEDANG TAMPIL, bukan file lama di folder reports/ dan bukan grafik
+angka yang SEDANG TAMPIL, bukan file lama di folder runtime/reports/ dan bukan grafik
 dengan angka hard-coded.
 
 Yang diuji:
@@ -139,7 +139,7 @@ def test_grafik_pdf_sama_dengan_layar() -> None:
 def test_deret_dari_snapshot() -> None:
     tanggal, sbn, ust = charts.seri_dari_snapshot()
     if not tanggal:
-        cek("snapshot tersedia untuk diuji", False, "data/report_data.json tidak terbaca")
+        cek("snapshot tersedia untuk diuji", False, "runtime/data/report_data.json tidak terbaca")
         return
     laporan = app.load_report() or {}
     f = app.market_facts(laporan)
@@ -155,7 +155,7 @@ def test_deret_dari_snapshot() -> None:
     cek("grafik tidak memakai seri contoh hard-coded",
         charts.seri_dari_snapshot()[2] != [4.55, 4.62, 4.70, 4.65, 4.58, 4.52, 4.55, 4.60])
 
-    kosong = charts.seri_dari_snapshot(path=ROOT / "data" / "tidak_ada.json")
+    kosong = charts.seri_dari_snapshot(path=ROOT / "runtime" / "data" / "tidak_ada.json")
     cek("snapshot hilang → seri kosong (bukan data palsu)", kosong == ([], [], []), str(kosong))
 
 

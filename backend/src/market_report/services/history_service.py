@@ -7,9 +7,10 @@ from market_report.infrastructure.repositories.history_repository import (
     JsonSbnHistoryRepository,
     configured_history_repository,
 )
+from market_report.config import market_data_directory
 
 
-_HISTORY_PATH = Path(__file__).resolve().parents[4] / "data" / "history_sbn.json"
+_HISTORY_PATH = market_data_directory() / "history_sbn.json"
 
 
 def source_date_iso(value) -> str | None:

@@ -17,8 +17,10 @@ from typing import Dict, Any, List
 import requests
 from bs4 import BeautifulSoup
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
-DATA_DIR.mkdir(exist_ok=True)
+from market_report.config import market_data_directory
+
+DATA_DIR = market_data_directory()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 HEADERS = {
     "User-Agent": (

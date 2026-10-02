@@ -18,14 +18,10 @@ env/
 # Streamlit secrets
 .streamlit/secrets.toml
 
-# Local generated market data and history
-/data/*.json
-!/data/.gitkeep
-/data/report_data_versions/
-
-# Generated reports and charts
-/reports/*.pdf
-/charts/*.png
+# Local generated data, reports, and charts
+/runtime/data/
+/runtime/reports/
+/runtime/charts/
 
 # Local visual check output
 /_cek_*.png

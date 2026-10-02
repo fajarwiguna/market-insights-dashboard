@@ -135,7 +135,7 @@ def main() -> int:
     else:
         print("OK  : tombol perbarui grafik ada")
 
-    # Tombol unduh PDF harus lahir dari data yang tampil (bukan file lama di reports/)
+    # Tombol unduh PDF harus lahir dari data yang tampil (bukan file lama di runtime/reports/)
     unduhan = at.get("download_button")
     if not any("PDF" in (d.label or "") for d in unduhan):
         ok = False

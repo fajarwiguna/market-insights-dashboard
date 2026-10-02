@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from market_report.config import load_environment
+from market_report.config import load_environment, market_data_directory
 from market_report.infrastructure.repositories.history_repository import (
     JsonSbnHistoryRepository,
     PostgresSbnHistoryRepository,
@@ -140,7 +140,7 @@ def main() -> int:
 
     apply_schema_migrations(database_url)
 
-    data_dir = Path(__file__).resolve().parents[3] / "data"
+    data_dir = market_data_directory()
     source = JsonReportRepository(data_dir / "report_data.json")
     archived = source.list_versions(limit=10000)
     active = source.get_active()

@@ -10,7 +10,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+from market_report.config import market_data_directory
+
+DATA_DIR = market_data_directory()
 
 
 def load_snapshot() -> Dict[str, Any]:

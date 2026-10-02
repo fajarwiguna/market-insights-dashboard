@@ -27,10 +27,12 @@ from reportlab.platypus import (
     Image, Flowable, KeepTogether, CondPageBreak, HRFlowable
 )
 
-REPORT_DIR = Path(__file__).resolve().parents[3] / "reports"
-CHART_DIR = Path(__file__).resolve().parents[3] / "charts"
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
-REPORT_DIR.mkdir(exist_ok=True)
+from market_report.config import chart_directory, market_data_directory, report_artifact_directory
+
+REPORT_DIR = report_artifact_directory()
+CHART_DIR = chart_directory()
+DATA_DIR = market_data_directory()
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Token desain: satu sumber warna & ukuran agar semua halaman seragam ──
 # Nilainya sengaja sama dengan design token CSS di dashboard (app.py) supaya
@@ -515,9 +517,9 @@ def build_pdf(
     meneruskan path-nya, supaya isi PDF selalu sama dengan yang tampil.
 
     Args:
-        report      : data laporan. Kalau None, dibaca dari data/report_data.json.
+        report      : data laporan. Kalau None, dibaca dari runtime/data/report_data.json.
         chart_path  : PNG grafik selisih imbal hasil. Kalau None, pakai
-                      charts/rate_differential.png bila ada; bila tidak ada,
+                      runtime/charts/rate_differential.png bila ada; bila tidak ada,
                       bagian grafik dilewati (tidak pernah diisi angka contoh).
         out_path    : tujuan tulis di disk. Diabaikan bila `stream` diisi.
         stream      : bila diisi (mis. io.BytesIO()), PDF tidak ditulis ke disk

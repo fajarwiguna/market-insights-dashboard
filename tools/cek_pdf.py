@@ -38,7 +38,7 @@ def teks_halaman(isi: bytes) -> str:
 
 
 def main() -> None:
-    laporan = json.loads((ROOT / "data" / "report_data.json").read_text(encoding="utf-8"))
+    laporan = json.loads((ROOT / "runtime" / "data" / "report_data.json").read_text(encoding="utf-8"))
     pdf, nama = build_pdf(laporan, stream=io.BytesIO())
     (ROOT / "_cek.pdf").write_bytes(pdf)
     print(f"{nama}  —  {len(pdf):,} byte")
