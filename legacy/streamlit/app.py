@@ -15,7 +15,7 @@ Susunan halaman (tanpa nomor bagian — penandanya pil kecil + judul besar):
     7. Glosarium & cara membaca, unduh PDF, dan (opsional) sumber data
 
 Dua sumber angka sengaja dibedakan:
-  - snapshot harian (data/report_data.json) → kartu, tabel, PDF: konsisten
+  - snapshot harian (runtime/data/report_data.json) → kartu, tabel, PDF: konsisten
   - harga terkini dari Yahoo Finance        → grafik: berubah saat disegarkan
 
 Run:  streamlit run src/app.py
@@ -58,11 +58,12 @@ from market_report.presentation.charts import (
 from market_report.presentation.formatting import _waktu_lokal
 from market_report.services import export_service, history_service, refresh_service, report_service
 from market_report.services.live_service import LIVE_SPOT, fetch_live_prices, pasang_angka_langsung
+from market_report.config import chart_directory, market_data_directory, report_artifact_directory
 
-CHART_DIR = ROOT.parent / "charts"
-REPORT_DIR = ROOT.parent / "reports"
+CHART_DIR = chart_directory()
+REPORT_DIR = report_artifact_directory()
 LIVE_TTL_DETIK = 45
-HISTORI_SBN = ROOT.parent / "data" / "history_sbn.json"
+HISTORI_SBN = market_data_directory() / "history_sbn.json"
 _DEFAULT_HISTORI_SBN = HISTORI_SBN
 
 st.set_page_config(

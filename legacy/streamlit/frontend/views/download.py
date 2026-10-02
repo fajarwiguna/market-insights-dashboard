@@ -11,7 +11,7 @@ def render_download(report: dict, sbn_hist: list[dict], *, pdf_builder, refresh_
     """
     Unduhan PDF.
 
-    Versi lama hanya menawarkan file lama yang tersimpan di folder reports/ — bisa
+    Versi lama hanya menawarkan file lama yang tersimpan di runtime/reports/ — bisa
     jadi bertanggal jauh lebih lama daripada angka di layar. Sekarang PDF selalu
     disusun dari objek `report` yang sedang dirender di halaman ini.
     """
@@ -56,8 +56,8 @@ def render_download(report: dict, sbn_hist: list[dict], *, pdf_builder, refresh_
                 except Exception as e:
                     st.error(f"Gagal mengambil data terbaru: {e}")
     with aksi[1]:
-        if st.button("💾 Simpan salinan ke folder reports/", width="stretch",
-                     help="Simpan PDF yang sama ke folder reports/ sebagai arsip."):
+        if st.button("💾 Simpan salinan ke runtime/reports/", width="stretch",
+                     help="Simpan PDF yang sama ke runtime/reports/ sebagai arsip."):
             path = report_dir / nama
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,5 +69,5 @@ def render_download(report: dict, sbn_hist: list[dict], *, pdf_builder, refresh_
     lama = sorted((p for p in report_dir.glob("Daily_Market_Update_*.pdf") if p.name != nama),
                   reverse=True) if report_dir.exists() else []
     if lama:
-        st.caption(f"Arsip PDF lain di folder reports/: {', '.join(p.name for p in lama[:3])}"
+        st.caption(f"Arsip PDF lain di runtime/reports/: {', '.join(p.name for p in lama[:3])}"
                    f"{' …' if len(lama) > 3 else ''} — bukan yang diunduh lewat tombol di atas.")
