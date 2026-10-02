@@ -1,6 +1,6 @@
 **Dokumen kerja sementara untuk migrasi bertahap ke FastAPI + Next.js.** Peta struktur proyek akhir pada bagian 2 menjadi acuan saat pemindahan kode. Simpan dokumen ini sampai semua tahap migrasi selesai dan struktur akhir diverifikasi; setelah itu pindahkan ringkasan yang masih diperlukan ke dokumentasi permanen dan hapus berkas ini sesuai arahan pemilik proyek.
 
-Status implementasi berubah sejak rancangan awal: modul API, domain, layanan, worker, scheduler, dan migrasi schema kini dihimpun di `backend/`; import Python masih memakai layout transisi dan belum menjadi package terpasang. Streamlit lama berada di `legacy/streamlit/`, dengan `src/app.py` sebagai entry point kompatibilitas. Dashboard Next.js di `web/` mencakup ringkasan, insight, dampak praktis, indikator, tabel, sumber, glosarium, grafik riwayat, pengaturan tema/teks, ekspor PDF per versi, monitor live, dan refresh melalui worker. API memakai fungsi analisis domain yang sama dengan Streamlit; token baca/operator tetap berada di server melalui route handler Next.js. Refresh web memakai sesi operator bertanda tangan dengan cookie HttpOnly; kata sandi operator dan secret sesi merupakan konfigurasi server terpisah. Riwayat SBN kini disimpan bersama versi laporan baru untuk pembuatan PDF. Production build, pemeriksaan TypeScript, tes pipeline, PDF, live, dan smoke test Streamlit berhasil. Uji alur runtime worker, pembatasan login, serta kontrol akses pada lingkungan deployment belum diverifikasi. Lihat `docs/PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
+Status implementasi berubah sejak rancangan awal: backend sekarang memakai package Python `market_report` pada `backend/src/market_report/`, dengan konfigurasi setuptools di `backend/pyproject.toml` dan dependensi backend tersendiri. Migrasi SQL tetap berada di `backend/migrations/`; Streamlit lama ada di `legacy/streamlit/` dan `src/app.py` tetap menjadi entry point kompatibilitas. Dashboard Next.js di `web/` mencakup ringkasan, insight, dampak praktis, indikator, tabel, sumber, glosarium, grafik riwayat, pengaturan tema/teks, ekspor PDF per versi, monitor live, dan refresh melalui worker. API memakai fungsi analisis domain yang sama dengan Streamlit; token baca/operator tetap berada di server melalui route handler Next.js. Refresh web memakai sesi operator bertanda tangan dengan cookie HttpOnly; kata sandi operator dan secret sesi merupakan konfigurasi server terpisah. Riwayat SBN kini disimpan bersama versi laporan baru untuk pembuatan PDF. Tes pipeline, PDF, live, smoke test Streamlit, compileall, instalasi editable package, dan health check API berhasil setelah pengemasan backend. Uji alur runtime worker, pembatasan login, serta kontrol akses pada lingkungan deployment belum diverifikasi. Lihat `docs/PROJECT_BRIEF.md` untuk status produk dan roadmap terkini.
 
 Asumsi kerja: aplikasi digunakan oleh tim internal, sebagian besar aktivitas berupa membaca laporan, dan pembaruan data dilakukan oleh operator atau scheduler. Rancangan ini menjadi peta migrasi; implementasi berjalan bertahap.
 
@@ -37,46 +37,32 @@ flowchart TD
 
 FastAPI mendukung pemisahan endpoint melalui router modular. Next.js dapat memisahkan tampilan awal di server dari komponen interaktif di browser. Ini cocok untuk laporan yang dibaca terlebih dahulu, kemudian tabel dan grafik yang digunakan secara interaktif. [Dokumentasi FastAPI (https://fastapi.tiangolo.com/tutorial/bigger-applications/)](<https://fastapi.tiangolo.com/tutorial/bigger-applications/>), [dokumentasi Next.js (https://nextjs.org/docs/app/getting-started/server-and-client-components)](<https://nextjs.org/docs/app/getting-started/server-and-client-components>).
 
-**2\. Struktur proyek yang dituju**
+**2. Struktur proyek yang dituju**
 
-Struktur ini dibangun bertahap; modul dipindahkan setelah perilakunya memiliki pengujian.
+Susunan berikut menjelaskan lokasi kode setelah pemindahan package backend. Layer domain dan layanan akan terus dipisahkan secara bertahap di dalam `market_report`.
 
 ```
 daily_market_report/
 ├── backend/
 │   ├── pyproject.toml
-│   ├── src/market_report/
-│   │   ├── domain/
-│   │   │   ├── models.py
-│   │   │   ├── calculations.py
-│   │   │   └── analysis.py
-│   │   ├── application/
-│   │   │   ├── report_service.py
-│   │   │   ├── refresh_service.py
-│   │   │   └── export_service.py
-│   │   ├── infrastructure/
-│   │   │   ├── providers/
-│   │   │   ├── repositories/
-│   │   │   └── rendering/
-│   │   ├── api/
-│   │   │   ├── routes/
-│   │   │   ├── schemas/
-│   │   │   └── dependencies.py
-│   │   ├── worker/
-│   │   └── config.py
+│   ├── requirements.txt
 │   ├── migrations/
-│   └── tests/
+│   └── src/market_report/
+│       ├── api/
+│       ├── domain/
+│       ├── presentation/
+│       ├── services/
+│       ├── scheduler/
+│       ├── worker/
+│       ├── calculate.py
+│       ├── fetch_data.py
+│       ├── report_pdf.py
+│       └── run_pipeline.py
 ├── web/
-│   ├── src/app/
-│   ├── src/features/
-│   │   ├── dashboard/
-│   │   ├── market-monitor/
-│   │   └── reports/
-│   ├── src/components/
-│   ├── src/lib/api/
-│   └── tests/
 ├── legacy/streamlit/
-├── deploy/
+├── src/app.py
+├── tests/
+├── data/
 └── docs/
 ```
 
@@ -84,15 +70,14 @@ Pemetaan kode sekarang:
 
 | Kode sekarang | Arah perubahan |
 |---|---|
-| `domain/market_analysis.py` | Pisahkan perhitungan/penilaian dari format angka dan HTML |
-| `calculate.py` | Jadikan pembentukan laporan fungsi tanpa penulisan berkas |
-| `fetch_data.py` | Pecah menjadi adapter Yahoo, PHEI, BI, dan sumber cadangan |
-| `services/report_service.py` | Menjadi alur publikasi laporan bersama |
-| `services/history_service.py` | Menyimpan observasi melalui repository |
-| `report_pdf.py` dan pembuat grafik | Tetap Python; dipanggil oleh layanan ekspor |
+| `backend/src/market_report/domain/market_analysis.py` | Pisahkan perhitungan/penilaian dari format angka dan HTML |
+| `backend/src/market_report/calculate.py` | Jadikan pembentukan laporan fungsi tanpa penulisan berkas |
+| `backend/src/market_report/fetch_data.py` | Pecah menjadi adapter Yahoo, PHEI, BI, dan sumber cadangan |
+| `backend/src/market_report/services/report_service.py` | Menjadi alur publikasi laporan bersama |
+| `backend/src/market_report/services/history_service.py` | Menyimpan observasi melalui repository |
+| `backend/src/market_report/report_pdf.py` dan pembuat grafik | Tetap Python; dipanggil oleh layanan ekspor |
 | `legacy/streamlit/` | Menampung frontend Streamlit selama transisi; dilepas setelah pengganti diverifikasi |
 | `src/app.py` | Entry point kompatibilitas untuk menjalankan dashboard lama |
-
 **3\. Kontrak data sebelum frontend baru**
 
 Frontend baru harus menerima data terstruktur, bukan HTML atau hasil format angka dari backend.

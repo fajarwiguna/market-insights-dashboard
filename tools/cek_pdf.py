@@ -14,9 +14,9 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "backend" / "src"))
 
-from report_pdf import build_pdf                     # noqa: E402
+from market_report.report_pdf import build_pdf                     # noqa: E402
 
 
 def stream_isi(pdf: bytes) -> list[bytes]:

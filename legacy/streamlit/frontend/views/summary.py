@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from domain.market_analysis import build_impacts, build_insights, build_summary
+from market_report.domain.market_analysis import build_impacts, build_insights, build_summary
 from frontend.components import esc, section_head
 
 

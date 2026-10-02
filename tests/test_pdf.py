@@ -26,7 +26,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "backend" / "src"))
 sys.path.insert(0, str(ROOT / "src"))
 warnings.filterwarnings("ignore")
 
@@ -40,8 +40,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt               # noqa: E402
 
 import app                                   # noqa: E402
-import charts                                # noqa: E402
-from report_pdf import build_pdf             # noqa: E402
+from market_report import charts                                # noqa: E402
+from market_report.report_pdf import build_pdf             # noqa: E402
 
 
 GAGAL: list[str] = []
@@ -180,7 +180,7 @@ def test_pdf_tidak_import_app() -> None:
     diteruskan lewat chart_path / fx_chart_path.
     """
     import ast
-    sumber = (ROOT / "backend" / "report_pdf.py").read_text(encoding="utf-8")
+    sumber = (ROOT / "backend" / "src" / "market_report" / "report_pdf.py").read_text(encoding="utf-8")
     impor: set[str] = set()
     for simpul in ast.walk(ast.parse(sumber)):
         if isinstance(simpul, ast.Import):

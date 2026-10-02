@@ -2,13 +2,13 @@
 
 import streamlit as st
 
-from domain.market_analysis import market_facts
+from market_report.domain.market_analysis import market_facts
 from frontend.components import chips_html, kpi_card, section_head, tone_legend
-from presentation.colors import COLOR_DOWN, COLOR_UP, COLOR_WARN
-from presentation.formatting import (
+from market_report.presentation.colors import COLOR_DOWN, COLOR_UP, COLOR_WARN
+from market_report.presentation.formatting import (
     _delta_bp, _delta_label, fmt_bp, fmt_num, fmt_pct, spread_word, tone_of,
 )
-from presentation.sparklines import sparkline_values
+from market_report.presentation.sparklines import sparkline_values
 from frontend.components import sparkline_svg
 
 

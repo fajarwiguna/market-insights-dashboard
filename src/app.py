@@ -5,7 +5,7 @@ import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_ROOT = PROJECT_ROOT / "backend"
+SOURCE_ROOT = PROJECT_ROOT / "backend" / "src"
 LEGACY_APP = PROJECT_ROOT / "legacy" / "streamlit" / "app.py"
 
 sys.path.insert(0, str(SOURCE_ROOT))

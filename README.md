@@ -53,7 +53,7 @@ PostgreSQL, salin `.env.example` menjadi `.env`, isi kredensial database, lalu i
 lokal dengan:
 
 ```powershell
-python backend/migrate_reports_to_postgres.py
+python backend/src/market_report/migrate_reports_to_postgres.py
 python -m streamlit run src/app.py
 ```
 
@@ -67,7 +67,7 @@ Seluruh kolom tanggal pada tabel PostgreSQL memakai nama `dates`.
 Untuk menerapkan perubahan schema tanpa mengimpor ulang snapshot lokal, jalankan:
 
 ```powershell
-python backend/apply_schema_migrations.py
+python backend/src/market_report/apply_schema_migrations.py
 ```
 
 Perintah ini aman dijalankan berulang. `migrate_reports_to_postgres.py` tetap dipakai
@@ -80,7 +80,7 @@ FastAPI dapat dijalankan berdampingan dengan Streamlit. API memuat konfigurasi `
 sama dan membaca repository laporan yang sama:
 
 ```powershell
-python -m uvicorn api.main:app --app-dir backend --host 127.0.0.1 --port 8000
+python -m uvicorn market_report.api.main:app --app-dir backend/src --host 127.0.0.1 --port 8000
 ```
 
 - `GET http://127.0.0.1:8000/api/v1/reports/latest` — laporan aktif.
@@ -107,7 +107,7 @@ token di server pemanggil, bukan di kode browser. Endpoint refresh memakai token
 Jalankan worker dalam terminal/proses terpisah:
 
 ```powershell
-python backend/worker/main.py
+python backend/src/market_report/worker/main.py
 ```
 
 Worker memproses satu refresh pada satu waktu, mencoba ulang kegagalan hingga tiga kali,
@@ -130,7 +130,7 @@ koma, misalnya `16:30`. Zona waktu default `Asia/Jakarta` dan dapat diubah melal
 `REFRESH_TIMEZONE`. Jalankan scheduler sebagai proses terpisah dari worker:
 
 ```powershell
-python backend/scheduler/main.py
+python backend/src/market_report/scheduler/main.py
 ```
 
 Scheduler mencatat setiap slot secara persisten di PostgreSQL, sehingga restart dan beberapa
@@ -325,13 +325,13 @@ Setelah live fetch, file berikut ikut ter-update:
 
 ```bash
 # Demo (angka sample)
-python backend/run_pipeline.py --demo
+python backend/src/market_report/run_pipeline.py --demo
 
 # PostgreSQL: masukkan refresh ke antrean worker
-python backend/run_pipeline.py
+python backend/src/market_report/run_pipeline.py
 
 # Mode JSON lokal saja: pakai snapshot yang sudah ada (cepat, offline)
-python backend/run_pipeline.py --no-fetch
+python backend/src/market_report/run_pipeline.py --no-fetch
 ```
 
 Dalam mode PostgreSQL, perintah live mengantrekan refresh lalu keluar; worker harus
@@ -361,7 +361,7 @@ crontab -e
 Contoh: update setiap hari kerja jam **16:30 WIB** (setelah pasar tutup):
 
 ```cron
-30 16 * * 1-5  cd /path/ke/daily_market_report && /usr/bin/python3 backend/run_pipeline.py >> logs/pipeline.log 2>&1
+30 16 * * 1-5  cd /path/ke/daily_market_report && /usr/bin/python3 backend/src/market_report/run_pipeline.py >> logs/pipeline.log 2>&1
 ```
 
 Lalu buka dashboard kapan saja — data sudah terisi dari cron, jadi tidak perlu klik apa pun di sidebar.
@@ -372,7 +372,7 @@ Lalu buka dashboard kapan saja — data sudah terisi dari cron, jadi tidak perlu
 2. Trigger: Daily, jam 16:30.
 3. Action: Start a program  
    - Program: `python`  
-   - Arguments: `backend/run_pipeline.py`
+   - Arguments: `backend/src/market_report/run_pipeline.py`
    - Start in: folder `daily_market_report`
 
 ### Opsi C — Auto-refresh di dalam Streamlit (opsional)
@@ -458,7 +458,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 
 ## 8. Tips operasional
 
-1. **Setelah pasar tutup** (sekitar 16:00–17:00 WIB) → klik **🔄 Perbarui data dari sumber (live)** di sidebar, atau jalankan `python backend/run_pipeline.py`.
+1. **Setelah pasar tutup** (sekitar 16:00–17:00 WIB) → klik **🔄 Perbarui data dari sumber (live)** di sidebar, atau jalankan `python backend/src/market_report/run_pipeline.py`.
 2. Siang hari / presentasi → biarkan dashboard memakai snapshot terakhir (tidak perlu klik perbarui data) agar cepat dan stabil.
 3. Jika PHEI atau BI lambat/error, pipeline tetap jalan dengan data yfinance; yield SBN bisa kosong sampai scraper sukses lagi.
 4. PDF terbaru bisa di-download langsung dari tombol di bawah dashboard.
@@ -473,7 +473,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 | Data pasar kosong / pembaruan ditolak | Periksa pesan error dan `data/snapshot.json`; pastikan terminal memiliki akses internet ke Yahoo Finance dan PHEI, lalu klik **🔄 Perbarui data dari sumber (live)** lagi. Pembaruan dengan kurang dari dua instrumen berhasil ditolak agar tidak menimpa laporan yang ada. |
 | Hanya sebagian instrumen yang muncul | Sumber berbeda dapat gagal secara terpisah. Cek bagian **Sumber Data & Metode** dan `data/snapshot.json`, lalu coba pembaruan lagi. |
 | BI Rate / INDONIA / JISDOR tampak lama | Jika halaman BI tidak merespons, pipeline memakai angka cadangan; periksa tanggal pada bagian Sumber Data & Metode. |
-| Perlu melihat data contoh | Jalankan `python backend/run_pipeline.py --demo` hanya untuk demonstrasi lokal. Mode demo mengganti `data/report_data.json`. |
+| Perlu melihat data contoh | Jalankan `python backend/src/market_report/run_pipeline.py --demo` hanya untuk demonstrasi lokal. Mode demo mengganti `data/report_data.json`. |
 | Pembaruan data gagal | Cek koneksi dan akses jaringan ke sumber; coba lagi. Dashboard mempertahankan laporan terakhir yang berhasil disimpan. |
 | Tampilan terasa berubah / tidak nyaman dibaca | Klik tombol **🎨** di pojok kanan bawah → **↺ Kembalikan tampilan asli**, atau refresh halaman (pengaturan tampilan tidak disimpan) |
 | Perlu memastikan tampilan tidak rusak setelah diubah | Jalankan `python tests/smoke_app.py` (harus berakhir `HASIL: PASS`) |
@@ -492,7 +492,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 Setiap hari (manual atau cron)
         │
         ▼
-python backend/run_pipeline.py     ← fetch live + calculate + chart + PDF
+python backend/src/market_report/run_pipeline.py     ← fetch live + calculate + chart + PDF
         │
         ▼
 data/report_data.json ter-update

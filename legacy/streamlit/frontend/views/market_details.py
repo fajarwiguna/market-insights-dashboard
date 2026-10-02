@@ -4,8 +4,8 @@ import pandas as pd
 import streamlit as st
 
 from frontend.components import section_head
-from presentation.formatting import _delta_bp, arrow, fmt_num, fmt_pct
-from presentation.market_metadata import COMMODITY_NOTES, YIELD_NOTES
+from market_report.presentation.formatting import _delta_bp, arrow, fmt_num, fmt_pct
+from market_report.presentation.market_metadata import COMMODITY_NOTES, YIELD_NOTES
 
 
 def _fx_decimals(rate) -> int:

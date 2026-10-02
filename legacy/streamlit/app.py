@@ -31,12 +31,12 @@ import streamlit as st
 LEGACY_ROOT = Path(__file__).resolve().parent
 ROOT = Path(__file__).resolve().parents[2] / "backend"
 sys.path.insert(0, str(LEGACY_ROOT))
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
-from domain.market_analysis import (
+from market_report.domain.market_analysis import (
     build_market_status, market_facts, market_sentiment,
 )
-from domain.market_data import find_key
+from market_report.domain.market_data import find_key
 from frontend.appearance import render_appearance_editor
 from frontend.components import chips_html, esc
 from frontend.footer import render_footer
@@ -52,12 +52,12 @@ from frontend.views.market_monitor import INTERVAL_LANGSUNG, render_market_monit
 from frontend.views.overview import render_kpis
 from frontend.views.sources import render_sources as render_data_sources
 from frontend.views.summary import render_headline, render_impacts
-from presentation.charts import (
+from market_report.presentation.charts import (
     FX_QUOTE_NAMES, deret_harga, gabung_sumbu, make_fx_chart, make_rate_diff_chart,
 )
-from presentation.formatting import _waktu_lokal
-from services import export_service, history_service, refresh_service, report_service
-from services.live_service import LIVE_SPOT, fetch_live_prices, pasang_angka_langsung
+from market_report.presentation.formatting import _waktu_lokal
+from market_report.services import export_service, history_service, refresh_service, report_service
+from market_report.services.live_service import LIVE_SPOT, fetch_live_prices, pasang_angka_langsung
 
 CHART_DIR = ROOT.parent / "charts"
 REPORT_DIR = ROOT.parent / "reports"

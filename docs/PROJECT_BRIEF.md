@@ -188,12 +188,13 @@ Streamlit masih memanggil layanan Python secara langsung. API dan worker menggun
 |---|---|
 | `src/app.py` | Entry point kompatibilitas dashboard Streamlit |
 | `legacy/streamlit/` | Aplikasi lama serta komponen, tema, dan halamannya |
-| `backend/domain/` | Logika dan analisis pasar |
-| `backend/services/` | Alur laporan, repository, riwayat, live, ekspor, dan job |
-| `backend/presentation/` | Format angka dan komponen grafik/presentasi |
-| `backend/api/` | Endpoint, schema respons, dan autentikasi API |
-| `backend/worker/` | Pemrosesan antrean refresh |
-| `backend/fetch_data.py`, `backend/calculate.py` | Pengambilan sumber dan pembentukan laporan |
+| `backend/src/market_report/domain/` | Logika dan analisis pasar |
+| `backend/src/market_report/services/` | Alur laporan, repository, riwayat, live, ekspor, dan job |
+| `backend/src/market_report/presentation/` | Format angka dan komponen grafik/presentasi |
+| `backend/src/market_report/api/` | Endpoint, schema respons, dan autentikasi API |
+| `backend/src/market_report/worker/` | Pemrosesan antrean refresh |
+| `backend/src/market_report/fetch_data.py`, `calculate.py` | Pengambilan sumber dan pembentukan laporan |
+| `backend/pyproject.toml`, `backend/requirements.txt` | Metadata package dan dependensi backend |
 | `backend/migrations/` | Migrasi schema PostgreSQL |
 | `tests/` | Pengujian yang tersedia |
 | `data/`, `charts/`, `reports/` | Data lokal dan keluaran pipeline |
@@ -202,7 +203,7 @@ Streamlit masih memanggil layanan Python secara langsung. API dan worker menggun
 
 Frontend Next.js + TypeScript mengakses FastAPI. Backend Python mempertahankan perhitungan dan analisis. PostgreSQL menyimpan laporan, riwayat, dan job. Worker menangani refresh serta ekspor, dengan scheduler mengirim pekerjaan melalui antrean yang sama. Streamlit dipertahankan selama transisi sampai kesetaraan fungsi pengganti terbukti.
 
-Pemindahan folder menjadi struktur `backend/` dan `web/` dilakukan saat memberi manfaat nyata. Pemisahan tanggung jawab dan kontrak data menjadi prioritas sebelum penataan ulang direktori secara menyeluruh.
+Backend kini memakai package `market_report` dengan susunan `src/` dan konfigurasi package tersendiri. Streamlit lama mengakses package yang sama melalui entry point kompatibilitas. Pemisahan tanggung jawab dan kontrak data tetap menjadi prioritas sebelum penghapusan frontend lama.
 
 ## 11. Penyimpanan dan kontrak integrasi
 
@@ -258,7 +259,7 @@ Antrean mendukung deduplikasi job aktif per jenis/versi, pengambilan job dengan 
 
 Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Pemulihan setelah crash masih dapat menerbitkan versi tambahan; idempotensi publikasi dan jeda retry menjadi pekerjaan lanjutan.
 
-Skrip `backend/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru.
+Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru.
 
 ## 13. Roadmap dan urutan prioritas
 

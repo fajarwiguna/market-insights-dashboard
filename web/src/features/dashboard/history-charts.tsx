@@ -18,9 +18,13 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
     const selected = ranges.find((item) => item.id === range)?.days;
     const points = [...series.points].sort((a, b) => a.dates.localeCompare(b.dates));
     if (selected === null || !selected || points.length < 2) return points;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - selected);
-    const filtered = points.filter((point) => new Date(`${point.dates}T00:00:00`) >= cutoff);
+    // Anchor the range to the newest observation, not the current clock. That
+    // keeps server and browser renders identical and includes the latest data
+    // even when a report is older than the selected range.
+    const latestDate = new Date(`${points[points.length - 1].dates}T00:00:00Z`);
+    const cutoff = new Date(latestDate);
+    cutoff.setUTCDate(cutoff.getUTCDate() - selected);
+    const filtered = points.filter((point) => new Date(`${point.dates}T00:00:00Z`) >= cutoff);
     return filtered.length > 1 ? filtered : points.slice(-Math.min(points.length, 30));
   }, [range, series.points]);
 
@@ -54,7 +58,7 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
         })}
         <path d={path} fill="none" stroke={series.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         {data.map((point, index) => <circle key={`${point.dates}-${index}`} cx={x(index)} cy={y(point.close)} r={data.length < 45 ? 3 : 1.7} fill={series.color}>
-          <title>{point.dates}: {number.format(point.close)}{series.unit}</title>
+          <title>{`${point.dates}: ${number.format(point.close)}${series.unit}`}</title>
         </circle>)}
         {labels.map((point, index) => <text key={`${point.dates}-${index}`} x={x(Math.floor(index * (data.length - 1) / 2))} y={height - 8} textAnchor={index === 0 ? "start" : index === 2 ? "end" : "middle"} className="chart-axis-label">{point.dates}</text>)}
       </svg>

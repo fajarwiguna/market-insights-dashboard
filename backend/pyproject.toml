@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daily-market-report"
+version = "0.1.0"
+description = "Daily Market Report API and market data pipeline"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

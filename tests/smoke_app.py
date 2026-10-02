@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "backend" / "src"))
 
 from streamlit.testing.v1 import AppTest  # noqa: E402
 

@@ -7,8 +7,8 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "backend"))
-from services import report_service
+sys.path.insert(0, str(ROOT / "backend" / "src"))
+from market_report.services import report_service
 
 
 def valid_source_snapshot() -> dict:

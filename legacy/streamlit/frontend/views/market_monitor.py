@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 
 from frontend.components import section_head
-from presentation.charts import deret_harga, make_fx_chart, make_rate_diff_chart
+from market_report.presentation.charts import deret_harga, make_fx_chart, make_rate_diff_chart
 
 
 INTERVAL_LANGSUNG = {
