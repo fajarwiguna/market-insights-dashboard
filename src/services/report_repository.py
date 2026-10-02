@@ -90,7 +90,7 @@ class PostgresReportRepository:
     def list_versions(self, limit: int = 30) -> list[dict]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT payload FROM report_versions ORDER BY published_at DESC LIMIT %s",
+                "SELECT payload FROM report_versions ORDER BY dates DESC LIMIT %s",
                 (max(0, limit),),
             ).fetchall()
         return [row["payload"] for row in rows]
@@ -102,7 +102,7 @@ class PostgresReportRepository:
         published.setdefault("published_at", now.isoformat(timespec="seconds"))
         with self._connect() as connection:
             connection.execute(
-                """INSERT INTO report_versions (report_id, published_at, schema_version, payload)
+                """INSERT INTO report_versions (report_id, dates, schema_version, payload)
                    VALUES (%s, %s, %s, %s::jsonb)
                    ON CONFLICT (report_id) DO NOTHING""",
                 (published["report_id"], published["published_at"], published.get("schema_version", 1),

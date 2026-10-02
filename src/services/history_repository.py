@@ -54,28 +54,28 @@ class PostgresSbnHistoryRepository:
     def list(self, limit: int = 30) -> list[dict]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT observation_date, close FROM sbn_history ORDER BY observation_date DESC LIMIT %s",
+                "SELECT dates, close FROM sbn_history ORDER BY dates DESC LIMIT %s",
                 (max(0, limit),),
             ).fetchall()
-        return [{"date": row["observation_date"].isoformat(), "close": float(row["close"])} for row in reversed(rows)]
+        return [{"date": row["dates"].isoformat(), "close": float(row["close"])} for row in reversed(rows)]
 
     def upsert(self, date: str, close: float, limit: int = 30) -> list[dict]:
         with self._connect() as connection:
             connection.execute(
-                """INSERT INTO sbn_history (observation_date, close) VALUES (%s, %s)
-                   ON CONFLICT (observation_date) DO UPDATE SET close = EXCLUDED.close""",
+                """INSERT INTO sbn_history (dates, close) VALUES (%s, %s)
+                   ON CONFLICT (dates) DO UPDATE SET close = EXCLUDED.close""",
                 (date, close),
             )
             connection.execute(
-                """DELETE FROM sbn_history WHERE observation_date NOT IN
-                   (SELECT observation_date FROM sbn_history ORDER BY observation_date DESC LIMIT %s)""",
+                """DELETE FROM sbn_history WHERE dates NOT IN
+                   (SELECT dates FROM sbn_history ORDER BY dates DESC LIMIT %s)""",
                 (max(0, limit),),
             )
             rows = connection.execute(
-                "SELECT observation_date, close FROM sbn_history ORDER BY observation_date DESC LIMIT %s",
+                "SELECT dates, close FROM sbn_history ORDER BY dates DESC LIMIT %s",
                 (max(0, limit),),
             ).fetchall()
-        return [{"date": row["observation_date"].isoformat(), "close": float(row["close"])} for row in reversed(rows)]
+        return [{"date": row["dates"].isoformat(), "close": float(row["close"])} for row in reversed(rows)]
 
 
 def configured_history_repository(default_path: Path):

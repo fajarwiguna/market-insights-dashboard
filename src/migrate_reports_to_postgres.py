@@ -14,17 +14,96 @@ from services.history_repository import JsonSbnHistoryRepository, PostgresSbnHis
 from services.report_repository import JsonReportRepository, PostgresReportRepository
 
 
+def _split_sql_statements(sql: str) -> list[str]:
+    """Pisahkan statement tanpa memecah semicolon di string atau blok DO dollar-quote."""
+    statements = []
+    start = index = 0
+    quote = None
+    dollar_quote = None
+    line_comment = False
+    block_comment = False
+    while index < len(sql):
+        if line_comment:
+            if sql[index] == "\n":
+                line_comment = False
+            index += 1
+            continue
+        if block_comment:
+            if sql.startswith("*/", index):
+                block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if dollar_quote:
+            if sql.startswith(dollar_quote, index):
+                index += len(dollar_quote)
+                dollar_quote = None
+            else:
+                index += 1
+            continue
+        if quote:
+            if sql[index] == quote:
+                if index + 1 < len(sql) and sql[index + 1] == quote:
+                    index += 2
+                    continue
+                quote = None
+            index += 1
+            continue
+
+        if sql.startswith("--", index):
+            line_comment = True
+            index += 2
+        elif sql.startswith("/*", index):
+            block_comment = True
+            index += 2
+        elif sql[index] in ("'", '"'):
+            quote = sql[index]
+            index += 1
+        elif sql[index] == "$":
+            marker = re.match(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$", sql[index:])
+            if marker:
+                dollar_quote = marker.group(0)
+                index += len(dollar_quote)
+            else:
+                index += 1
+        elif sql[index] == ";":
+            statement = sql[start:index].strip()
+            if statement:
+                statements.append(statement)
+            index += 1
+            start = index
+        else:
+            index += 1
+    remainder = sql[start:].strip()
+    if remainder:
+        statements.append(remainder)
+    return statements
+
+
 def apply_schema_migrations(database_url: str) -> None:
     """Jalankan migrasi schema yang idempotent sebelum memindahkan data."""
     import psycopg
 
     migrations_dir = Path(__file__).resolve().parents[1] / "migrations"
     with psycopg.connect(database_url) as connection:
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS schema_migrations (
+                   version TEXT PRIMARY KEY,
+                   dates TIMESTAMPTZ NOT NULL DEFAULT now()
+               )"""
+        )
         for migration_path in sorted(migrations_dir.glob("*.sql")):
+            version = migration_path.name
+            already_applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = %s", (version,)
+            ).fetchone()
+            if already_applied:
+                continue
             sql = migration_path.read_text(encoding="utf-8")
-            for statement in sql.split(";"):
-                if statement.strip():
-                    connection.execute(statement)
+            for statement in _split_sql_statements(sql):
+                connection.execute(statement)
+            connection.execute("INSERT INTO schema_migrations (version) VALUES (%s)", (version,))
 
 
 def _report_content(report: dict) -> dict:

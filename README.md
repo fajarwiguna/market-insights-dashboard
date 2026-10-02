@@ -55,6 +55,26 @@ dipakai oleh layanan laporan untuk membaca dan menerbitkan versi. Tanpa
 variabel tersebut, layanan memakai repository JSON. Lakukan backup data JSON sebelum impor;
 skrip mempertahankan semua versi arsip yang memiliki ID, mengimpor hingga 30 titik riwayat
 SBN, dan menjadikan laporan aktif lokal sebagai versi aktif terakhir.
+Seluruh kolom tanggal pada tabel PostgreSQL memakai nama `dates`.
+
+### API baca (tahap transisi)
+
+FastAPI dapat dijalankan berdampingan dengan Streamlit. API memuat konfigurasi `.env` yang
+sama dan membaca repository laporan yang sama:
+
+```powershell
+python -m uvicorn api.main:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+- `GET http://127.0.0.1:8000/api/v1/reports/latest` — laporan aktif.
+- `GET http://127.0.0.1:8000/api/v1/reports/{report_id}` — versi tertentu.
+- `GET http://127.0.0.1:8000/health` — status proses API.
+- `GET http://127.0.0.1:8000/docs` — dokumentasi interaktif.
+
+API baca memerlukan header `Authorization: Bearer <API_READ_TOKEN>`. Isi token acak di `.env`
+(dapat dibuat dengan `python -c "import secrets; print(secrets.token_urlsafe(32))"`). Simpan
+token di server pemanggil, bukan di kode browser. Endpoint baca belum menyediakan aksi operator;
+refresh dan ekspor akan ditambahkan melalui job service pada tahap worker.
 
 ---
 
