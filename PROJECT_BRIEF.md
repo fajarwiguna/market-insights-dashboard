@@ -87,7 +87,7 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend pengganti | Next.js + TypeScript | Direncanakan; belum diimplementasikan |
+| Frontend pengganti | Next.js + TypeScript | Kerangka dashboard baca-saja tersedia di `web/`; belum dibuild atau disetarakan fiturnya |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.
@@ -243,14 +243,14 @@ Token dikirim melalui `Authorization: Bearer ...`. Token baca dan operator adala
 
 ## 12. Operasional, keamanan, dan keandalan
 
-Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, dan `API_OPERATOR_TOKEN`. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi.
+Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, `REFRESH_TIMES`, dan `REPORT_ARTIFACT_DIR`. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi.
 
 Operasional yang dituju mencakup:
 
 - Jadwal pembaruan sesuai kebutuhan pengguna dan kalender sumber.
 - Log serta status job yang dapat ditelusuri melalui `job_id` dan `report_id`.
 - Pemeriksaan kesiapan database/worker selain pemeriksaan proses API.
-- Backup dan pemulihan database serta artefak laporan.
+- Backup dan pemulihan database serta artefak laporan. Worker dan API harus memakai lokasi artefak persisten yang sama melalui `REPORT_ARTIFACT_DIR`.
 - Deployment yang dapat diulang, dependensi terkunci, dan pemeriksaan otomatis sebelum rilis.
 - Pengelolaan akses pengguna, rahasia konfigurasi, serta pencatatan aktivitas bila lingkup penggunaan berkembang.
 
@@ -268,7 +268,7 @@ Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor
 | 2. Repository | Laporan aktif dan versi di PostgreSQL | Sudah diterapkan | Impor, kegagalan publikasi, dan pemulihan penyimpanan tervalidasi |
 | 3. API | Kontrak baca dan akses backend yang stabil | Implementasi awal tersedia | Kontrak, autentikasi, serta kesetaraan angka diverifikasi melalui integrasi |
 | 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; scheduler, job ekspor, dan endpoint unduh tersedia | Integrasi terverifikasi, jadwal bisnis, penyimpanan artefak persisten, serta pemulihan tersedia |
-| 5. Frontend baru | Next.js mencapai kesetaraan fitur MVP | Belum dimulai | Alur baca, detail, status, tema, dan unduhan diterima pengguna |
+| 5. Frontend baru | Next.js mencapai kesetaraan fitur MVP | Tahap awal: dashboard baca laporan aktif | Alur baca, detail, status, tema, dan unduhan diterima pengguna |
 | 6. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
 | 7. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |
 

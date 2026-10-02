@@ -8,13 +8,13 @@ from pathlib import Path
 
 from api.dependencies import require_read_access
 from api.schemas import JobResponse, ReportResponse
+from config import report_artifact_directory
 from services import report_service
 from services.job_repository import PostgresJobRepository
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reports", tags=["reports"], dependencies=[Depends(require_read_access)])
-_REPORT_DIR = Path(__file__).resolve().parents[3] / "reports"
 
 
 def _read_report(report_id: str | None = None) -> dict:
@@ -65,7 +65,7 @@ def download_report_pdf(report_id: str) -> FileResponse:
     if artifact is None:
         raise HTTPException(status_code=404, detail="PDF belum tersedia untuk versi laporan ini.")
     key = artifact["storage_key"]
-    root = _REPORT_DIR.resolve()
+    root = report_artifact_directory()
     path = (root / key).resolve()
     if Path(key).name != key or path.parent != root or not path.is_file():
         raise HTTPException(status_code=404, detail="Berkas PDF tidak tersedia.")

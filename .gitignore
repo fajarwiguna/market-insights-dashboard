@@ -33,6 +33,11 @@ env/
 .coverage
 htmlcov/
 
+# Next.js frontend
+/web/node_modules/
+/web/.next/
+/web/out/
+
 # Editor and operating system files
 .vscode/
 .idea/

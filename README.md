@@ -116,7 +116,9 @@ Worker lama yang kehilangan kepemilikan tidak dapat menerbitkan laporan.
 Setelah report terbit, worker juga mencoba menyimpan PDF laporan ke `reports/`; kegagalan
 PDF dicatat di log dan tidak membatalkan laporan yang sudah berhasil diterbitkan.
 Ekspor versi tertentu dapat diminta melalui endpoint API; worker memprosesnya dan menyimpan
-metadata artefak di PostgreSQL. API mengunduh berkas dari direktori `reports/` bersama.
+metadata artefak di PostgreSQL. Worker dan API harus berbagi folder artefak yang sama;
+atur `REPORT_ARTIFACT_DIR` ke folder persisten bila direktori default `reports/` tidak sesuai.
+Nilai relatif dihitung dari root project.
 Saat `DATABASE_URL` diatur, tombol refresh dashboard dan perintah CLI live memasukkan job
 ke antrean ini. Jalankan worker agar permintaan diproses; setelah status berhasil, muat ulang
 dashboard untuk melihat laporan terbaru. Mode tanpa PostgreSQL mempertahankan refresh lokal.
@@ -135,6 +137,22 @@ Scheduler mencatat setiap slot secara persisten di PostgreSQL, sehingga restart 
 instans scheduler tidak mengantrekan slot yang sama berulang kali. Slot yang terlewat masih
 dapat dimasukkan dalam jendela `REFRESH_CATCHUP_MINUTES` (default 10). Untuk deployment,
 jalankan scheduler dan worker sebagai proses layanan terpisah yang otomatis aktif kembali.
+
+### Frontend Next.js (tahap baca-saja)
+
+Frontend baru sedang dikembangkan berdampingan dengan Streamlit di folder `web/`. Halaman
+dashboard membaca laporan aktif melalui API. Gunakan Node.js 20.9 atau lebih baru, lalu
+siapkan konfigurasi lokal berdasarkan `web/.env.example` sebagai `web/.env.local`:
+
+```powershell
+cd web
+npm install
+npm run dev
+```
+
+Jalankan FastAPI secara terpisah. `API_READ_TOKEN` dipakai oleh server Next.js dan tidak
+boleh dipindahkan ke variabel `NEXT_PUBLIC_*` atau kode browser. Frontend ini masih tahap
+awal baca-saja; Streamlit tetap menjadi aplikasi MVP utama selama kesetaraan fitur dibangun.
 
 ---
 

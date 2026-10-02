@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from services.job_repository import PostgresJobRepository
 from services import export_service, history_service
 from services import report_service
+from config import report_artifact_directory
 
 
 _logger = logging.getLogger("market_report.worker")
@@ -58,11 +59,10 @@ def process_one(repository: PostgresJobRepository) -> bool:
             repository.fail(job_id, owner_token, error)
     else:
         try:
-            project_root = Path(__file__).resolve().parents[2]
             history = history_service.load_sbn_history()
             with repository.ownership_guard(job_id, owner_token):
                 pdf_path, download_name = export_service.save_report_pdf(
-                    report, history, project_root / "reports",
+                    report, history, report_artifact_directory(),
                     storage_prefix=f"{job_id}_",
                 )
                 artifact = repository.record_pdf_artifact(
