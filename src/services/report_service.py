@@ -86,6 +86,8 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     report = build_report_data(snapshot)
     report["schema_version"] = 1
     report["_source_snapshot"] = snapshot
+    if isinstance(snapshot.get("_sbn_history"), list):
+        report["_sbn_history"] = snapshot["_sbn_history"]
     validate_report(report)
 
     # Repository menyimpan versi immutable, lalu mengganti laporan aktif atomik.
@@ -105,6 +107,25 @@ def run_live_pipeline(*, publication_guard=None) -> dict:
     from fetch_data import run_all
 
     snapshot = run_all(persist=False)
+    # Capture the SBN chart series in the immutable report version. A PDF for
+    # an older report must not silently use today's global history table.
+    from calculate import build_report_data
+    from domain.market_analysis import market_facts
+    from services.history_service import load_sbn_history, record_sbn_history
+
+    candidate = build_report_data(snapshot)
+    sbn10 = market_facts(candidate).get("sbn10", {})
+    history = load_sbn_history()
+    if sbn10.get("today") is not None and sbn10.get("date"):
+        from services.history_service import source_date_iso
+
+        date = source_date_iso(sbn10["date"])
+        if date:
+            history = [point for point in history if point.get("date") != date]
+            history.append({"date": date, "close": float(sbn10["today"])})
+            history.sort(key=lambda point: point.get("date", ""), reverse=True)
+            history = history[:30]
+    snapshot["_sbn_history"] = history
     guard = publication_guard() if publication_guard else nullcontext()
     with guard:
         report = publish_snapshot(snapshot)
@@ -112,10 +133,6 @@ def run_live_pipeline(*, publication_guard=None) -> dict:
     # Riwayat SBN dikumpulkan saat pipeline menerbitkan laporan, bukan saat
     # halaman dashboard dibuka. Kegagalan pencatatan riwayat tidak membatalkan laporan.
     try:
-        from domain.market_analysis import market_facts
-        from services.history_service import record_sbn_history
-
-        sbn10 = market_facts(report).get("sbn10", {})
         if sbn10.get("today") is not None:
             record_sbn_history(sbn10["today"], sbn10.get("date"))
     except Exception:

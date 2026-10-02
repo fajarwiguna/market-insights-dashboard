@@ -27,7 +27,7 @@ export function AppearanceControls() {
   }, [ready, theme, textSize]);
 
   return (
-    <div className="appearance-controls" aria-label="Pengaturan tampilan">
+    <div className="appearance-controls" role="group" aria-label="Pengaturan tampilan">
       <button type="button" className="appearance-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Gunakan tema terang" : "Gunakan tema gelap"}>
         {theme === "dark" ? "☀ Terang" : "◐ Gelap"}
       </button>

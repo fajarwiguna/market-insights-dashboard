@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { getServerApiConfig } from "@/lib/api/server-config";
 
 type Context = { params: Promise<{ reportId: string }> };
 
 export async function POST(_request: Request, context: Context) {
-  const baseUrl = process.env.DAILY_MARKET_API_URL?.replace(/\/+$/, "");
-  const token = process.env.API_READ_TOKEN;
+  const { baseUrl, readToken: token } = getServerApiConfig();
   if (!baseUrl || !token) return NextResponse.json({ message: "Konfigurasi API web belum lengkap." }, { status: 503 });
 
   try {

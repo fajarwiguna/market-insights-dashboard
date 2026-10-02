@@ -3,6 +3,8 @@ import { StatusPill } from "@/components/status-pill";
 import { AppearanceControls } from "@/components/appearance-controls";
 import { ExportReportButton } from "@/components/export-report-button";
 import { HistoryCharts } from "@/features/dashboard/history-charts";
+import { LiveMarketMonitor } from "@/features/dashboard/live-market-monitor";
+import { RefreshReportControl } from "@/components/refresh-report-control";
 
 type MarketGroup = {
   key: "fx" | "indices" | "yields" | "commodities";
@@ -222,6 +224,7 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
           <a className="nav-link" href="#insights"><span>✳</span> Insight</a>
           <a className="nav-link" href="#impacts"><span>⌁</span> Dampak</a>
           <a className="nav-link" href="#history"><span>⌁</span> Grafik</a>
+          {!report.is_demo && <a className="nav-link" href="#live"><span>◉</span> Monitor live</a>}
           <a className="nav-link" href="#references"><span>⌁</span> Indikator acuan</a>
           <a className="nav-link" href="#sources"><span>◎</span> Sumber</a>
           <a className="nav-link" href="#glossary"><span>?</span> Glosarium</a>
@@ -258,6 +261,8 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
 
         <MarketReferences report={report} />
         {!report.is_demo && <HistoryCharts histories={histories} />}
+        {!report.is_demo && <LiveMarketMonitor report={report} />}
+        {!report.is_demo && <RefreshReportControl />}
         <div className="market-sections">
           {groups.map((group) => <DataTable key={group.key} group={group} report={report} />)}
         </div>

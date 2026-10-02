@@ -10,6 +10,21 @@ export type InstrumentReading = {
 
 export type HistoryPoint = { dates: string; close: number };
 
+export type LiveQuote = {
+  status: "available" | "unavailable" | string;
+  last?: number | null;
+  prev?: number | null;
+  change_pct?: number | null;
+  dates?: string | null;
+  source?: string | null;
+};
+
+export type LiveMarket = {
+  fetched_at?: string | null;
+  status: "available" | "partial" | "unavailable" | string;
+  quotes: Record<string, LiveQuote>;
+};
+
 export type MarketReport = {
   report_id?: string | null;
   schema_version?: number;

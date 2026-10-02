@@ -1,14 +1,43 @@
 import "server-only";
 
 import type { HistoryPoint, MarketReport } from "@/lib/api/types";
+import { getServerApiConfig } from "@/lib/api/server-config";
 
 export type LatestReportResult =
   | { kind: "available"; report: MarketReport }
   | { kind: "unavailable"; message: string };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isMarketReport(value: unknown): value is MarketReport {
+  if (!isRecord(value)) return false;
+  const sections = ["fx", "indices", "yields", "commodities"];
+  const hasMarketSection = sections.some((section) => isRecord(value[section]));
+  if (!hasMarketSection) return false;
+
+  for (const section of sections) {
+    const readings = value[section];
+    if (readings === undefined) continue;
+    if (!isRecord(readings)) return false;
+    for (const reading of Object.values(readings)) {
+      if (!isRecord(reading)) return false;
+      for (const key of ["today", "prev", "change_pct", "change_bp"]) {
+        const number = reading[key];
+        if (number !== undefined && number !== null && (typeof number !== "number" || !Number.isFinite(number))) return false;
+      }
+    }
+  }
+
+  if (value.insights !== undefined && !Array.isArray(value.insights)) return false;
+  if (value.impacts !== undefined && !Array.isArray(value.impacts)) return false;
+  if (value.sources !== undefined && !Array.isArray(value.sources)) return false;
+  return true;
+}
+
 export async function getInstrumentHistory(instrumentId: string): Promise<HistoryPoint[]> {
-  const baseUrl = process.env.DAILY_MARKET_API_URL?.replace(/\/+$/, "");
-  const token = process.env.API_READ_TOKEN;
+  const { baseUrl, readToken: token } = getServerApiConfig();
   if (!baseUrl || !token) return [];
 
   try {
@@ -20,23 +49,21 @@ export async function getInstrumentHistory(instrumentId: string): Promise<Histor
     if (!response.ok) return [];
     const payload: unknown = await response.json();
     if (!payload || typeof payload !== "object" || !("points" in payload) || !Array.isArray(payload.points)) return [];
-    return payload.points.filter((point): point is HistoryPoint =>
-      !!point && typeof point === "object" && "dates" in point && typeof point.dates === "string" &&
-      "close" in point && typeof point.close === "number" && Number.isFinite(point.close)
-    );
+    if (!payload.points.every((point) => isRecord(point) && typeof point.dates === "string" &&
+      typeof point.close === "number" && Number.isFinite(point.close))) return [];
+    return payload.points as HistoryPoint[];
   } catch {
     return [];
   }
 }
 
 export async function getLatestReport(): Promise<LatestReportResult> {
-  const baseUrl = process.env.DAILY_MARKET_API_URL?.replace(/\/+$/, "");
-  const token = process.env.API_READ_TOKEN;
+  const { baseUrl, readToken: token } = getServerApiConfig();
 
   if (!baseUrl || !token) {
     return {
       kind: "unavailable",
-      message: "Konfigurasi API belum lengkap. Atur DAILY_MARKET_API_URL dan API_READ_TOKEN pada server web.",
+      message: "API belum siap. Periksa API_READ_TOKEN dan pastikan FastAPI berjalan di alamat DAILY_MARKET_API_URL.",
     };
   }
 
@@ -55,10 +82,10 @@ export async function getLatestReport(): Promise<LatestReportResult> {
     }
 
     const payload: unknown = await response.json();
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-      return { kind: "unavailable", message: "API mengembalikan struktur laporan yang tidak dikenali." };
+    if (!isMarketReport(payload)) {
+      return { kind: "unavailable", message: "API mengembalikan data laporan yang tidak sesuai format." };
     }
-    return { kind: "available", report: payload as MarketReport };
+    return { kind: "available", report: payload };
   } catch {
     return { kind: "unavailable", message: "Laporan tidak dapat dimuat. Periksa koneksi web ke API." };
   }

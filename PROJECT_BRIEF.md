@@ -268,14 +268,14 @@ Skrip `src/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor
 | 2. Repository | Laporan aktif dan versi di PostgreSQL | Sudah diterapkan | Impor, kegagalan publikasi, dan pemulihan penyimpanan tervalidasi |
 | 3. API | Kontrak baca dan akses backend yang stabil | Implementasi awal tersedia | Kontrak, autentikasi, serta kesetaraan angka diverifikasi melalui integrasi |
 | 4. Worker | Refresh, scheduler, dan ekspor di latar belakang | Sebagian: refresh UI/CLI/API terantrekan; scheduler, job ekspor, dan endpoint unduh tersedia | Integrasi terverifikasi, jadwal bisnis, penyimpanan artefak persisten, serta pemulihan tersedia |
-| 5. Frontend baru | Next.js mencapai kesetaraan fitur baca MVP | Dashboard baca, grafik riwayat, tema/teks, dan alur ekspor PDF tersedia; build berhasil | Integrasi API dengan data representatif, ketersediaan riwayat, worker ekspor, responsif, serta penerimaan alur baca diverifikasi |
-| 6. Fitur operasional frontend | Monitor live dan refresh operator di Next.js | Belum dimulai; grafik yang ada membaca riwayat tersimpan | Monitor live, otorisasi operator, polling status refresh, dan fallback sumber diterapkan serta diverifikasi |
+| 5. Frontend baru | Next.js mencapai kesetaraan fitur baca MVP | Dashboard baca, grafik riwayat, tema/teks, dan alur ekspor PDF tersedia; build serta pemeriksaan TypeScript berhasil | Integrasi API dengan data representatif, worker ekspor, responsif, serta penerimaan alur baca diverifikasi |
+| 6. Fitur operasional frontend | Monitor live dan refresh operator di Next.js | Implementasi awal tersedia: polling monitor live, fallback snapshot, login sesi operator, dan refresh melalui worker | Alur API/worker, batas percobaan login, kontrol akses deployment, polling refresh, dan fallback sumber diverifikasi |
 | 7. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
 | 8. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |
 
 Penguatan kualitas, keamanan, dan pengujian dilakukan sepanjang tahap; tidak seluruhnya ditunda sampai tahap terakhir.
 
-**Prioritas implementasi berikutnya:** memverifikasi perilaku antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; setelah itu menguatkan penyimpanan artefak untuk deployment multi-host. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
+**Prioritas implementasi berikutnya:** memverifikasi antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; membatasi percobaan login sebelum deployment; lalu menguatkan penyimpanan artefak untuk deployment multi-host. Laporan baru menyimpan riwayat SBN yang dipakai saat PDF dibuat; laporan lama belum memiliki riwayat terikat versi. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
 
 Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditetapkan.
 

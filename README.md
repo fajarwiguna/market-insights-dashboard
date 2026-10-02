@@ -138,11 +138,14 @@ instans scheduler tidak mengantrekan slot yang sama berulang kali. Slot yang ter
 dapat dimasukkan dalam jendela `REFRESH_CATCHUP_MINUTES` (default 10). Untuk deployment,
 jalankan scheduler dan worker sebagai proses layanan terpisah yang otomatis aktif kembali.
 
-### Frontend Next.js (tahap baca-saja)
+### Frontend Next.js (tahap transisi)
 
 Frontend baru sedang dikembangkan berdampingan dengan Streamlit di folder `web/`. Halaman
 dashboard membaca laporan aktif melalui API. Gunakan Node.js 20.9 atau lebih baru, lalu
-siapkan konfigurasi lokal berdasarkan `web/.env.example` sebagai `web/.env.local`:
+siapkan konfigurasi berdasarkan `.env.example` di direktori proyek untuk FastAPI dan worker.
+Untuk Next.js, salin `web/.env.example` menjadi `web/.env.local`; Next.js memuat konfigurasi
+frontend dari direktori `web/`. Nilai `API_READ_TOKEN` di `web/.env.local` harus sama
+dengan yang ada di `.env` utama. Rahasia ini hanya dipakai server dan tidak masuk ke browser:
 
 ```powershell
 cd web
@@ -150,9 +153,17 @@ npm install
 npm run dev
 ```
 
-Jalankan FastAPI secara terpisah. `API_READ_TOKEN` dipakai oleh server Next.js dan tidak
-boleh dipindahkan ke variabel `NEXT_PUBLIC_*` atau kode browser. Frontend ini masih tahap
-awal baca-saja; Streamlit tetap menjadi aplikasi MVP utama selama kesetaraan fitur dibangun.
+Jalankan FastAPI, PostgreSQL, dan worker secara terpisah. `API_READ_TOKEN` dipakai oleh
+server Next.js untuk membaca laporan dan data live. Untuk refresh dari web, konfigurasi
+`API_OPERATOR_TOKEN`, `WEB_OPERATOR_PASSWORD`, dan `WEB_OPERATOR_SESSION_SECRET` pada
+lingkungan server Next.js. Gunakan kata sandi operator khusus minimal 16 karakter dan
+secret sesi acak minimal 32 karakter. Login web membuat cookie HttpOnly dengan masa berlaku 8 jam; token API tidak
+dikirim ke browser. Jangan menaruh rahasia ini di variabel `NEXT_PUBLIC_*` atau kode frontend.
+
+Monitor live memperbarui tampilan setiap 60 detik dan menggunakan snapshot laporan sebagai
+cadangan ketika sumber live tidak tersedia. Endpoint API memakai cache singkat 30 detik.
+Tombol refresh memasukkan job ke antrean dan menunggu status worker sebelum memuat laporan
+versi baru. Streamlit tetap menjadi aplikasi utama selama alur Next.js dan worker diverifikasi.
 
 ---
 
