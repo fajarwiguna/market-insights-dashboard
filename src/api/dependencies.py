@@ -12,13 +12,11 @@ from config import load_environment
 bearer = HTTPBearer(auto_error=False)
 
 
-def require_read_access(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-) -> None:
+def _require_token(credentials: HTTPAuthorizationCredentials | None, setting: str, label: str) -> None:
     load_environment()
-    expected = os.environ.get("API_READ_TOKEN", "").strip()
+    expected = os.environ.get(setting, "").strip()
     if not expected:
-        raise HTTPException(status_code=503, detail="API_READ_TOKEN belum dikonfigurasi.")
+        raise HTTPException(status_code=503, detail=f"{setting} belum dikonfigurasi.")
     if (
         credentials is None
         or credentials.scheme.lower() != "bearer"
@@ -26,6 +24,18 @@ def require_read_access(
     ):
         raise HTTPException(
             status_code=401,
-            detail="Token baca tidak valid.",
+            detail=f"Token {label} tidak valid.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def require_read_access(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> None:
+    _require_token(credentials, "API_READ_TOKEN", "baca")
+
+
+def require_operator_access(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> None:
+    _require_token(credentials, "API_OPERATOR_TOKEN", "operator")

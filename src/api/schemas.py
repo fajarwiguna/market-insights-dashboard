@@ -46,3 +46,21 @@ class LiveMarketResponse(BaseModel):
     fetched_at: str | None = None
     status: str
     quotes: dict[str, LiveQuote]
+
+
+class JobEventResponse(BaseModel):
+    status: str
+    dates: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class JobResponse(BaseModel):
+    job_id: str
+    job_type: str
+    status: str
+    attempts: int
+    max_attempts: int
+    dates: str
+    report_id: str | None = None
+    error_code: str | None = None
+    events: list[JobEventResponse] = Field(default_factory=list)

@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from api.routers import instruments, market, reports
+from api.routers import instruments, jobs, market, reports
 
 
 app = FastAPI(
@@ -13,6 +13,7 @@ app = FastAPI(
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(instruments.router, prefix="/api/v1")
 app.include_router(market.router, prefix="/api/v1")
+app.include_router(jobs.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["system"], summary="Pemeriksaan proses API")

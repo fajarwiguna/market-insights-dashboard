@@ -14,6 +14,13 @@ Streamlit Dashboard  +  PDF Report
 
 ---
 
+## Acuan proyek
+
+- [Project Brief](PROJECT_BRIEF.md): tujuan produk, pengguna, fitur, data, pengalaman pengguna, operasional, roadmap, dan kriteria keberhasilan.
+- [Rancangan migrasi](project_migration.md): arah arsitektur dan rencana migrasi bertahap.
+
+README ini berisi panduan instalasi dan penggunaan teknis. Kondisi produk serta progres pengembangan dirangkum dalam Project Brief.
+
 ## 1. Instalasi
 
 Python 3.10 atau lebih baru diperlukan. Buat virtual environment, lalu pasang dependensi
@@ -57,7 +64,7 @@ skrip mempertahankan semua versi arsip yang memiliki ID, mengimpor hingga 30 tit
 SBN, dan menjadikan laporan aktif lokal sebagai versi aktif terakhir.
 Seluruh kolom tanggal pada tabel PostgreSQL memakai nama `dates`.
 
-### API baca (tahap transisi)
+### API dan worker (tahap transisi)
 
 FastAPI dapat dijalankan berdampingan dengan Streamlit. API memuat konfigurasi `.env` yang
 sama dan membaca repository laporan yang sama:
@@ -70,6 +77,8 @@ python -m uvicorn api.main:app --app-dir src --host 127.0.0.1 --port 8000
 - `GET http://127.0.0.1:8000/api/v1/reports/{report_id}` — versi tertentu.
 - `GET http://127.0.0.1:8000/api/v1/instruments/{instrument_id}/history?from=2026-01-01&to=2026-12-31` — riwayat instrumen.
 - `GET http://127.0.0.1:8000/api/v1/market/live` — kutipan live dengan cache 30 detik per proses.
+- `POST http://127.0.0.1:8000/api/v1/refresh-jobs` — antrekan refresh (Bearer `API_OPERATOR_TOKEN`).
+- `GET http://127.0.0.1:8000/api/v1/jobs/{job_id}` — status dan rangkaian event job.
 - `GET http://127.0.0.1:8000/health` — status proses API.
 - `GET http://127.0.0.1:8000/docs` — dokumentasi interaktif.
 
@@ -79,8 +88,17 @@ belum memiliki seri tersimpan mengembalikan daftar titik kosong.
 
 API baca memerlukan header `Authorization: Bearer <API_READ_TOKEN>`. Isi token acak di `.env`
 (dapat dibuat dengan `python -c "import secrets; print(secrets.token_urlsafe(32))"`). Simpan
-token di server pemanggil, bukan di kode browser. Endpoint baca belum menyediakan aksi operator;
-refresh dan ekspor akan ditambahkan melalui job service pada tahap worker.
+token di server pemanggil, bukan di kode browser. Endpoint refresh memakai token terpisah
+`API_OPERATOR_TOKEN`; permintaan duplikat memakai kembali job yang masih antre atau berjalan.
+
+Jalankan worker dalam terminal/proses terpisah:
+
+```powershell
+python src/worker/main.py
+```
+
+Worker memproses satu refresh pada satu waktu, mencoba ulang kegagalan hingga tiga kali, dan
+memulihkan job yang berstatus `running` tanpa progres selama 15 menit.
 
 ---
 
