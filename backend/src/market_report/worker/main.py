@@ -10,9 +10,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
-from market_report.services import export_service, history_service
+from market_report.services import export_service
 from market_report.services import report_service
 from market_report.config import report_artifact_directory
+from market_report.services.artifact_service import pdf_artifact_path
 
 
 _logger = logging.getLogger("market_report.worker")
@@ -60,15 +61,22 @@ def process_one(repository: PostgresJobRepository) -> bool:
     else:
         try:
             version_history = report.get("_sbn_history")
-            history = version_history if isinstance(version_history, list) else history_service.load_sbn_history()
-            with repository.ownership_guard(job_id, owner_token):
-                pdf_path, download_name = export_service.save_report_pdf(
-                    report, history, report_artifact_directory(),
-                    storage_prefix=f"{job_id}_",
-                )
-                artifact = repository.record_pdf_artifact(
-                    report["report_id"], download_name, pdf_path.name
-                )
+            if not isinstance(version_history, list):
+                version_history = (report.get("_source_snapshot") or {}).get("_sbn_history")
+            history = version_history if isinstance(version_history, list) else []
+            # Wait for the version lock before taking the job row lock, allowing
+            # heartbeats to continue while another worker generates the same PDF.
+            with repository.artifact_guard(report["report_id"]):
+                with repository.ownership_guard(job_id, owner_token):
+                    artifact = repository.get_artifact(report["report_id"])
+                    directory = report_artifact_directory()
+                    if pdf_artifact_path(artifact, directory) is None:
+                        pdf_path, download_name = export_service.save_report_pdf(
+                            report, history, directory, storage_prefix=f"{job_id}_",
+                        )
+                        artifact = repository.record_pdf_artifact(
+                            report["report_id"], download_name, pdf_path.name
+                        )
             _logger.info("PDF laporan %s disimpan sebagai artefak %s", report.get("report_id"), artifact["artifact_id"])
         except Exception:
             if job["job_type"] == "export_pdf":

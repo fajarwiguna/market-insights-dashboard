@@ -36,6 +36,10 @@ env/
 # ==============================================================================
 # Mengabaikan seluruh folder runtime lokal (data, reports, charts)
 /runtime/
+# Output lama sebelum pemindahan ke runtime/.
+/reports/
+/charts/
+/data/
 
 # Local visual check output
 /_cek_*.png

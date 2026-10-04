@@ -1,13 +1,12 @@
 """Pengunduhan artefak laporan yang telah dibuat worker."""
 
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from market_report.api.dependencies import require_read_access
-from market_report.config import report_artifact_directory
+from market_report.services.artifact_service import pdf_artifact_path
 from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
 
@@ -25,11 +24,7 @@ def download_artifact(artifact_id: str) -> FileResponse:
     if artifact is None:
         raise HTTPException(status_code=404, detail="Artefak tidak ditemukan.")
 
-    storage_key = artifact["storage_key"]
-    if Path(storage_key).name != storage_key:
-        raise HTTPException(status_code=404, detail="Artefak tidak ditemukan.")
-    root = report_artifact_directory()
-    path = (root / storage_key).resolve()
-    if path.parent != root or not path.is_file():
+    path = pdf_artifact_path(artifact)
+    if path is None:
         raise HTTPException(status_code=404, detail="Berkas artefak tidak tersedia.")
     return FileResponse(path, media_type="application/pdf", filename=artifact["file_name"])

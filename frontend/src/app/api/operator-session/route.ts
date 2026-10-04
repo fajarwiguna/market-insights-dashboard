@@ -12,6 +12,8 @@ export async function POST(request: Request) {
   if (retryAfter > 0) return NextResponse.json({ message: "Terlalu banyak percobaan login. Coba lagi setelah masa tunggu berakhir." }, { status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } });
   try {
     const payload: unknown = await request.json();
+    const pendingRetry = operatorLoginRetryAfter(request);
+    if (pendingRetry > 0) return NextResponse.json({ message: "Terlalu banyak percobaan login. Coba lagi setelah masa tunggu berakhir." }, { status: 429, headers: { "Retry-After": String(pendingRetry), "Cache-Control": "no-store" } });
     const password = payload && typeof payload === "object" && "password" in payload && typeof payload.password === "string" ? payload.password : "";
     if (!operatorPasswordMatches(password)) {
       const waitSeconds = recordOperatorLoginFailure(request);

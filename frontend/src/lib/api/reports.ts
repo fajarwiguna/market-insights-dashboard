@@ -36,12 +36,12 @@ function isMarketReport(value: unknown): value is MarketReport {
   return true;
 }
 
-export async function getInstrumentHistory(instrumentId: string): Promise<HistoryPoint[]> {
+export async function getInstrumentHistory(instrumentId: string, reportId: string): Promise<HistoryPoint[]> {
   const { baseUrl, readToken: token } = getServerApiConfig();
   if (!baseUrl || !token) return [];
 
   try {
-    const response = await fetch(`${baseUrl}/instruments/${encodeURIComponent(instrumentId)}/history`, {
+    const response = await fetch(`${baseUrl}/instruments/${encodeURIComponent(instrumentId)}/history?report_id=${encodeURIComponent(reportId)}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
       signal: AbortSignal.timeout(8_000),
@@ -49,6 +49,7 @@ export async function getInstrumentHistory(instrumentId: string): Promise<Histor
     if (!response.ok) return [];
     const payload: unknown = await response.json();
     if (!payload || typeof payload !== "object" || !("points" in payload) || !Array.isArray(payload.points)) return [];
+    if (!("report_id" in payload) || payload.report_id !== reportId) return [];
     if (!payload.points.every((point) => isRecord(point) && typeof point.dates === "string" &&
       typeof point.close === "number" && Number.isFinite(point.close))) return [];
     return payload.points as HistoryPoint[];

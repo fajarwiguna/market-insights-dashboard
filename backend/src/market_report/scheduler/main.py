@@ -85,7 +85,7 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     repository = PostgresJobRepository.from_environment()
-    _logger.info("Scheduler aktif pada zona %s, waktu %s", timezone.key, raw_times)
+    _logger.info("Scheduler aktif pada zona %s, waktu %s", str(timezone), raw_times)
     while True:
         try:
             dispatch_due_slots(repository, schedule_name, datetime.now(timezone), refresh_times, catchup_minutes)

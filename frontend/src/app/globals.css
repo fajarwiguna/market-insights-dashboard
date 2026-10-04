@@ -179,7 +179,7 @@ tbody th { color: #33494c; font-weight: 620; }
 .unavailable-card .eyebrow { margin: 0 0 8px; }
 .unavailable-card h1 { margin: 0; color: #1d353c; font-size: 25px; letter-spacing: -.7px; }
 .unavailable-card > p:not(.eyebrow) { color: #78878a; font-size: 13px; line-height: 1.7; }
-.unavailable-card > a { display: inline-block; margin-top: 12px; color: #187e70; font-size: 12px; font-weight: 650; }
+.unavailable-card > .unavailable-retry { display: inline-block; margin-top: 12px; padding: 0; border: 0; background: none; color: #187e70; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
 .retry-button { margin-top: 12px; padding: 10px 15px; border: 0; border-radius: 8px; background: var(--navy); color: #fff; cursor: pointer; font-size: 12px; }
 .loading-page { display: block; padding: 8vh 8vw; }
 .loading-top, .loading-hero, .loading-grid { display: flex; gap: 14px; }

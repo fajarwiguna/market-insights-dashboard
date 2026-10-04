@@ -35,6 +35,14 @@ class PostgresJobRepository:
     def enqueue_export(self, report_id: str) -> dict:
         return self._enqueue("export_pdf", report_id=report_id)
 
+    @contextmanager
+    def artifact_guard(self, report_id: str):
+        """Serialize PDF generation across refresh and export jobs for the same version."""
+        with self._connect() as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                               (f"pdf:{report_id}",))
+            yield
+
     def enqueue_scheduled_refresh(self, schedule_name: str, scheduled_for: datetime) -> dict:
         """Buat satu job per slot jadwal secara atomik dan aman untuk beberapa scheduler."""
         if scheduled_for.tzinfo is None:

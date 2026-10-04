@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -47,5 +48,15 @@ def save_report_pdf(
     )
     destination = Path(report_dir) / f"{storage_prefix}{filename}"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(payload)
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=destination.parent, suffix=".tmp", delete=False) as output:
+            temporary_path = Path(output.name)
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary_path, destination)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
     return destination, filename

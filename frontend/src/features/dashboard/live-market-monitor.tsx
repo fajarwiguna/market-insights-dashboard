@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { InstrumentReading, LiveMarket, LiveQuote, MarketReport } from "@/lib/api/types";
 
 const displayNames: Record<string, string> = {
@@ -48,33 +48,38 @@ export function LiveMarketMonitor({ report }: { report: MarketReport }) {
   const [data, setData] = useState<LiveMarket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const activeRequest = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
     try {
-      const response = await fetch("/api/market/live", { cache: "no-store" });
+      const response = await fetch("/api/market/live", { cache: "no-store", signal: controller.signal });
       if (!response.ok) throw new Error("Harga live belum dapat dimuat.");
       const payload = await response.json() as LiveMarket;
+      if (controller.signal.aborted) return;
       setData(payload);
       setError("");
     } catch {
+      if (controller.signal.aborted) return;
       setData(null);
       setError("Sumber live tidak merespons. Nilai snapshot laporan tetap ditampilkan sebagai cadangan.");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 60_000);
-    return () => window.clearInterval(timer);
+    const initialTimer = window.setTimeout(() => void refresh(), 0);
+    const timer = window.setInterval(() => { setLoading(true); void refresh(); }, 60_000);
+    return () => { window.clearTimeout(initialTimer); window.clearInterval(timer); activeRequest.current?.abort(); };
   }, [refresh]);
 
   const quotes = data?.quotes ?? {};
   return <section className="reader-section live-section" id="live" aria-labelledby="live-heading">
     <div className="section-heading"><div><p className="eyebrow">PEMANTAUAN INTRADAY</p><h2 id="live-heading">Monitor Pasar Live</h2></div>
-      <button type="button" className="live-refresh-button" onClick={() => void refresh()} disabled={loading}>{loading ? "Memuat…" : "Perbarui sekarang"}</button>
+      <button type="button" className="live-refresh-button" onClick={() => { setLoading(true); void refresh(); }} disabled={loading}>{loading ? "Memuat…" : "Perbarui sekarang"}</button>
     </div>
     <div className={`live-status live-status-${data?.status || (error ? "unavailable" : "loading")}`} role="status" aria-live="polite">
       <span className="live-status-dot" />

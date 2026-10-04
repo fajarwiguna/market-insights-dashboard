@@ -1,6 +1,6 @@
 """Schema respons API; bagian data tetap kompatibel dengan laporan Streamlit."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,7 +34,14 @@ class HistoryPoint(BaseModel):
 
 class InstrumentHistoryResponse(BaseModel):
     instrument_id: str
+    report_id: str | None = None
     points: list[HistoryPoint]
+
+
+class ExportReadyResponse(BaseModel):
+    status: Literal["ready"] = "ready"
+    report_id: str
+    artifact_id: str
 
 
 class LiveQuote(BaseModel):

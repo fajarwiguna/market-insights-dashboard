@@ -5,6 +5,7 @@ import { ExportReportButton } from "@/components/export-report-button";
 import { HistoryCharts } from "@/features/dashboard/history-charts";
 import { LiveMarketMonitor } from "@/features/dashboard/live-market-monitor";
 import { RefreshReportControl } from "@/components/refresh-report-control";
+import { ReloadPageButton } from "@/components/reload-page-button";
 
 type MarketGroup = {
   key: "fx" | "indices" | "yields" | "commodities";
@@ -278,6 +279,6 @@ export function DashboardUnavailable({ message }: { message: string }) {
   return <main className="unavailable-page"><div className="unavailable-card">
     <span className="brand-mark">M</span><p className="eyebrow">MARKET TODAY</p>
     <h1>Laporan belum dapat ditampilkan.</h1><p>{message}</p>
-    <a href="/">Coba muat ulang halaman <span aria-hidden="true">↗</span></a>
+    <ReloadPageButton />
   </div></main>;
 }

@@ -91,6 +91,13 @@ class FakeJobRepository:
         return self.job
 
     @contextmanager
+    def artifact_guard(self, _report_id):
+        yield
+
+    def get_artifact(self, report_id):
+        return next((item for item in self.artifacts if item["report_id"] == report_id), None)
+
+    @contextmanager
     def ownership_guard(self, _job_id, _owner_token):
         yield
 

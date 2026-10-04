@@ -1,7 +1,8 @@
 # Project Brief — Daily Market Report / Market Today
 
-Versi dokumen: 1.0  
-Tanggal acuan: 2 Oktober 2026  
+Versi dokumen: 1.1
+
+Tanggal acuan: 4 Oktober 2026
 Status produk: MVP/prototype yang sedang digunakan; pengembangan menuju aplikasi production dilakukan bertahap.
 
 Dokumen ini menjadi acuan bersama untuk memahami produk, menetapkan prioritas, dan mengevaluasi perubahan. Kondisi implementasi dibedakan dari arah pengembangan. Target, peran pengguna, dan kebijakan operasional yang belum disepakati ditandai sebagai usulan atau keputusan terbuka.
@@ -253,7 +254,11 @@ Token dikirim melalui `Authorization: Bearer ...`. Token baca dan operator adala
 
 ## 12. Operasional, keamanan, dan keandalan
 
-Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, `REFRESH_TIMES`, dan `REPORT_ARTIFACT_DIR`. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi. Login operator membatasi lima kegagalan per alamat klien dalam jendela 15 menit, lalu menahan percobaan selama 15 menit. Penghitung ini berada di memori proses Next.js dan ditujukan untuk satu instance; sebelum menjalankan beberapa instance, pindahkan pembatasan ke penyimpanan bersama.
+Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, `REFRESH_TIMES`, dan `REPORT_ARTIFACT_DIR`. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi. Instalasi package mendukung `DAILY_MARKET_PROJECT_ROOT` dan `DAILY_MARKET_RUNTIME_DIR`; SQL migrasi disertakan dalam wheel.
+
+Login operator membatasi lima kegagalan dalam 15 menit, lalu menahan percobaan selama 15 menit. Secara bawaan pembatas dibagi semua klien dan tidak mempercayai header IP. Pembatas per IP hanya aktif dengan `WEB_TRUST_PROXY=true` di belakang proxy yang menimpa `X-Real-IP` dan menutup akses langsung. Penyimpanan dibatasi 2.000 entri. Penghitung berada di memori proses Next.js; sebelum menjalankan beberapa instance, pindahkan pembatasan ke penyimpanan bersama.
+
+Grafik riwayat frontend mengambil data dengan `report_id` yang sama dengan dashboard. Laporan lama tanpa riwayat SBN tersimpan menampilkan seri kosong dan PDF tidak memakai riwayat terbaru sebagai pengganti. Ekspor memakai PDF yang sudah tersedia, mengunci pembuatan per versi di PostgreSQL, dan mempublikasikan berkas secara atomik. Permintaan ekspor tanpa berkas tersedia dibatasi 10 per menit per proses API, dengan respons `429` dan `Retry-After` saat batas tercapai.
 
 Operasional yang dituju mencakup:
 
@@ -319,7 +324,7 @@ Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditet
 
 Baseline dan target numerik belum tersedia. Target ditetapkan setelah kebutuhan operasional dan hasil pengukuran awal diketahui.
 
-Pemeriksaan lokal mencakup pipeline/UI/PDF pada tahap terdahulu, pemeriksaan TypeScript dan lint untuk berkas frontend yang berubah, serta tujuh uji terisolasi untuk kontrak API, enqueue refresh, alur worker memakai repository tiruan, kegagalan ekspor PDF, dan dispatch scheduler. Uji worker ini tidak menulis ke database pengguna. Integrasi melalui HTTP dan PostgreSQL, konkurensi/pemulihan, serta uji rute batas login belum diverifikasi. Lint penuh frontend masih memiliki tiga temuan pada berkas lain yang sudah ada.
+Pemeriksaan tahap terdahulu mencakup pipeline/UI/PDF serta tujuh uji terisolasi kontrak API, enqueue refresh, worker, kegagalan ekspor PDF, dan dispatch scheduler. Perbaikan 4 Oktober 2026 lolos pemeriksaan TypeScript, lint penuh frontend, build produksi Next.js, kompilasi Python, dan pembentukan schema OpenAPI. Wheel backend berhasil dibangun dengan instalasi Python lokal yang memiliki `setuptools`, lalu dipasang ke direktori pemeriksaan terpisah: sembilan migrasi SQL tersedia dan root default mengikuti direktori kerja, bukan direktori instalasi package. Pemeriksaan ini tidak menulis ke database pengguna. Integrasi melalui HTTP dan PostgreSQL, konkurensi/pemulihan, serta uji rute batas login masih perlu diverifikasi.
 
 ## 15. Ketergantungan dan keputusan terbuka
 

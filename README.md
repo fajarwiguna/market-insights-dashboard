@@ -53,6 +53,29 @@ python -m pip install -r requirements.txt
 
 Dependencies utama: `streamlit`, `yfinance`, `pandas`, `matplotlib`, `reportlab`, `beautifulsoup4`, `requests`.
 
+### Package backend dan direktori deployment
+
+Kode backend berada di `backend/src/market_report/`. Untuk instalasi sebagai package:
+
+```powershell
+python -m pip install ./backend
+python -m market_report.apply_schema_migrations
+python -m uvicorn market_report.api.main:app --host 127.0.0.1 --port 8000
+python -m market_report.worker.main
+```
+
+Perintah tersebut dijalankan terpisah sesuai kebutuhan; migrasi schema dijalankan sebelum
+layanan memakai database. Wheel menyertakan SQL dari `backend/migrations/` dan proses
+migrasi akan berhenti jika berkas SQL tidak tersedia.
+
+Dalam checkout, root proyek ditemukan dari struktur `backend/src/`. Pada instalasi wheel,
+root default adalah direktori kerja proses. Untuk lokasi tetap, set
+`DAILY_MARKET_PROJECT_ROOT` di lingkungan proses sebelum startup agar `.env` dapat ditemukan.
+`DAILY_MARKET_RUNTIME_DIR` mengatur lokasi data/chart/PDF runtime; nilai relatif dihitung dari
+root proyek. Tanpa konfigurasi ini lokasi default adalah `<root>/runtime/`.
+`REPORT_ARTIFACT_DIR` dapat mengganti lokasi PDF secara khusus. API, worker, dan scheduler
+harus memakai konfigurasi root yang sama; API dan worker juga harus berbagi folder PDF.
+
 ### Penyimpanan laporan dan riwayat versi
 
 Secara default, aplikasi tetap memakai JSON lokal. Setiap laporan yang diterbitkan disimpan
@@ -94,11 +117,11 @@ python -m uvicorn market_report.api.main:app --app-dir backend/src --host 127.0.
 
 - `GET http://127.0.0.1:8000/api/v1/reports/latest` — laporan aktif.
 - `GET http://127.0.0.1:8000/api/v1/reports/{report_id}` — versi tertentu.
-- `GET http://127.0.0.1:8000/api/v1/instruments/{instrument_id}/history?from=2026-01-01&to=2026-12-31` — riwayat instrumen.
+- `GET http://127.0.0.1:8000/api/v1/instruments/{instrument_id}/history?report_id={report_id}&from=2026-01-01&to=2026-12-31` — riwayat instrumen dari versi laporan yang sama.
 - `GET http://127.0.0.1:8000/api/v1/market/live` — kutipan live dengan cache 30 detik per proses.
 - `POST http://127.0.0.1:8000/api/v1/refresh-jobs` — antrekan refresh (Bearer `API_OPERATOR_TOKEN`).
 - `GET http://127.0.0.1:8000/api/v1/jobs/{job_id}` — status dan rangkaian event job.
-- `POST http://127.0.0.1:8000/api/v1/reports/{report_id}/exports` — antrekan ekspor PDF versi tertentu.
+- `POST http://127.0.0.1:8000/api/v1/reports/{report_id}/exports` — `200` dengan `status: ready` bila PDF tersedia, atau `202` dengan ID job ekspor.
 - `GET http://127.0.0.1:8000/api/v1/reports/{report_id}/exports/pdf` — unduh PDF versi laporan.
 - `GET http://127.0.0.1:8000/api/v1/artifacts/{artifact_id}` — unduh artefak menggunakan ID artefak.
 - `GET http://127.0.0.1:8000/health` — status proses API.
@@ -107,6 +130,11 @@ python -m uvicorn market_report.api.main:app --app-dir backend/src --host 127.0.
 ID riwayat yang tersedia: `sbn-10y`, `us-10y`, `us-5y`, `usd-idr`, `eur-idr`, `cny-idr`,
 `jpy-idr`, `dxy`, `ihsg`, `dji`, `gold`, `brent`, dan `wti`. Instrumen yang dikenal tetapi
 belum memiliki seri tersimpan mengembalikan daftar titik kosong.
+
+Frontend selalu mengirim `report_id` pada permintaan riwayat agar grafik mengikuti versi laporan
+yang dirender. Versi yang tidak ditemukan mengembalikan `404`. Riwayat SBN pada versi lama
+yang belum menyimpan seri sendiri tetap kosong; grafik dan PDF tidak mengambil riwayat terbaru
+untuk menggantikan riwayat versi tersebut. Parameter ini opsional bagi pemanggil API lama.
 
 API baca memerlukan header `Authorization: Bearer <API_READ_TOKEN>`. Isi token acak di `.env`
 (dapat dibuat dengan `python -c "import secrets; print(secrets.token_urlsafe(32))"`). Simpan
@@ -128,6 +156,10 @@ Ekspor versi tertentu dapat diminta melalui endpoint API; worker memprosesnya da
 metadata artefak di PostgreSQL. Worker dan API harus berbagi folder artefak yang sama;
 atur `REPORT_ARTIFACT_DIR` ke folder persisten bila direktori default `runtime/reports/` tidak sesuai.
 Nilai relatif dihitung dari root project.
+Permintaan ekspor yang belum memiliki berkas PDF dibatasi 10 per menit per proses API;
+kelebihan permintaan menerima `429` dengan `Retry-After`. PDF yang sudah tersedia tidak
+memakai kuota tersebut. Worker mengunci pembuatan PDF per versi di PostgreSQL dan memakai
+kembali artefak yang ada. Berkas dipublikasikan melalui penggantian atomik setelah selesai ditulis.
 Saat `DATABASE_URL` diatur, tombol refresh dashboard dan perintah CLI live memasukkan job
 ke antrean ini. Jalankan worker agar permintaan diproses; setelah status berhasil, muat ulang
 dashboard untuk melihat laporan terbaru. Mode tanpa PostgreSQL mempertahankan refresh lokal.
@@ -167,9 +199,14 @@ server Next.js untuk membaca laporan dan data live. Untuk refresh dari web, konf
 `API_OPERATOR_TOKEN`, `WEB_OPERATOR_PASSWORD`, dan `WEB_OPERATOR_SESSION_SECRET` pada
 lingkungan server Next.js. Gunakan kata sandi operator khusus minimal 16 karakter dan
 secret sesi acak minimal 32 karakter. Login web membuat cookie HttpOnly dengan masa berlaku 8 jam; token API tidak
-dikirim ke browser. Lima kegagalan login dari alamat klien dalam 15 menit memicu jeda 15 menit. Pembatas ini
-disimpan per proses Next.js, jadi gunakan satu instance sampai pembatas bersama dikonfigurasi. Reverse proxy
-harus mengisi `x-real-ip` dari alamat klien. Jangan menaruh rahasia ini di variabel `NEXT_PUBLIC_*` atau kode frontend.
+dikirim ke browser. Lima kegagalan login dalam 15 menit memicu jeda 15 menit. Secara bawaan
+semua klien berbagi pembatas karena header IP yang dikirim pemanggil tidak dipercaya.
+Set `WEB_TRUST_PROXY=true` hanya jika Next.js dapat diakses melalui proxy tepercaya yang
+menimpa `X-Real-IP` dengan alamat klien valid dan menutup akses langsung ke Next.js.
+Dalam konfigurasi itu pembatas berlaku per IP; `X-Forwarded-For` tetap diabaikan.
+Penyimpanan dibatasi 2.000 entri, dengan bucket bersama saat kapasitas penuh.
+Pembatas ini disimpan per proses Next.js, jadi gunakan satu instance sampai pembatas bersama
+dikonfigurasi. Jangan menaruh rahasia ini di variabel `NEXT_PUBLIC_*` atau kode frontend.
 
 Monitor live memperbarui tampilan setiap 60 detik dan menggunakan snapshot laporan sebagai
 cadangan ketika sumber live tidak tersedia. Endpoint API memakai cache singkat 30 detik.
@@ -485,7 +522,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 | Data pasar kosong / pembaruan ditolak | Periksa pesan error dan `runtime/data/snapshot.json`; pastikan terminal memiliki akses internet ke Yahoo Finance dan PHEI, lalu klik **🔄 Perbarui data dari sumber (live)** lagi. Pembaruan dengan kurang dari dua instrumen berhasil ditolak agar tidak menimpa laporan yang ada. |
 | Hanya sebagian instrumen yang muncul | Sumber berbeda dapat gagal secara terpisah. Cek bagian **Sumber Data & Metode** dan `runtime/data/snapshot.json`, lalu coba pembaruan lagi. |
 | BI Rate / INDONIA / JISDOR tampak lama | Jika halaman BI tidak merespons, pipeline memakai angka cadangan; periksa tanggal pada bagian Sumber Data & Metode. |
-| Perlu melihat data contoh | Jalankan `python backend/src/market_report/run_pipeline.py --demo` hanya untuk demonstrasi lokal. Mode demo mengganti `runtime/data/report_data.json`. |
+| Perlu melihat data contoh | Jalankan `python backend/src/market_report/run_pipeline.py --demo` untuk demonstrasi lokal. Mode demo menulis `runtime/data/demo_report_data.json` secara terpisah dari laporan aktif. |
 | Pembaruan data gagal | Cek koneksi dan akses jaringan ke sumber; coba lagi. Dashboard mempertahankan laporan terakhir yang berhasil disimpan. |
 | Tampilan terasa berubah / tidak nyaman dibaca | Klik tombol **🎨** di pojok kanan bawah → **↺ Kembalikan tampilan asli**, atau refresh halaman (pengaturan tampilan tidak disimpan) |
 | Perlu memastikan tampilan tidak rusak setelah diubah | Jalankan `python tests/smoke_app.py` (harus berakhir `HASIL: PASS`) |

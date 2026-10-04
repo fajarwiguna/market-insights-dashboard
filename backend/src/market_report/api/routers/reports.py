@@ -2,13 +2,13 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
-from pathlib import Path
 
 from market_report.api.dependencies import require_read_access
-from market_report.api.schemas import JobResponse, ReportResponse
-from market_report.config import report_artifact_directory
+from market_report.api.schemas import ExportReadyResponse, JobResponse, ReportResponse
+from market_report.api.rate_limits import export_requests
+from market_report.services.artifact_service import pdf_artifact_path
 from market_report.domain.market_analysis import build_impacts, build_insights, build_summary
 from market_report.services import report_service
 from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
@@ -52,12 +52,21 @@ def read_report_version(report_id: str) -> dict:
 
 
 @router.post("/{report_id}/exports", status_code=status.HTTP_202_ACCEPTED,
-             response_model=JobResponse, summary="Antrekan PDF untuk versi laporan")
-def request_report_export(report_id: str) -> dict:
+             response_model=JobResponse | ExportReadyResponse, summary="Gunakan PDF tersedia atau antrekan ekspor")
+def request_report_export(report_id: str, response: Response) -> dict:
     try:
         if report_service.load_report_version(report_id) is None:
             raise HTTPException(status_code=404, detail="Versi laporan tidak ditemukan.")
-        return PostgresJobRepository.from_environment().enqueue_export(report_id)
+        repository = PostgresJobRepository.from_environment()
+        artifact = repository.get_artifact(report_id)
+        if pdf_artifact_path(artifact) is not None:
+            response.status_code = status.HTTP_200_OK
+            return {"status": "ready", "report_id": report_id, "artifact_id": artifact["artifact_id"]}
+        retry_after = export_requests.admit()
+        if retry_after:
+            raise HTTPException(status_code=429, detail="Antrean ekspor sedang dibatasi. Coba lagi sebentar.",
+                                headers={"Retry-After": str(retry_after)})
+        return repository.enqueue_export(report_id)
     except HTTPException:
         raise
     except Exception as error:
@@ -74,9 +83,7 @@ def download_report_pdf(report_id: str) -> FileResponse:
         raise HTTPException(status_code=503, detail="Metadata artefak sedang tidak tersedia.") from error
     if artifact is None:
         raise HTTPException(status_code=404, detail="PDF belum tersedia untuk versi laporan ini.")
-    key = artifact["storage_key"]
-    root = report_artifact_directory()
-    path = (root / key).resolve()
-    if Path(key).name != key or path.parent != root or not path.is_file():
+    path = pdf_artifact_path(artifact)
+    if path is None:
         raise HTTPException(status_code=404, detail="Berkas PDF tidak tersedia.")
     return FileResponse(path, media_type="application/pdf", filename=artifact["file_name"])

@@ -6,6 +6,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from importlib.resources import files
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -87,11 +88,25 @@ def _split_sql_statements(sql: str) -> list[str]:
     return statements
 
 
+def schema_migration_files():
+    """Read bundled SQL in wheels, or the canonical folder in a source checkout."""
+    directory = files("market_report").joinpath("migrations")
+    if not directory.is_dir():
+        directory = Path(__file__).resolve().parents[2] / "migrations"
+    migrations = sorted(
+        (item for item in directory.iterdir() if item.name.endswith(".sql")),
+        key=lambda item: item.name,
+    ) if directory.is_dir() else []
+    if not migrations:
+        raise RuntimeError("Migrasi SQL tidak ditemukan; schema belum diterapkan.")
+    return migrations
+
+
 def apply_schema_migrations(database_url: str) -> None:
     """Jalankan migrasi schema yang idempotent sebelum memindahkan data."""
     import psycopg
 
-    migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
+    migrations = schema_migration_files()
     with psycopg.connect(database_url) as connection:
         connection.execute(
             """CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -99,7 +114,7 @@ def apply_schema_migrations(database_url: str) -> None:
                    dates TIMESTAMPTZ NOT NULL DEFAULT now()
                )"""
         )
-        for migration_path in sorted(migrations_dir.glob("*.sql")):
+        for migration_path in migrations:
             version = migration_path.name
             already_applied = connection.execute(
                 "SELECT 1 FROM schema_migrations WHERE version = %s", (version,)

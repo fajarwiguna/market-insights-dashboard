@@ -48,8 +48,14 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
       }
 
       const queued = await fetch(`/api/reports/${encodeURIComponent(reportId)}/exports`, { method: "POST" });
+      if (queued.status === 429) throw new Error("Terlalu banyak permintaan ekspor. Tunggu sebentar, lalu coba kembali.");
       if (!queued.ok) throw new Error("Ekspor gagal dimulai. Pastikan API, PostgreSQL, dan worker tersedia.");
       const job = await queued.json() as ExportJob;
+      if (job.status === "ready") {
+        downloadFromUrl(pdfUrl);
+        setMessage("PDF siap diunduh.");
+        return;
+      }
       if (!job.job_id) throw new Error("API tidak mengembalikan ID pekerjaan ekspor.");
 
       for (let attempt = 0; attempt < 60; attempt += 1) {
