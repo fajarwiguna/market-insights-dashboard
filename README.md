@@ -210,6 +210,10 @@ dikonfigurasi. Jangan menaruh rahasia ini di variabel `NEXT_PUBLIC_*` atau kode 
 
 Monitor live memperbarui tampilan setiap 60 detik dan menggunakan snapshot laporan sebagai
 cadangan ketika sumber live tidak tersedia. Endpoint API memakai cache singkat 30 detik.
+Dashboard menempatkan angka utama dan indikator acuan di atas, dilanjutkan insight,
+grafik historis, tabel detail, dan monitor live. Sumber serta glosarium berada di bawah;
+glosarium dan dampak praktis dapat dibuka sesuai kebutuhan. Klik **Pengelolaan** di header
+untuk membuka login operator dan kontrol refresh laporan.
 Tombol refresh memasukkan job ke antrean dan menunggu status worker sebelum memuat laporan
 versi baru. Streamlit tetap menjadi aplikasi utama selama alur Next.js dan worker diverifikasi.
 

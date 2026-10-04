@@ -30,9 +30,9 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
 
   if (data.length < 2) return <div className="chart-empty">Riwayat belum cukup untuk menampilkan grafik.</div>;
 
-  const width = 720;
+  const width = series.id === "sbn-10y" ? 900 : 520;
   const height = 230;
-  const left = 58;
+  const left = 85;
   const right = 14;
   const top = 18;
   const bottom = 33;
@@ -45,7 +45,7 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
   const x = (index: number) => left + (index / (data.length - 1)) * (width - left - right);
   const y = (value: number) => top + ((high - value) / (high - low)) * (height - top - bottom);
   const path = data.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.close).toFixed(1)}`).join(" ");
-  const labels = [data[0], data[Math.floor((data.length - 1) / 2)], data[data.length - 1]];
+  const labels = [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])];
 
   return (
     <div className="chart-canvas">
@@ -60,7 +60,7 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
         {data.map((point, index) => <circle key={`${point.dates}-${index}`} cx={x(index)} cy={y(point.close)} r={data.length < 45 ? 3 : 1.7} fill={series.color}>
           <title>{`${point.dates}: ${number.format(point.close)}${series.unit}`}</title>
         </circle>)}
-        {labels.map((point, index) => <text key={`${point.dates}-${index}`} x={x(Math.floor(index * (data.length - 1) / 2))} y={height - 8} textAnchor={index === 0 ? "start" : index === 2 ? "end" : "middle"} className="chart-axis-label">{point.dates}</text>)}
+        {labels.map((index) => <text key={`${data[index].dates}-${index}`} x={x(index)} y={height - 8} textAnchor={index === 0 ? "start" : index === data.length - 1 ? "end" : "middle"} className="chart-axis-label">{data[index].dates}</text>)}
       </svg>
     </div>
   );
@@ -81,7 +81,7 @@ export function HistoryCharts({ histories }: { histories: Record<string, History
           {ranges.map((item) => <button type="button" key={item.id} onClick={() => setRange(item.id)} aria-pressed={range === item.id} className={range === item.id ? "selected" : ""}>{item.label}</button>)}
         </div>
       </div>
-      <div className="history-grid">{series.map((item) => <article className="history-card" key={item.id}>
+      <div className="history-grid">{series.map((item) => <article className={`history-card${item.id === "sbn-10y" ? " history-card-featured" : ""}`} key={item.id}>
         <div className="history-card-heading"><h3>{item.title}</h3><span>{item.points.length ? `${item.points.length} observasi` : "Riwayat terbatas"}</span></div>
         <LineChart series={item} range={range} />
         <p className="chart-caption">Sumber riwayat laporan · tanggal mengikuti data yang tersedia.</p>

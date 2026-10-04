@@ -161,7 +161,10 @@ Desain ditujukan untuk membaca laporan pasar secara profesional, dengan hierarki
 
 Pedoman pengembangan:
 
-- Urutan halaman: identitas/tanggal laporan → ringkasan → insight → angka kunci → grafik/detail → sumber dan unduhan.
+- Urutan halaman: identitas/tanggal laporan dan unduh PDF → angka utama → indikator acuan → ringkasan/insight dan dampak → grafik historis → tabel detail → monitor live → sumber/metode → glosarium → footer.
+- Dashboard menampilkan tiga sorotan awal; sorotan tambahan, dampak praktis, dan glosarium dapat dibuka sesuai kebutuhan. Tanggal observasi tetap berada pada kartu serta tabel, dan sumber singkat tetap tersedia di tabel.
+- Grafik SBN memakai lebar penuh; USD/IDR dan IHSG berdampingan pada desktop. Tabel kategori memakai lebar penuh dan dapat digeser horizontal pada layar kecil.
+- Navigasi mengikuti urutan konten dan menandai bagian yang sedang dibaca. Login serta refresh operator diakses melalui tombol **Pengelolaan** pada header.
 - Gunakan tipografi, jarak, warna, dan komponen yang konsisten.
 - Format angka mengikuti unit instrumen dan menggunakan presisi yang konsisten.
 - Warna membantu membaca perubahan; label atau simbol tetap menjelaskan maknanya.

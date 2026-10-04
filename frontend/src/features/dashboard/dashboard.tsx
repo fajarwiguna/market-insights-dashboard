@@ -4,7 +4,8 @@ import { AppearanceControls } from "@/components/appearance-controls";
 import { ExportReportButton } from "@/components/export-report-button";
 import { HistoryCharts } from "@/features/dashboard/history-charts";
 import { LiveMarketMonitor } from "@/features/dashboard/live-market-monitor";
-import { RefreshReportControl } from "@/components/refresh-report-control";
+import { OperatorMenu } from "@/components/operator-menu";
+import { DashboardNav } from "@/features/dashboard/dashboard-nav";
 import { ReloadPageButton } from "@/components/reload-page-button";
 
 type MarketGroup = {
@@ -143,32 +144,48 @@ const glossary = [
   ["JISDOR", "Kurs referensi dolar AS terhadap Rupiah yang diterbitkan Bank Indonesia."],
 ];
 
-function ReaderGuide({ report }: { report: MarketReport }) {
+function ReportInsights({ report }: { report: MarketReport }) {
   const insights = report.insights ?? [];
   const impacts = report.impacts ?? [];
-  const sources = report.sources ?? [];
-  const phei = report.phei_meta;
 
   return (
     <>
       <section className="reader-section" id="insights" aria-labelledby="insights-heading">
         <div className="section-heading"><div><p className="eyebrow">RINGKASAN & ANALISIS</p><h2 id="insights-heading">Insight Hari Ini</h2></div></div>
         <p className="summary-copy">{report.summary || "Data hari ini belum lengkap untuk menyusun ringkasan otomatis."}</p>
-        {insights.length ? <div className="insight-grid">{insights.map((item, index) => (
+        {insights.length ? <div className="insight-grid">{insights.slice(0, 3).map((item, index) => (
           <article className={`insight-card tone-${item.tone || "flat"}`} key={`${item.title || "insight"}-${index}`}>
             <h3>{item.title || "Sorotan pasar"}</h3><p>{item.text || "—"}</p>
             {item.dampak && <small><strong>Artinya:</strong> {item.dampak}</small>}
           </article>
         ))}</div> : <p className="empty-section">Belum ada sorotan untuk laporan ini.</p>}
+        {insights.length > 3 && <details className="reader-disclosure additional-insights">
+          <summary>Lihat {insights.length - 3} sorotan lainnya</summary>
+          <div className="insight-grid">{insights.slice(3).map((item, index) => (
+            <article className={`insight-card tone-${item.tone || "flat"}`} key={`${item.title || "insight"}-${index}`}>
+              <h3>{item.title || "Sorotan pasar"}</h3><p>{item.text || "—"}</p>
+              {item.dampak && <small><strong>Artinya:</strong> {item.dampak}</small>}
+            </article>
+          ))}</div>
+        </details>}
       </section>
 
       <section className="reader-section" id="impacts" aria-labelledby="impacts-heading">
-        <div className="section-heading"><div><p className="eyebrow">KONTEKS PEMBACA</p><h2 id="impacts-heading">Apa Artinya untuk Anda</h2></div></div>
+        <details className="reader-disclosure" data-section-disclosure>
+        <summary><span className="eyebrow">KONTEKS PEMBACA</span><h2 id="impacts-heading">Apa Artinya untuk Anda</h2><span className="disclosure-hint">Buka penjelasan dampak praktis</span></summary>
         {impacts.length ? <div className="impact-grid">{impacts.map((item, index) => (
           <article className="impact-card" key={`${item.title || "impact"}-${index}`}><h3>{item.title || "Dampak praktis"}</h3><p>{item.text || "—"}</p></article>
         ))}</div> : <p className="empty-section">Dampak praktis belum tersedia untuk laporan ini.</p>}
+        </details>
       </section>
+    </>
+  );
+}
 
+function DataSources({ report }: { report: MarketReport }) {
+  const sources = report.sources ?? [];
+  const phei = report.phei_meta;
+  return (
       <section className="reader-section" id="sources" aria-labelledby="sources-heading">
         <div className="section-heading"><div><p className="eyebrow">VERIFIKASI DATA</p><h2 id="sources-heading">Sumber Data & Metode</h2></div><p>Periksa asal angka dan tanggal observasinya.</p></div>
         {sources.length ? <div className="source-list">{sources.map((source, index) => (
@@ -191,15 +208,20 @@ function ReaderGuide({ report }: { report: MarketReport }) {
         ))}</div> : <p className="empty-section">Metadata sumber belum tersedia pada laporan ini.</p>}
         {phei?.as_of_label && <p className="phei-note">Kurva imbal hasil PHEI yang dipakai bertanggal <strong>{phei.as_of_label}</strong>{phei.source_name ? ` · ${phei.source_name}` : ""}{phei.url ? <> · <a href={phei.url} target="_blank" rel="noreferrer">Lihat sumber</a></> : null}</p>}
       </section>
+  );
+}
 
+function ReadingGlossary() {
+  return (
       <section className="reader-section" id="glossary" aria-labelledby="glossary-heading">
-        <div className="section-heading"><div><p className="eyebrow">PANDUAN PEMBACA</p><h2 id="glossary-heading">Glosarium & Cara Membaca</h2></div></div>
+        <details className="reader-disclosure" data-section-disclosure>
+        <summary><span className="eyebrow">PANDUAN PEMBACA</span><h2 id="glossary-heading">Glosarium & Cara Membaca</h2><span className="disclosure-hint">Buka arti istilah dan panduan membaca angka</span></summary>
         <div className="glossary-wrap"><table><thead><tr><th>Istilah</th><th>Arti sederhana</th></tr></thead><tbody>
           {glossary.map(([term, meaning]) => <tr key={term}><th scope="row">{term}</th><td>{meaning}</td></tr>)}
         </tbody></table></div>
         <p className="guide-note"><strong>Cara membaca:</strong> perubahan harian dibandingkan dengan penutupan hari perdagangan sebelumnya. Arti “naik” bergantung pada indikator: kurs USD/IDR naik berarti Rupiah melemah, sedangkan indeks saham naik berarti pasar saham menguat. Tanggal data bisa berbeda antar sumber.</p>
+        </details>
       </section>
-    </>
   );
 }
 
@@ -207,10 +229,21 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
   const featured = [
     { title: "Rupiah", section: "fx" as const, fragments: ["USD/IDR"] },
     { title: "IHSG", section: "indices" as const, fragments: ["IHSG"] },
-    { title: "UST 10Y", section: "yields" as const, fragments: ["US Treasury 10 Tahun", "US Treasury 10Y"] },
     { title: "SBN 10Y", section: "yields" as const, fragments: ["ID SBN 10 Tahun", "ID SBN 10Y"] },
+    { title: "UST 10Y", section: "yields" as const, fragments: ["US Treasury 10 Tahun", "US Treasury 10Y"] },
   ];
   const published = report.published_at || report.generated_at;
+  const navigation = [
+    { id: "overview", label: "Ringkasan", icon: "◫" },
+    { id: "references", label: "Indikator acuan", icon: "⌁" },
+    { id: "insights", label: "Insight", icon: "✳" },
+    { id: "impacts", label: "Dampak", icon: "⌁" },
+    ...(!report.is_demo ? [{ id: "history", label: "Grafik historis", icon: "⌁" }] : []),
+    ...groups.map((group) => ({ id: group.key, label: group.title, icon: "◦" })),
+    ...(!report.is_demo ? [{ id: "live", label: "Monitor live", icon: "◉" }] : []),
+    { id: "sources", label: "Sumber & metode", icon: "◎" },
+    { id: "glossary", label: "Glosarium", icon: "?" },
+  ];
 
   return (
     <div className="workspace">
@@ -218,25 +251,15 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
         <a className="brand" href="#overview" aria-label="Market Today beranda">
           <span className="brand-mark">M</span><span>market<span className="brand-light">today</span></span>
         </a>
-        <p className="sidebar-label">WORKSPACE</p>
-        <nav className="side-nav" aria-label="Navigasi dashboard">
-          <a className="nav-link nav-active" href="#overview"><span>◫</span> Ringkasan</a>
-          {groups.map((group) => <a className="nav-link" href={`#${group.key}`} key={group.key}><span>◦</span>{group.title}</a>)}
-          <a className="nav-link" href="#insights"><span>✳</span> Insight</a>
-          <a className="nav-link" href="#impacts"><span>⌁</span> Dampak</a>
-          <a className="nav-link" href="#history"><span>⌁</span> Grafik</a>
-          {!report.is_demo && <a className="nav-link" href="#live"><span>◉</span> Monitor live</a>}
-          <a className="nav-link" href="#references"><span>⌁</span> Indikator acuan</a>
-          <a className="nav-link" href="#sources"><span>◎</span> Sumber</a>
-          <a className="nav-link" href="#glossary"><span>?</span> Glosarium</a>
-        </nav>
+        <p className="sidebar-label">JELAJAHI PASAR</p>
+        <DashboardNav items={navigation} />
         <div className="sidebar-bottom"><span className="sidebar-orb" />
           <p>Daily Market Report</p><small>Informasi pasar harian</small>
         </div>
       </aside>
 
       <main className="main-content" id="overview">
-        <header className="topbar"><span>DAILY MARKET INTELLIGENCE</span><div className="topbar-actions"><StatusPill demo={report.is_demo} /><AppearanceControls /></div></header>
+        <header className="topbar"><span>DAILY MARKET INTELLIGENCE</span><div className="topbar-actions"><StatusPill demo={report.is_demo} /><AppearanceControls />{!report.is_demo && <OperatorMenu />}</div></header>
         <section className="page-intro">
           <div><p className="eyebrow">PASAR KEUANGAN · INDONESIA & GLOBAL</p>
             <h1>Market <span>Today</span></h1>
@@ -246,27 +269,19 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
             <small>Dipublikasikan {formatPublishedAt(published)}</small><ExportReportButton reportId={report.report_id} /></div>
         </section>
 
-        <section className="welcome-panel">
-          <div className="welcome-copy"><p className="eyebrow">DAILY BRIEFING</p>
-            <h2>Gambaran pasar terbaru, tersaji dengan jelas.</h2>
-            <p>Mulai dari indikator utama, lalu telusuri data, tanggal observasi, dan sumbernya pada setiap bagian.</p>
-          </div>
-          <div className="welcome-art" aria-hidden="true"><span className="art-line line-one" /><span className="art-line line-two" /><span className="art-line line-three" /><span className="art-point" /></div>
-        </section>
-
-        <ReaderGuide report={report} />
-
         <section className="metrics-grid" aria-label="Angka utama">
           {featured.map((item) => <MetricCard key={item.title} title={item.title} section={item.section} metric={findMetric(report, item.section, item.fragments)} />)}
         </section>
 
         <MarketReferences report={report} />
+        <ReportInsights report={report} />
         {!report.is_demo && <HistoryCharts histories={histories} />}
-        {!report.is_demo && <LiveMarketMonitor report={report} />}
-        {!report.is_demo && <RefreshReportControl />}
         <div className="market-sections">
           {groups.map((group) => <DataTable key={group.key} group={group} report={report} />)}
         </div>
+        {!report.is_demo && <LiveMarketMonitor report={report} />}
+        <DataSources report={report} />
+        <ReadingGlossary />
 
         <footer className="page-footer"><span>Market Today · Daily Market Report</span>
           <span>ID laporan: {report.report_id || "belum tersedia"}</span></footer>
