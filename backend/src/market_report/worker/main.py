@@ -46,7 +46,8 @@ def process_one(repository: PostgresJobRepository) -> bool:
     try:
         if job["job_type"] == "refresh":
             report = report_service.run_live_pipeline(
-                publication_guard=lambda: repository.publication_guard(job_id, owner_token)
+                publication_guard=lambda: repository.publication_guard(job_id, owner_token),
+                report_id=f"job-{job_id}",
             )
         elif job["job_type"] == "export_pdf":
             report = report_service.load_report_version(job.get("report_id"))
@@ -67,16 +68,18 @@ def process_one(repository: PostgresJobRepository) -> bool:
             # Wait for the version lock before taking the job row lock, allowing
             # heartbeats to continue while another worker generates the same PDF.
             with repository.artifact_guard(report["report_id"]):
-                with repository.ownership_guard(job_id, owner_token):
-                    artifact = repository.get_artifact(report["report_id"])
-                    directory = report_artifact_directory()
-                    if pdf_artifact_path(artifact, directory) is None:
-                        pdf_path, download_name = export_service.save_report_pdf(
-                            report, history, directory, storage_prefix=f"{job_id}_",
-                        )
-                        artifact = repository.record_pdf_artifact(
-                            report["report_id"], download_name, pdf_path.name
-                        )
+                artifact = repository.get_artifact(report["report_id"])
+                directory = report_artifact_directory()
+                if pdf_artifact_path(artifact, directory) is None:
+                    pdf_path, download_name = export_service.save_report_pdf(
+                        report, history, directory, storage_prefix=f"{job_id}_",
+                    )
+                    with repository.ownership_guard(job_id, owner_token):
+                        artifact = repository.get_artifact(report["report_id"])
+                        if pdf_artifact_path(artifact, directory) is None:
+                            artifact = repository.record_pdf_artifact(
+                                report["report_id"], download_name, pdf_path.name
+                            )
             _logger.info("PDF laporan %s disimpan sebagai artefak %s", report.get("report_id"), artifact["artifact_id"])
         except Exception:
             if job["job_type"] == "export_pdf":

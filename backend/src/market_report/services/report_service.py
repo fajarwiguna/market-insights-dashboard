@@ -83,7 +83,7 @@ def validate_report(report: dict) -> None:
 
 
 def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
-                     snapshot_path: Path | None = None) -> dict:
+                     snapshot_path: Path | None = None, report_id: str | None = None) -> dict:
     """Bangun dan validasi laporan dari payload snapshot yang diberikan, lalu terbitkan."""
     from market_report.calculate import build_report_data, persist_json_data
 
@@ -92,6 +92,8 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     report["_source_snapshot"] = snapshot
     if isinstance(snapshot.get("_sbn_history"), list):
         report["_sbn_history"] = snapshot["_sbn_history"]
+    if report_id:
+        report["report_id"] = report_id
     validate_report(report)
 
     # Repository menyimpan versi immutable, lalu mengganti laporan aktif atomik.
@@ -106,7 +108,7 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     return report
 
 
-def run_live_pipeline(*, publication_guard=None) -> dict:
+def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -> dict:
     """Ambil sumber satu kali, bentuk laporan dari payload itu, lalu terbitkan."""
     from market_report.fetch_data import run_all
 
@@ -132,7 +134,7 @@ def run_live_pipeline(*, publication_guard=None) -> dict:
     snapshot["_sbn_history"] = history
     guard = publication_guard() if publication_guard else nullcontext()
     with guard:
-        report = publish_snapshot(snapshot)
+        report = publish_snapshot(snapshot, report_id=report_id)
 
     # Riwayat SBN dikumpulkan saat pipeline menerbitkan laporan, bukan saat
     # halaman dashboard dibuka. Kegagalan pencatatan riwayat tidak membatalkan laporan.

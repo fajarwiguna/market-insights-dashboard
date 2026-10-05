@@ -150,8 +150,9 @@ class WorkerAndSchedulerTests(unittest.TestCase):
     ):
         report = {"report_id": "report-test", "_sbn_history": []}
 
-        def publish_with_guard(publication_guard):
+        def publish_with_guard(publication_guard, report_id):
             with publication_guard():
+                report["report_id"] = report_id
                 return report
 
         run_pipeline.side_effect = publish_with_guard

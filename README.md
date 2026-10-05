@@ -8,17 +8,18 @@
 
 *Gambar menggunakan data simulasi untuk memperlihatkan tampilan aplikasi; nilainya bukan data pasar aktual.*
 
-Pipeline otomatis untuk **Market Today** (FX, indices, yield SBN/SBSN, BI Rate, spread, chart Rate Differential).
+Website **Market Today** menyajikan data pasar Indonesia dan global. FastAPI membaca laporan
+berversi, PostgreSQL menyimpan antrean pembaruan, dan worker menyiapkan refresh serta PDF.
 
 
 ```
-Market Data (yfinance + PHEI + BI)
+Sumber pasar (Yahoo Finance + PHEI + BI)
         ↓
-Python (fetch + calculate daily change)
+Backend Python (pengambilan + validasi + analisis)
         ↓
-Generate Charts
+FastAPI + PostgreSQL + worker
         ↓
-Streamlit Dashboard  +  PDF Report
+Frontend Next.js + laporan PDF
 ```
 
 ---
@@ -26,32 +27,66 @@ Streamlit Dashboard  +  PDF Report
 ## Acuan proyek
 
 - [Project Brief](docs/PROJECT_BRIEF.md): tujuan produk, pengguna, fitur, data, pengalaman pengguna, operasional, roadmap, dan kriteria keberhasilan.
-- [Rancangan migrasi](project_migration.md): arah arsitektur dan rencana migrasi bertahap.
 
 README ini berisi panduan instalasi dan penggunaan teknis. Kondisi produk serta progres pengembangan dirangkum dalam Project Brief.
 
-## 1. Instalasi
+## 1. Menyiapkan aplikasi
 
-Python 3.10 atau lebih baru diperlukan. Buat virtual environment, lalu pasang dependensi
-(Streamlit 1.50 atau lebih baru diperlukan untuk fragment dan API tampilan yang dipakai):
+Gunakan Python 3.10 atau lebih baru dan Node.js 20.9 atau lebih baru. Checkout proyek ini,
+lalu siapkan dependensi backend dan frontend.
 
 ### Windows (PowerShell)
 
-```bash
+```powershell
 py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+Set-Location frontend
+npm ci
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
+Set-Location ..
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
 ### Linux / macOS
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r backend/requirements.txt
+cd frontend && npm ci
+test -f .env.local || cp .env.example .env.local
+cd ..
+test -f .env || cp .env.example .env
 ```
 
-Dependencies utama: `streamlit`, `yfinance`, `pandas`, `matplotlib`, `reportlab`, `beautifulsoup4`, `requests`.
+Isi `.env` dengan URL dan kredensial PostgreSQL serta token API. Isi `frontend/.env.local`
+dengan `DAILY_MARKET_API_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, kata sandi operator,
+dan secret sesi. Nilai token baca harus sama pada kedua file; rahasia operator hanya disimpan
+di lingkungan frontend. Jangan menimpa file konfigurasi yang sudah berisi nilai lokal.
+
+Terapkan schema database satu kali:
+
+```powershell
+.\.venv\Scripts\python.exe backend/src/market_report/apply_schema_migrations.py
+```
+
+Jalankan API dan worker pada terminal terpisah dari root proyek:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn market_report.api.main:app --app-dir backend/src --host 127.0.0.1 --port 8000
+```
+
+```powershell
+.\.venv\Scripts\python.exe backend/src/market_report/worker/main.py
+```
+
+Jalankan website dari direktori `frontend` dengan `npm run dev`. Bila database belum
+memiliki laporan, minta refresh dari menu **Pengelolaan** setelah API dan worker aktif.
+Worker juga dapat dijadwalkan dengan menjalankan
+`.\.venv\Scripts\python.exe backend/src/market_report/scheduler/main.py` secara terpisah.
+
+Kode aplikasi menggunakan `backend/requirements.txt`. Berkas Streamlit lama seperti root
+`requirements.txt`, `src/app.py`, dan `legacy/` mungkin masih ada pada checkout pengembangan,
+tetapi bukan bagian dari alur clone dan menjalankan website Next.js.
 
 ### Package backend dan direktori deployment
 
@@ -63,6 +98,8 @@ python -m market_report.apply_schema_migrations
 python -m uvicorn market_report.api.main:app --host 127.0.0.1 --port 8000
 python -m market_report.worker.main
 ```
+
+Perintah ini berlaku setelah backend dipasang sebagai package melalui perintah pertama.
 
 Perintah tersebut dijalankan terpisah sesuai kebutuhan; migrasi schema dijalankan sebelum
 layanan memakai database. Wheel menyertakan SQL dari `backend/migrations/` dan proses
@@ -86,7 +123,6 @@ lokal dengan:
 
 ```powershell
 python backend/src/market_report/migrate_reports_to_postgres.py
-python -m streamlit run src/app.py
 ```
 
 Skrip migrasi menerapkan schema pada berkas `backend/migrations/` secara otomatis. `DATABASE_URL`
@@ -106,10 +142,9 @@ Perintah ini aman dijalankan berulang. `migrate_reports_to_postgres.py` tetap di
 untuk impor awal karena perintah tersebut juga dapat menjadikan snapshot lokal sebagai
 laporan aktif database.
 
-### API dan worker (tahap transisi)
+### API dan worker
 
-FastAPI dapat dijalankan berdampingan dengan Streamlit. API memuat konfigurasi `.env` yang
-sama dan membaca repository laporan yang sama:
+FastAPI memuat konfigurasi `.env` dan membaca repository laporan yang sama dengan worker:
 
 ```powershell
 python -m uvicorn market_report.api.main:app --app-dir backend/src --host 127.0.0.1 --port 8000
@@ -179,10 +214,9 @@ instans scheduler tidak mengantrekan slot yang sama berulang kali. Slot yang ter
 dapat dimasukkan dalam jendela `REFRESH_CATCHUP_MINUTES` (default 10). Untuk deployment,
 jalankan scheduler dan worker sebagai proses layanan terpisah yang otomatis aktif kembali.
 
-### Frontend Next.js (tahap transisi)
+### Frontend Next.js
 
-Frontend Next.js berada di `frontend/` dan berjalan berdampingan dengan Streamlit selama masa
-transisi. Halaman dashboard membaca laporan aktif melalui API. Gunakan Node.js 20.9 atau lebih baru, lalu
+Frontend Next.js di `frontend/` adalah antarmuka aktif. Halaman dashboard membaca laporan aktif melalui API. Gunakan Node.js 20.9 atau lebih baru, lalu
 siapkan konfigurasi berdasarkan `.env.example` di direktori proyek untuk FastAPI dan worker.
 Untuk Next.js, salin `frontend/.env.example` menjadi `frontend/.env.local`; Next.js memuat konfigurasi
 frontend dari direktori saat ini. Nilai `API_READ_TOKEN` di `frontend/.env.local` harus sama
@@ -215,20 +249,17 @@ grafik historis, tabel detail, dan monitor live. Sumber serta glosarium berada d
 glosarium dan dampak praktis dapat dibuka sesuai kebutuhan. Klik **Pengelolaan** di header
 untuk membuka login operator dan kontrol refresh laporan.
 Tombol refresh memasukkan job ke antrean dan menunggu status worker sebelum memuat laporan
-versi baru. Streamlit tetap menjadi aplikasi utama selama alur Next.js dan worker diverifikasi.
+versi baru. Next.js merupakan antarmuka aktif; Streamlit hanya tersedia pada checkout lama
+yang masih memiliki berkas transisinya.
 
----
+### Streamlit lama di checkout lokal
 
-## 2. Menjalankan Dashboard (Streamlit)
+Streamlit dipertahankan sebagai jalur transisi pada salinan kerja lama. Berkas root
+`requirements.txt`, `src/app.py`, dan `legacy/` dikecualikan dari repository aktif, sehingga
+perintah Streamlit berikut hanya berlaku bila berkas tersebut tersedia di checkout lokal.
+Untuk clone baru, gunakan aplikasi Next.js pada bagian instalasi di atas.
 
-```bash
-python -m streamlit run src/app.py
-```
-
-Browser akan terbuka di **http://localhost:8501**.
-Jika menggunakan virtual environment, aktifkan dahulu seperti langkah instalasi di atas.
-
-### Isi sidebar
+### Isi sidebar Streamlit lama
 
 | Kontrol | Kegunaan |
 |---------|----------|
@@ -427,22 +458,25 @@ Lalu buka dashboard kapan saja — data sudah terisi dari cron, jadi tidak perlu
    - Arguments: `backend/src/market_report/run_pipeline.py`
    - Start in: folder `daily_market_report`
 
-### Opsi C — Auto-refresh di dalam Streamlit (opsional)
+### Opsi C — Auto-refresh di dalam Streamlit lama (opsional)
 
 Tambahkan di sidebar interval auto-rerun (contoh setiap 30 menit) dengan fragment / `st.rerun` + timer. Untuk produksi, lebih aman menjalankan cron (pipeline menyimpan snapshot ke `runtime/data/report_data.json`) lalu membiarkan dashboard menampilkan snapshot tersebut — sumber data (yfinance / PHEI) tidak dibebani permintaan berulang.
 
-### Opsi D — Deploy online
+### Opsi D — Deployment Streamlit lama
 
-- **Streamlit Community Cloud**: push repo, set main file `src/app.py`.  
-  Untuk data live, gunakan tombol **🔄 Perbarui data dari sumber (live)** di sidebar atau schedule job terpisah (GitHub Actions) yang commit/update `runtime/data/report_data.json`.
-- **Server sendiri**: `streamlit run src/app.py --server.port 8501` + reverse proxy (nginx) + cron pipeline.
+Petunjuk deployment Streamlit berikut hanya berlaku untuk salinan lama yang masih memuat
+`src/app.py` dan dependensinya. Deployment aplikasi aktif perlu menjalankan frontend Next.js,
+FastAPI, PostgreSQL, dan worker sebagai layanan terpisah.
+
+- **Streamlit Community Cloud**: set main file `src/app.py` pada checkout lama.
+- **Server sendiri**: `streamlit run src/app.py --server.port 8501` pada checkout lama.
 
 ---
 
 ## 6. Struktur direktori
 
-Berikut struktur saat ini beserta komponen transisi. Lihat [`project_migration.md`](project_migration.md)
-untuk target pemisahan lebih lanjut dan peta migrasi sementara.
+Berikut ringkasan struktur aktif. Berkas runtime dan artefak migrasi lokal tidak disertakan
+dalam clone baru.
 
 ```
 daily_market_report/
@@ -452,23 +486,17 @@ daily_market_report/
 │   ├── pyproject.toml         ← konfigurasi package Python
 │   ├── requirements.txt       ← dependensi backend
 │   └── src/market_report/     ← API, domain, layanan, worker, scheduler, pipeline
-├── src/
-│   └── app.py                ← entry point kompatibilitas Streamlit
-├── legacy/streamlit/          ← aplikasi lama, komponen, gaya, dan ikon
-├── tests/                     ← pemeriksaan pipeline, PDF, live, dan UI lama
-├── tools/                     ← alat pemeriksaan lokal
 ├── frontend/                  ← aplikasi Next.js
-├── runtime/
-│   ├── data/                  ← snapshot, versi laporan, dan riwayat lokal
-│   ├── charts/                ← grafik hasil pipeline
-│   └── reports/               ← arsip PDF lokal
-├── requirements.txt           ← backend + Streamlit untuk pengembangan lokal
-├── project_migration.md       ← peta migrasi sementara
+├── tests/                     ← pemeriksaan backend dan integrasi
+├── tools/                     ← utilitas pengembang
+├── .env.example               ← konfigurasi lokal server/backend
+├── frontend/.env.example      ← konfigurasi lokal frontend
 └── README.md
 ```
-Data pasar, riwayat, grafik, dan laporan PDF adalah keluaran lokal yang dikecualikan
-oleh `.gitignore`. Simpan salinan di lokasi lain bila ingin mengarsipkannya atau
-memindahkannya ke komputer lain.
+Data pasar, riwayat, grafik, dan laporan PDF disimpan sebagai keluaran runtime lokal dan
+dikecualikan oleh `.gitignore`. Berkas `src/app.py`, `legacy/`, dan root `requirements.txt`
+masih dapat ditemukan pada checkout transisi lama, tetapi tidak menjadi bagian dari struktur
+aktif.
 
 ### Uji cepat setelah mengubah tampilan
 

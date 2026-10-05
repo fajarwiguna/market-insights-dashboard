@@ -42,6 +42,10 @@ class JsonReportRepository:
         # Simpan versi dahulu; file aktif menjadi penunjuk commit.
         self.versions_path.mkdir(parents=True, exist_ok=True)
         version_path = self.versions_path / f"{published['report_id']}.json"
+        existing = self._read(version_path)
+        if existing is not None:
+            persist_json_data(existing, self.active_path)
+            return existing
         persist_json_data(published, version_path)
         persist_json_data(published, self.active_path)
         return published
@@ -108,12 +112,17 @@ class PostgresReportRepository:
                 (published["report_id"], published["published_at"], published.get("schema_version", 1),
                  json.dumps(published, ensure_ascii=False, default=str)),
             )
+            stored = connection.execute(
+                "SELECT payload FROM report_versions WHERE report_id = %s",
+                (published["report_id"],),
+            ).fetchone()
+            canonical = stored["payload"]
             connection.execute(
                 """INSERT INTO active_report (slot, report_id) VALUES ('active', %s)
                    ON CONFLICT (slot) DO UPDATE SET report_id = EXCLUDED.report_id""",
                 (published["report_id"],),
             )
-        return published
+        return canonical
 
 
 def configured_report_repository(default_path: Path):

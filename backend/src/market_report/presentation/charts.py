@@ -201,7 +201,7 @@ def make_fx_chart(fx: dict, live_at: str | None = None):
     values = [b[1] for b in baris]
     colors = [COLOR_DOWN if v > 0 else (COLOR_UP if v < 0 else "#94a3b8") for v in values]
 
-    fig, ax = plt.subplots(figsize=(7, 3.0 + 0.42 * len(labels)))
+    fig, ax = plt.subplots(figsize=(10, 2.8 + 0.24 * len(labels)))
     y = np.arange(len(labels))
     ax.barh(y, values, color=colors, height=0.6)
     ax.set_yticks(y)

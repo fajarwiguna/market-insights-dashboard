@@ -198,12 +198,14 @@ def generate_fx_bar_chart(fx_data: Dict) -> Path:
     _style()
     labels, values, colors = [], [], []
     for k, v in fx_data.items():
+        if k.upper().startswith("DXY"):
+            continue
         chg = (v or {}).get("change_pct")
         if chg is None:      # belum ada penutupan pembanding → dilewati
             continue
         labels.append(k)
         values.append(float(chg))
-        colors.append("#E53935" if chg < 0 else "#43A047")
+        colors.append("#E53935" if chg > 0 else ("#43A047" if chg < 0 else "#94a3b8"))
 
     if not labels:           # tidak ada yang bisa digambar — jangan tampilkan sumbu kosong
         raise ValueError("Tidak ada data perubahan kurs untuk digambar (semua baris belum punya "
@@ -215,8 +217,8 @@ def generate_fx_bar_chart(fx_data: Dict) -> Path:
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels)
     ax.axvline(0, color="black", linewidth=0.8)
-    ax.set_xlabel("Change %")
-    ax.set_title("Exchange Rate Daily Change %", fontsize=12, fontweight="bold")
+    ax.set_xlabel("Perubahan harian (%)")
+    ax.set_title("Pergerakan Kurs terhadap Rupiah", fontsize=12, fontweight="bold")
     for i, v in enumerate(values):
         ax.text(v + (0.02 if v >= 0 else -0.02), i, f"{v:+.2f}%",
                 va="center", ha="left" if v >= 0 else "right", fontsize=9)

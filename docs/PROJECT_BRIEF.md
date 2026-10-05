@@ -75,28 +75,27 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 
 ### Arah struktur teknis
 
-Struktur tujuan menggunakan `backend/` untuk aplikasi Python modular, `frontend/` untuk
+Struktur aktif menggunakan `backend/` untuk aplikasi Python modular, `frontend/` untuk
 Next.js, `docs/` untuk dokumentasi permanen, `tools/` untuk utilitas pengembang, dan `runtime/`
-untuk keluaran lokal. `legacy/streamlit/` serta `src/app.py` dipertahankan hanya selama masa
-transisi. Direktori source Next.js saat ini bernama `frontend/`.
-Rincian pemetaan dan tahapan pemindahan ada di [`project_migration.md`](../project_migration.md).
+untuk keluaran lokal. Berkas Streamlit lama hanya tersisa pada checkout pengembangan lama dan
+tidak menjadi bagian dari clone baru. Direktori source Next.js bernama `frontend/`.
 
 ## 6. Lingkup fungsional dan kondisi saat ini
 
 | Area | Cakupan | Kondisi |
 |---|---|---|
-| Ringkasan pasar | Header, insight harian, interpretasi, angka kunci | Tersedia di Streamlit |
+| Ringkasan pasar | Header, insight harian, interpretasi, angka kunci | Tersedia di dashboard Next.js |
 | Detail indikator | FX, indeks, yield, dan komoditas | Tersedia; kelengkapan bergantung pada sumber |
 | Monitor pasar | Grafik dan data live dari penyedia | Tersedia; terpisah dari laporan harian |
 | Penjelasan | Glosarium, sumber, dan metode | Tersedia |
-| Tampilan | Tema terang/gelap dan pengaturan tampilan | Tersedia di frontend Streamlit |
+| Tampilan | Tema terang/gelap dan pengaturan tampilan | Tersedia di frontend Next.js |
 | PDF | Mengunduh laporan dari aplikasi; pipeline CLI | Tersedia secara sinkron |
 | Laporan berversi | Laporan aktif, ID laporan, arsip versi | Tersedia melalui repository JSON/PostgreSQL |
 | API | Baca laporan, riwayat instrumen, data live | Implementasi tersedia; kontrak masih dalam tahap transisi |
-| Antrean refresh | Membuat dan membaca status job; worker terpisah | Refresh Streamlit, CLI live, dan API memakai antrean saat PostgreSQL aktif; perlu verifikasi integrasi |
+| Antrean refresh | Membuat dan membaca status job; worker terpisah | Dashboard Next.js meminta refresh melalui API; job diproses worker saat PostgreSQL aktif |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend pengganti | Next.js + TypeScript | Dashboard di `frontend/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Production build berhasil, integrasi runtime dan penerimaan pengguna belum diverifikasi |
+| Frontend aktif | Next.js + TypeScript | Dashboard di `frontend/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Integrasi runtime dan penerimaan pengguna belum diverifikasi |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.
@@ -115,7 +114,7 @@ Pengalaman yang dituju: informasi utama mudah ditemukan, angka mudah dibandingka
 
 ### B. Memperbarui laporan
 
-Saat ini refresh dapat berjalan langsung dari Streamlit/CLI, atau melalui API dan worker. Pada jalur antrean, operator membuat job, worker mengambil data dan menyusun laporan, kemudian hasil yang valid diterbitkan sebagai versi baru.
+Saat ini operator meminta refresh melalui dashboard Next.js dan API. Worker mengambil data dan menyusun laporan, kemudian hasil yang valid diterbitkan sebagai versi baru.
 
 Pengalaman yang dituju: operator dapat melihat status menunggu, berjalan, berhasil, atau gagal; laporan aktif terakhir tetap dapat dibaca saat pembaruan gagal; seluruh refresh akhirnya menggunakan satu mekanisme penerbitan yang terkontrol.
 
@@ -153,7 +152,7 @@ Ketersediaan data bergantung pada respons penyedia, kalender pasar, dan keberhas
 
 Validasi publikasi saat ini menolak laporan demo dan mensyaratkan setidaknya dua nilai `today` numerik yang valid dari kelompok pasar. Ini merupakan pemeriksaan dasar; pemeriksaan kelengkapan per instrumen, kesegaran, dan kewajaran perubahan masih perlu diperkuat.
 
-Riwayat SBN saat ini dibatasi hingga 30 titik dan pengumpulannya masih terkait render dashboard. Riwayat instrumen lain yang tersedia di API sebagian berasal dari snapshot laporan aktif. Sistem belum menjadi gudang data historis lengkap.
+Riwayat SBN dibatasi hingga 30 titik dan dikumpulkan pada pipeline penerbitan laporan. Riwayat SBN dilampirkan ke versi laporan; versi lama yang tidak menyimpan riwayat tersebut tidak memakai seri terbaru sebagai pengganti. Riwayat instrumen lain yang tersedia di API sebagian berasal dari snapshot laporan aktif. Sistem belum menjadi gudang data historis lengkap.
 
 ## 9. Arah desain dan pengalaman pengguna
 
@@ -181,7 +180,8 @@ Pada frontend baru, komponen ringkasan, kartu indikator, tabel, grafik, status d
 
 ```mermaid
 flowchart TD
-    S[Dashboard Streamlit] --> C[Layanan dan domain Python]
+    WEB[Dashboard Next.js] --> API[FastAPI]
+    API --> C[Layanan dan domain Python]
     CLI[Pipeline CLI] --> C
     API[FastAPI] --> C
     API --> Q[Antrean refresh PostgreSQL]
@@ -194,12 +194,11 @@ flowchart TD
     C --> PDF[Grafik dan PDF]
 ```
 
-Streamlit masih memanggil layanan Python secara langsung. API dan worker menggunakan layanan yang sama. Diagram menunjukkan hubungan modul; tidak seluruh pemanggilan layanan mengambil data dari penyedia atau menghasilkan PDF.
+Dashboard Next.js mengakses layanan Python melalui FastAPI. Worker menggunakan layanan yang sama. Diagram menunjukkan hubungan modul; tidak seluruh pemanggilan layanan mengambil data dari penyedia atau menghasilkan PDF.
 
 | Lokasi | Tanggung jawab |
 |---|---|
-| `src/app.py` | Entry point kompatibilitas dashboard Streamlit |
-| `legacy/streamlit/` | Aplikasi lama serta komponen, tema, dan halamannya |
+| `frontend/` | Aplikasi dashboard Next.js |
 | `backend/src/market_report/domain/` | Logika dan analisis pasar |
 | `backend/src/market_report/services/` | Alur laporan, riwayat, live, ekspor, dan refresh |
 | `backend/src/market_report/infrastructure/repositories/` | Repository JSON dan PostgreSQL untuk laporan, riwayat, job, serta artefak |
@@ -214,9 +213,9 @@ Streamlit masih memanggil layanan Python secara langsung. API dan worker menggun
 
 ### Arsitektur tujuan
 
-Frontend Next.js + TypeScript mengakses FastAPI. Backend Python mempertahankan perhitungan dan analisis. PostgreSQL menyimpan laporan, riwayat, dan job. Worker menangani refresh serta ekspor, dengan scheduler mengirim pekerjaan melalui antrean yang sama. Streamlit dipertahankan selama transisi sampai kesetaraan fungsi pengganti terbukti.
+Frontend Next.js + TypeScript mengakses FastAPI. Backend Python mempertahankan perhitungan dan analisis. PostgreSQL menyimpan laporan, riwayat, dan job. Worker menangani refresh serta ekspor, dengan scheduler mengirim pekerjaan melalui antrean yang sama.
 
-Backend kini memakai package `market_report` dengan susunan `src/` dan konfigurasi package tersendiri. Streamlit lama mengakses package yang sama melalui entry point kompatibilitas. Pemisahan tanggung jawab dan kontrak data tetap menjadi prioritas sebelum penghapusan frontend lama.
+Backend memakai package `market_report` dengan susunan `src/` dan konfigurasi package tersendiri. Pemisahan tanggung jawab dan kontrak data tetap menjadi prioritas pengembangan.
 
 ## 11. Penyimpanan dan kontrak integrasi
 
@@ -272,9 +271,9 @@ Operasional yang dituju mencakup:
 - Deployment yang dapat diulang, dependensi terkunci, dan pemeriksaan otomatis sebelum rilis.
 - Pengelolaan akses pengguna, rahasia konfigurasi, serta pencatatan aktivitas bila lingkup penggunaan berkembang.
 
-Antrean mendukung deduplikasi job aktif per jenis/versi, pengambilan job dengan row lock, maksimal tiga percobaan, token kepemilikan, heartbeat 30 detik, lease dua menit, dan penguncian kepemilikan saat publikasi/ekspor. Pemulihan job menggunakan lease yang kedaluwarsa. Jeda retry belum tersedia. Saat PostgreSQL aktif, refresh Streamlit, CLI live, dan API masuk ke antrean. Mode JSON lokal tetap menerbitkan langsung untuk pengembangan.
+Antrean mendukung deduplikasi job aktif per jenis/versi, pengambilan job dengan row lock, maksimal tiga percobaan, token kepemilikan, heartbeat 30 detik, dan lease dua menit. Refresh menetapkan ID laporan dari ID job agar retry tidak menerbitkan versi duplikat; worker memegang row lock hanya saat publikasi atau menyimpan metadata artefak, bukan selama PDF dirender. Pemulihan job menggunakan lease yang kedaluwarsa. Jeda retry belum tersedia. Refresh dashboard Next.js menggunakan antrean PostgreSQL; mode JSON lokal tetap menerbitkan langsung untuk pengembangan.
 
-Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Pemulihan setelah crash masih dapat menerbitkan versi tambahan; idempotensi publikasi dan jeda retry menjadi pekerjaan lanjutan.
+Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Refresh worker kini menetapkan ID laporan deterministik dari job agar retry memakai versi yang sudah terbit; transaksi atomik antara publikasi dan penyelesaian job serta jeda retry tetap menjadi pekerjaan lanjutan.
 
 Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru.
 
@@ -293,7 +292,7 @@ Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan sche
 
 Penguatan kualitas, keamanan, dan pengujian dilakukan sepanjang tahap; tidak seluruhnya ditunda sampai tahap terakhir.
 
-**Prioritas implementasi berikutnya:** memverifikasi antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; memeriksa kontrol akses deployment; lalu menguatkan penyimpanan artefak dan pembatasan login bersama untuk deployment multi-host. Laporan baru menyimpan riwayat SBN yang dipakai saat PDF dibuat; laporan lama belum memiliki riwayat terikat versi. Pengumpulan riwayat SBN sudah dipindahkan dari render UI ke pipeline penerbitan laporan.
+**Prioritas implementasi berikutnya:** memverifikasi antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; memeriksa kontrol akses deployment; lalu menguatkan penyimpanan artefak dan pembatasan login bersama untuk deployment multi-host. Pemulihan job sekarang memakai ulang ID versi laporan yang sama, sedangkan publikasi laporan dan penyelesaian job belum satu transaksi. Laporan baru menyimpan riwayat SBN yang dipakai saat PDF dibuat; laporan lama belum memiliki riwayat terikat versi.
 
 Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditetapkan.
 
@@ -304,7 +303,7 @@ Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditet
 - Pengguna dapat menemukan tanggal laporan, ringkasan, angka utama, detail, dan PDF tanpa arahan pengembang.
 - Tanggal data, sumber, dan kondisi data tidak tersedia dapat dipahami dari tampilan.
 - Dashboard dan PDF memiliki angka harian yang sama untuk `report_id` yang sama.
-- Fitur penting MVP tetap tersedia selama transisi dan setelah frontend pengganti digunakan.
+- Fitur penting MVP tetap tersedia pada dashboard Next.js yang menjadi antarmuka aktif.
 
 ### Data dan sistem
 
@@ -353,12 +352,10 @@ Ketergantungan utama meliputi akses database, ketersediaan penyedia data, format
 - Pisahkan fitur yang tersedia, fitur yang baru memiliki implementasi awal, dan rencana yang belum dikerjakan.
 - Hindari memasukkan kredensial, isi `.env`, atau data sensitif ke dokumentasi.
 
-### Dokumen pendamping
+### Dokumen dan kode terkait
 
 - [README.md](../README.md): instalasi, menjalankan aplikasi, konfigurasi, dan penggunaan teknis.
-- [project_migration.md](../project_migration.md): dokumen migrasi sementara. Peta struktur kode akhir mengacu pada bagian struktur proyek di dalamnya. Dokumen ini tetap dipakai selama migrasi, lalu dipindahkan/dirangkum ke acuan permanen dan dihapus hanya setelah tahap migrasi selesai serta struktur akhir telah diverifikasi.
-- [src/](../src/): entry point kompatibilitas dan ikon Streamlit.
 - [backend/](../backend/): layanan API, domain, worker, scheduler, dan migrasi.
-- [legacy/streamlit/](../legacy/streamlit/): dashboard Streamlit selama transisi.
+- [frontend/](../frontend/): dashboard Next.js.
 
-Brief ini merupakan acuan holistik produk. README menjadi panduan menjalankan proyek, sedangkan rancangan migrasi memberikan detail arah teknis.
+Brief ini merupakan acuan holistik produk. README menjadi panduan menjalankan proyek.
