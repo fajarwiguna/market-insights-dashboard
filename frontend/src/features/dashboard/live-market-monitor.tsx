@@ -8,9 +8,11 @@ const displayNames: Record<string, string> = {
   "fx|JPY/IDR": "JPY/IDR", "fx|DXY": "DXY", "indices|IHSG (ID)": "IHSG",
   "indices|DJI (US)": "Dow Jones", "yields|US Treasury 10 Tahun": "UST 10Y",
   "yields|US Treasury 5 Tahun": "UST 5Y", "commodities|Gold (USD/oz)": "Emas",
+  "commodities|Emas Antam 1 gr (Rp)": "Emas Antam 1 gr",
   "commodities|Brent Crude": "Brent", "commodities|WTI Crude": "WTI",
 };
 const number = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
+const wholeNumber = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 const groups = ["fx", "indices", "yields", "commodities"] as const;
 const groupNames: Record<(typeof groups)[number], string> = { fx: "Valuta", indices: "Indeks", yields: "Yield", commodities: "Komoditas" };
 
@@ -39,7 +41,7 @@ function LiveQuoteCard({ quote, fallback, keyName }: { quote?: LiveQuote; fallba
   const origin = available ? "Live" : "Snapshot laporan";
   return <article className={`live-card ${available ? "live-card-fresh" : "live-card-fallback"}`}>
     <div className="live-card-title"><strong>{displayNames[keyName] || keyName}</strong><span>{origin}</span></div>
-    <p className="live-value">{typeof value === "number" ? `${number.format(value)}${unit}` : "—"}</p>
+    <p className="live-value">{typeof value === "number" ? `${(unit ? number : wholeNumber).format(value)}${unit}` : "—"}</p>
     <div className="live-card-meta"><span>{typeof change === "number" ? `${change > 0 ? "+" : ""}${number.format(change)}%` : "Perubahan —"}</span><span>{formatDate(sourceDate)}</span></div>
   </article>;
 }
@@ -92,6 +94,6 @@ export function LiveMarketMonitor({ report }: { report: MarketReport }) {
         {rows.map(([key]) => <LiveQuoteCard key={key} keyName={key} quote={quotes[key]} fallback={snapshotReading(report, key)} />)}
       </div></div>;
     })}
-    <p className="live-footnote">Harga intraday berasal dari Yahoo Finance dan dapat tertunda. Yield SBN tetap mengikuti publikasi harian PHEI.</p>
+    <p className="live-footnote">Harga intraday berasal dari Yahoo Finance dan dapat tertunda. Yield SBN mengikuti publikasi harian PHEI, sedangkan harga Antam mengikuti harga dasar harian Logam Mulia.</p>
   </section>;
 }

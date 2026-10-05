@@ -92,6 +92,8 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     report["_source_snapshot"] = snapshot
     if isinstance(snapshot.get("_sbn_history"), list):
         report["_sbn_history"] = snapshot["_sbn_history"]
+    if isinstance(snapshot.get("_antam_gold_history"), list):
+        report["_antam_gold_history"] = snapshot["_antam_gold_history"]
     if report_id:
         report["report_id"] = report_id
     validate_report(report)
@@ -118,6 +120,37 @@ def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -
     from market_report.calculate import build_report_data
     from market_report.domain.market_analysis import market_facts
     from market_report.services.history_service import load_sbn_history, record_sbn_history
+
+    # Reuse published report versions as the durable daily history for Antam.
+    # The official source exposes today's price; older points are collected by
+    # this pipeline as each dated report is published.
+    antam = snapshot.get("antam_gold")
+    if isinstance(antam, dict) and isinstance(antam.get("price"), (int, float)) \
+            and not isinstance(antam.get("price"), bool) and math.isfinite(antam["price"]):
+        from market_report.services.history_service import source_date_iso
+
+        antam_day = source_date_iso(antam.get("date"))
+        observations: dict[str, float] = {}
+        for prior_report in list_report_versions(limit=90):
+            prior_reading = (prior_report.get("commodities") or {}).get("Emas Antam 1 gr (Rp)", {})
+            prior_day = source_date_iso(prior_reading.get("date"))
+            prior_value = prior_reading.get("today")
+            if prior_day and isinstance(prior_value, (int, float)) and not isinstance(prior_value, bool) \
+                    and math.isfinite(prior_value):
+                observations[prior_day] = float(prior_value)
+
+        previous_days = [day for day in observations if antam_day and day < antam_day]
+        if previous_days:
+            antam["prev"] = observations[max(previous_days)]
+            antam["change_pct"] = round(
+                (float(antam["price"]) - antam["prev"]) / antam["prev"] * 100, 4
+            ) if antam["prev"] else None
+        if antam_day:
+            observations[antam_day] = float(antam["price"])
+            snapshot["_antam_gold_history"] = [
+                {"date": day, "close": value}
+                for day, value in sorted(observations.items())[-30:]
+            ]
 
     candidate = build_report_data(snapshot)
     sbn10 = market_facts(candidate).get("sbn10", {})

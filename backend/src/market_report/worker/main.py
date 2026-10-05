@@ -1,6 +1,7 @@
 """Worker polling untuk mengeksekusi job refresh yang persisten."""
 
 import argparse
+import hashlib
 import logging
 import sys
 import threading
@@ -70,13 +71,19 @@ def process_one(repository: PostgresJobRepository) -> bool:
             with repository.artifact_guard(report["report_id"]):
                 artifact = repository.get_artifact(report["report_id"])
                 directory = report_artifact_directory()
-                if pdf_artifact_path(artifact, directory) is None:
+                # An explicit export job means the PDF may have been built by
+                # older code. Rebuild it even when a valid artifact exists.
+                rebuild_requested = job["job_type"] == "export_pdf"
+                if rebuild_requested or pdf_artifact_path(artifact, directory) is None:
+                    stable_prefix = hashlib.sha256(
+                        report["report_id"].encode("utf-8")
+                    ).hexdigest()[:16] + "_"
                     pdf_path, download_name = export_service.save_report_pdf(
-                        report, history, directory, storage_prefix=f"{job_id}_",
+                        report, history, directory, storage_prefix=stable_prefix,
                     )
                     with repository.ownership_guard(job_id, owner_token):
                         artifact = repository.get_artifact(report["report_id"])
-                        if pdf_artifact_path(artifact, directory) is None:
+                        if rebuild_requested or pdf_artifact_path(artifact, directory) is None:
                             artifact = repository.record_pdf_artifact(
                                 report["report_id"], download_name, pdf_path.name
                             )

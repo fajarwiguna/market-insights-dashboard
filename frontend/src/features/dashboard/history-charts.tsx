@@ -11,7 +11,8 @@ const ranges: { id: Range; label: string; days: number | null }[] = [
   { id: "6m", label: "6B", days: 183 }, { id: "1y", label: "1T", days: 366 },
   { id: "all", label: "Semua", days: null },
 ];
-const number = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
+const wholeNumber = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
+const rateNumber = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 
 function LineChart({ series, range }: { series: Series; range: Range }) {
   const data = useMemo(() => {
@@ -46,6 +47,7 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
   const y = (value: number) => top + ((high - value) / (high - low)) * (height - top - bottom);
   const path = data.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.close).toFixed(1)}`).join(" ");
   const labels = [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])];
+  const formatValue = series.id === "sbn-10y" ? rateNumber : wholeNumber;
 
   return (
     <div className="chart-canvas">
@@ -54,11 +56,11 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
           const value = high - ((high - low) * step) / 3;
           const yy = y(value);
           return <g key={step}><line x1={left} x2={width - right} y1={yy} y2={yy} className="chart-gridline" />
-            <text x={left - 9} y={yy + 4} textAnchor="end" className="chart-axis-label">{number.format(value)}{series.unit}</text></g>;
+            <text x={left - 9} y={yy + 4} textAnchor="end" className="chart-axis-label">{formatValue.format(value)}{series.unit}</text></g>;
         })}
         <path d={path} fill="none" stroke={series.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         {data.map((point, index) => <circle key={`${point.dates}-${index}`} cx={x(index)} cy={y(point.close)} r={data.length < 45 ? 3 : 1.7} fill={series.color}>
-          <title>{`${point.dates}: ${number.format(point.close)}${series.unit}`}</title>
+          <title>{`${point.dates}: ${formatValue.format(point.close)}${series.unit}`}</title>
         </circle>)}
         {labels.map((index) => <text key={`${data[index].dates}-${index}`} x={x(index)} y={height - 8} textAnchor={index === 0 ? "start" : index === data.length - 1 ? "end" : "middle"} className="chart-axis-label">{data[index].dates}</text>)}
       </svg>

@@ -1,10 +1,8 @@
-"""
-Daily Market Update — laporan pasar harian dalam format PDF.
+"""PDF renderers for Daily Market Report.
 
-Tampilan disusun sebagai laporan korporat: kop dengan bar aksen, kartu angka
-kunci, tabel tanpa garis vertikal, grafik berbingkai, dan footer bernomor
-halaman. Seluruh angka diambil dari objek `report` yang sama dengan dashboard,
-sehingga PDF yang diunduh selalu cocok dengan yang terlihat di layar.
+`build_pdf` creates the standard one-page A4 executive brief. The earlier
+full-report layout remains available through `build_detailed_pdf`. Both use
+values from the selected report version.
 """
 
 from __future__ import annotations
@@ -14,6 +12,7 @@ from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 from functools import partial
 from typing import Dict, Any, Optional
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -28,6 +27,11 @@ from reportlab.platypus import (
 )
 
 from market_report.config import chart_directory, market_data_directory, report_artifact_directory
+from market_report.presentation.pdf_charts import (
+    GoldPricesChart,
+    RateDifferentialChart,
+    chart_heading,
+)
 
 REPORT_DIR = report_artifact_directory()
 CHART_DIR = chart_directory()
@@ -311,8 +315,8 @@ class KanvasLaporan(pdfcanvas.Canvas):
 
         c.setFont("Helvetica-Bold", 7.2)
         c.setFillColor(MUTED)
-        c.drawRightString(lebar - MARGIN_X, garis_y - 4.2 * mm,
-                          f"Halaman {nomor} dari {total}")
+        page_text = f"Halaman {nomor} dari {total}" if total > 1 else "Ringkasan 1 halaman"
+        c.drawRightString(lebar - MARGIN_X, garis_y - 4.2 * mm, page_text)
 
 
 def summary_text(report: Dict[str, Any]) -> str:
@@ -338,8 +342,8 @@ def summary_text(report: Dict[str, Any]) -> str:
     if ihsg.get("today") is not None:
         chg = ihsg.get("change_pct")
         kalimat.append(
-            f"IHSG {_arah(chg, 'naik', 'turun')} {_fmt_num(abs(chg), 2)}% ke {_fmt_num(ihsg['today'], 2)}."
-            if chg is not None else f"IHSG berada di {_fmt_num(ihsg['today'], 2)}."
+            f"IHSG {_arah(chg, 'naik', 'turun')} {_fmt_num(abs(chg), 2)}% ke {_fmt_num(ihsg['today'], 0)}."
+            if chg is not None else f"IHSG berada di {_fmt_num(ihsg['today'], 0)}."
         )
     if sbn10.get("today") is not None:
         bp = sbn10.get("change_bp")
@@ -387,6 +391,18 @@ def _gaya_dokumen() -> Dict[str, ParagraphStyle]:
                                   leading=10.4, textColor=MUTED),
         "Sumber": ParagraphStyle("Sumber", fontName="Helvetica", fontSize=8,
                                  leading=10.4, textColor=MUTED),
+        "BriefHeading": ParagraphStyle("BriefHeading", fontName="Helvetica-Bold", fontSize=10.5,
+                                        leading=12.5, textColor=INK),
+        "InsightTitle": ParagraphStyle("InsightTitle", fontName="Helvetica-Bold", fontSize=9.2,
+                                       leading=11.2, textColor=INK),
+        "InsightBody": ParagraphStyle("InsightBody", fontName="Helvetica", fontSize=8.4,
+                                      leading=10.5, textColor=BODY),
+        "SupportLabel": ParagraphStyle("SupportLabel", fontName="Helvetica-Bold", fontSize=7.1,
+                                       leading=8.5, textColor=MUTED),
+        "SupportValue": ParagraphStyle("SupportValue", fontName="Helvetica-Bold", fontSize=11.5,
+                                       leading=13.2, textColor=INK),
+        "SupportChange": ParagraphStyle("SupportChange", fontName="Helvetica-Bold", fontSize=7.3,
+                                        leading=8.8, textColor=MUTED),
     }
     for style in baru.values():
         styles.add(style)
@@ -427,9 +443,9 @@ def _kartu_angka(gaya, label: str, nilai: str, delta: str = "", arah: int = 0,
                  lebar: Optional[float] = None,
                  ukuran_nilai: Optional[float] = None) -> Table:
     """
-    Kartu angka kunci: label kecil, nilai besar, dan perubahan berarah.
+    Kartu angka kunci: label kecil, nilai besar, dan perubahan persentase/bp.
 
-    `arah` 1 = naik, -1 = turun, 0 = tanpa panah.
+    `arah` tetap diterima untuk kompatibilitas dengan pemanggil lama.
     `ukuran_nilai` dipakai untuk nilai berupa teks panjang (mis. status spread)
     supaya tetap muat di dalam kartu.
     """
@@ -443,20 +459,9 @@ def _kartu_angka(gaya, label: str, nilai: str, delta: str = "", arah: int = 0,
         [Paragraph(nilai, gaya_nilai)],
     ]
     if delta:
-        isi_delta = Table(
-            [[PanahNaikTurun(arah, warna or MUTED, lebar=2.8 * mm, tinggi=3.0 * mm),
-                  Paragraph(delta, ParagraphStyle(
-                  "DeltaKartu", fontName="Helvetica-Bold", fontSize=7.8,
-                  leading=9.6, textColor=warna or MUTED))]],
-            colWidths=[3.6 * mm, None])
-        isi_delta.setStyle(TableStyle([
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ("TOPPADDING", (0, 0), (-1, -1), 0),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ]))
-        baris.append([isi_delta])
+        baris.append([Paragraph(delta, ParagraphStyle(
+            "DeltaKartu", fontName="Helvetica-Bold", fontSize=7.8,
+            leading=9.6, textColor=warna or MUTED))])
 
     t = Table(baris, colWidths=[lebar])
     t.setStyle(TableStyle([
@@ -506,7 +511,7 @@ def _tabel_pasar(gaya, judul_kolom: list, baris: list, lebar_kolom: list,
     return t
 
 
-def build_pdf(
+def build_detailed_pdf(
     report: Dict[str, Any] = None,
     chart_path: Optional[Path] = None,
     out_path: Optional[Path] = None,
@@ -540,7 +545,7 @@ def build_pdf(
 
     date_str = _tanggal_laporan(report)
     # Nama file mengikuti TANGGAL LAPORAN, bukan tanggal saat PDF dibuat.
-    hari = str(report.get("report_date_iso") or datetime.now().strftime("%Y-%m-%d"))
+    hari = str(report.get("report_date_iso") or datetime.now().strftime("%d-%m-%Y"))
     nama_file = f"Market Update {hari.replace('-', '')}.pdf"
     buf = stream
     if stream is None:
@@ -602,7 +607,7 @@ def build_pdf(
         _kartu_angka(gaya, "USD / IDR", _fmt_num(usd.get("today"), 0),
                      _fmt_pct(usd.get("change_pct")), _arah_panah(usd.get("change_pct")),
                      _warna_arah(usd.get("change_pct"), naik_baik=False)),
-        _kartu_angka(gaya, "IHSG", _fmt_num(ihsg.get("today"), 2),
+        _kartu_angka(gaya, "IHSG", _fmt_num(ihsg.get("today"), 0),
                      _fmt_pct(ihsg.get("change_pct")), _arah_panah(ihsg.get("change_pct")),
                      _warna_arah(ihsg.get("change_pct"))),
         _kartu_angka(gaya, "SBN 10Y", _fmt_num(sbn10.get("today"), 2, suffix="%"),
@@ -718,7 +723,7 @@ def build_pdf(
               Spacer(1, 2.6 * mm)]
     fx_baris, fx_kunci = [], []
     for i, (name, v) in enumerate(fx.items()):
-        desimal = 0 if any(k in name.upper() for k in ("USD/IDR", "EUR/IDR", "CNY/IDR", "SAR/IDR")) else 2
+        desimal = 0
         chg = v.get("change_pct")
         # Pasangan IDR bergerak berlawanan dengan nilai Rupiah; DXY adalah indeks dolar.
         warna_perubahan = (_warna_arah(chg) if name.upper().startswith("DXY")
@@ -756,8 +761,8 @@ def build_pdf(
         idx_baris.append([
             Paragraph(name, ParagraphStyle("Nm", parent=gaya["Td"],
                                            fontName="Helvetica-Bold", textColor=INK)),
-            Paragraph(_fmt_num(v.get("today"), 2), gaya["TdAngka"]),
-            Paragraph(_fmt_num(v.get("prev"), 2), gaya["TdAngka"]),
+            Paragraph(_fmt_num(v.get("today"), 0), gaya["TdAngka"]),
+            Paragraph(_fmt_num(v.get("prev"), 0), gaya["TdAngka"]),
             Paragraph(f'<font color="#{(_warna_arah(chg) or MUTED).hexval()[2:]}">'
                       f"{_fmt_pct(chg)}</font>", gaya["TdArah"]),
         ])
@@ -857,8 +862,8 @@ def build_pdf(
             kom_baris.append([
                 Paragraph(name, ParagraphStyle("Nm", parent=gaya["Td"],
                                               fontName="Helvetica-Bold", textColor=INK)),
-                Paragraph(_fmt_num(v.get("today"), 2), gaya["TdAngka"]),
-                Paragraph(_fmt_num(v.get("prev"), 2), gaya["TdAngka"]),
+                Paragraph(_fmt_num(v.get("today"), 0), gaya["TdAngka"]),
+                Paragraph(_fmt_num(v.get("prev"), 0), gaya["TdAngka"]),
                 Paragraph(f'<font color="#{(_warna_arah(chg) or MUTED).hexval()[2:]}">'
                           f"{_fmt_pct(chg)}</font>", gaya["TdArah"]),
             ])
@@ -914,6 +919,302 @@ def build_pdf(
     if stream is not None:
         return buf.getvalue(), nama_file
     print(f"PDF saved -> {out_path}")   # ASCII: konsol Windows (cp1252) tidak bisa cetak "→"
+    return out_path
+
+
+def _brief_paragraph_text(value: Any) -> str:
+    """Hilangkan markup internal dan escape teks sebelum dimasukkan ke Paragraph."""
+    text = re.sub(r"</?b>", "", str(value or ""), flags=re.IGNORECASE)
+    return escape(_teks_bersih(text))
+
+
+def _brief_insights(report: Dict[str, Any]) -> list[dict]:
+    """Pilih tiga insight yang paling mudah dipahami pembaca laporan harian."""
+    from market_report.domain.market_analysis import build_insights
+
+    available = build_insights(report)
+    preferred = (
+        "Nilai tukar Rupiah",
+        "Pasar saham (IHSG)",
+        "Selisih imbal hasil RI–AS (spread)",
+    )
+    selected = []
+    for title in preferred:
+        item = next((row for row in available if row.get("title") == title), None)
+        if item is not None:
+            selected.append(item)
+    for item in available:
+        if item not in selected and len(selected) < 3:
+            selected.append(item)
+    return selected[:3]
+
+
+def _brief_insight_card(gaya, item: dict) -> Table:
+    tone = item.get("tone")
+    tone_color = {"good": GOOD, "bad": BAD, "warn": AMBER}.get(tone, ACCENT)
+    tone_background = {
+        "good": colors.HexColor("#eef8f1"),
+        "bad": colors.HexColor("#fff1f0"),
+        "warn": colors.HexColor("#fff8e8"),
+    }.get(tone, colors.HexColor("#f4f7f7"))
+    content = [
+        [Paragraph(_brief_paragraph_text(item.get("title")), gaya["InsightTitle"])],
+        [Paragraph(_brief_paragraph_text(item.get("text")), gaya["InsightBody"])],
+    ]
+    if item.get("dampak"):
+        impact_style = ParagraphStyle(
+            "BriefImpact", fontName="Helvetica-Oblique", fontSize=7.5,
+            leading=9.2, textColor=MUTED,
+        )
+        content.append([Paragraph(_brief_paragraph_text(item["dampak"]), impact_style)])
+    card = Table(content, colWidths=[LEBAR - 3 * mm])
+    card.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), tone_background),
+        ("BOX", (0, 0), (-1, -1), 0.45, BORDER),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.2, tone_color),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3.5 * mm),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3.5 * mm),
+        ("TOPPADDING", (0, 0), (-1, 0), 2.0 * mm),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.0 * mm),
+        ("TOPPADDING", (0, 1), (-1, -1), 0.8 * mm),
+    ]))
+    return card
+
+
+def _brief_support_card(gaya, label: str, value, *, decimals: int = 0,
+                        suffix: str = "", change=None,
+                        higher_is_better: bool = True) -> Table:
+    label_paragraph = Paragraph(escape(label), gaya["SupportLabel"])
+    value_paragraph = Paragraph(_fmt_num(value, decimals, suffix=suffix), gaya["SupportValue"])
+    content = [[label_paragraph], [value_paragraph]]
+    tone = _warna_arah(change, naik_baik=higher_is_better) if change is not None else ACCENT
+    if change is not None:
+        change_style = ParagraphStyle(
+            "BriefSupportChange", parent=gaya["SupportChange"],
+            textColor=tone or MUTED,
+        )
+        content.append([Paragraph(_fmt_pct(change), change_style)])
+    card = Table(content, colWidths=[LEBAR / 3 - 2.4 * mm])
+    card.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), SURFACE),
+        ("BOX", (0, 0), (-1, -1), 0.45, BORDER),
+        ("LINEABOVE", (0, 0), (-1, 0), 1.8, tone or ACCENT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3 * mm),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
+        ("TOPPADDING", (0, 0), (-1, 0), 1.6 * mm),
+        ("TOPPADDING", (0, 1), (-1, -1), 0.5 * mm),
+        ("BOTTOMPADDING", (0, -1), (-1, -1), 1.7 * mm),
+    ]))
+    return card
+
+
+def build_pdf(
+    report: Dict[str, Any] = None,
+    chart_path: Optional[Path] = None,
+    out_path: Optional[Path] = None,
+    stream=None,
+    fx_chart_path: Optional[Path] = None,
+) -> "Path | tuple[bytes, str]":
+    """Buat PDF ringkas satu halaman dengan grafik dari riwayat versi laporan.
+
+    `chart_path` dan `fx_chart_path` tetap diterima untuk kompatibilitas caller lama;
+    grafik brief digambar dari data historis yang terikat pada `report`.
+    """
+    if report is None:
+        with open(DATA_DIR / "report_data.json", encoding="utf-8") as source:
+            report = json.load(source)
+
+    date_str = _tanggal_laporan(report)
+    report_day = str(report.get("report_date_iso") or datetime.now().strftime("%Y-%m-%d"))
+    filename = f"Market Update {report_day.replace('-', '')}.pdf"
+    target = stream
+    if stream is None:
+        out_path = Path(out_path) if out_path else REPORT_DIR / filename
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        target = str(out_path)
+
+    doc = SimpleDocTemplate(
+        target,
+        pagesize=A4,
+        leftMargin=MARGIN_X,
+        rightMargin=MARGIN_X,
+        topMargin=MARGIN_TOP,
+        bottomMargin=MARGIN_BOTTOM,
+        title="Market Today - Ringkasan Pasar Harian",
+        author="Market Today",
+        subject=f"Ringkasan pasar harian per {date_str}",
+        creator="Daily Market Report Automation",
+    )
+    gaya = _gaya_dokumen()
+    fx = report.get("fx") or {}
+    indices = report.get("indices") or {}
+    yields = report.get("yields") or {}
+    commodities = report.get("commodities") or {}
+    bi = report.get("bi") or {}
+
+    usd = _cari(fx, "usd/idr")
+    ihsg = _cari(indices, "ihsg")
+    sbn10 = _cari(yields, "sbn", "10", exclude=("sbsn", "fr0"))
+    ust10 = _cari(yields, "treasury", "10")
+    spread = report.get("spread_sbn10_ust10_bp")
+
+    header = Table(
+        [[Paragraph("Market Today", gaya["Judul"]),
+          Paragraph(f"<b>{escape(date_str)}</b><br/>"
+                    f"<font size=8 color='#64748b'>Diperbarui {_jam_snapshot(report)}</font>",
+                    ParagraphStyle("BriefDate", fontName="Helvetica", fontSize=9.5,
+                                   leading=13.5, textColor=INK, alignment=TA_RIGHT))]],
+        colWidths=[LEBAR * 0.58, LEBAR * 0.42],
+    )
+    header.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.6, ACCENT),
+    ]))
+
+    key_cards = [
+        _kartu_angka(gaya, "USD / IDR", _fmt_num(usd.get("today"), 0),
+                     _fmt_pct(usd.get("change_pct")), _arah_panah(usd.get("change_pct")),
+                     _warna_arah(usd.get("change_pct"), naik_baik=False)),
+        _kartu_angka(gaya, "IHSG", _fmt_num(ihsg.get("today"), 0),
+                     _fmt_pct(ihsg.get("change_pct")), _arah_panah(ihsg.get("change_pct")),
+                     _warna_arah(ihsg.get("change_pct"))),
+        _kartu_angka(gaya, "SBN 10Y", _fmt_num(sbn10.get("today"), 2, suffix="%"),
+                     _fmt_bp(sbn10.get("change_bp")), _arah_panah(sbn10.get("change_bp")),
+                     _warna_yield(sbn10.get("change_bp"))),
+        _kartu_angka(gaya, "UST 10Y", _fmt_num(ust10.get("today"), 2, suffix="%"),
+                     _fmt_bp(ust10.get("change_bp")), _arah_panah(ust10.get("change_bp")),
+                     _warna_yield(ust10.get("change_bp"))),
+        _kartu_angka(gaya, "Spread SBN / UST", _fmt_num(spread, 0, suffix=" bp"),
+                     "", 0, ACCENT),
+    ]
+    key_row = Table([key_cards], colWidths=[LEBAR_KARTU] * 5, hAlign="LEFT")
+    key_row.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), JEDA_KARTU),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+
+    summary_box = Table(
+        [[Paragraph("Ringkasan pasar", gaya["InsightTitle"])],
+         [Paragraph(escape(summary_text(report)), gaya["Ringkasan"])]],
+        colWidths=[LEBAR - 4 * mm],
+    )
+    summary_box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), ACCENT_SOFT),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.2, ACCENT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4 * mm),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm),
+        ("TOPPADDING", (0, 0), (-1, 0), 2.2 * mm),
+        ("TOPPADDING", (0, 1), (-1, -1), 0.8 * mm),
+        ("BOTTOMPADDING", (0, -1), (-1, -1), 2.4 * mm),
+    ]))
+
+    insights = _brief_insights(report)
+    insight_cards = [_brief_insight_card(gaya, item) for item in insights]
+    insight_grid = Table([[card] for card in insight_cards], colWidths=[LEBAR])
+    insight_grid_styles = [
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    ]
+    insight_grid_styles.extend(
+        ("BOTTOMPADDING", (0, row), (-1, row), 1.6 * mm)
+        for row in range(max(0, len(insight_cards) - 1))
+    )
+    insight_grid.setStyle(TableStyle(insight_grid_styles))
+
+    dji = _cari(indices, "dji")
+    dxy = _cari(fx, "dxy")
+    gold = _cari(commodities, "gold")
+    antam = _cari(commodities, "emas", "antam")
+    brent = _cari(commodities, "brent")
+    support_items = [
+        ("Dow Jones", dji.get("today"), 0, "", dji.get("change_pct"), True),
+        ("DXY", dxy.get("today"), 0, "", dxy.get("change_pct"), False),
+        ("Emas Antam 1 gr", antam.get("today"), 0, "", antam.get("change_pct"), True),
+        ("Brent · USD/barel", brent.get("today"), 0, "", brent.get("change_pct"), False),
+        ("BI Rate", bi.get("BI Rate"), 2, "%", None, True),
+        ("INDONIA", bi.get("INDONIA"), 2, "%", None, True),
+    ]
+    support_cards = [
+        _brief_support_card(
+            gaya, label, value, decimals=decimals, suffix=suffix, change=change,
+            higher_is_better=higher_is_better,
+        )
+        for label, value, decimals, suffix, change, higher_is_better in support_items
+    ]
+    support_rows = [support_cards[:3], support_cards[3:]]
+    support_grid = Table(support_rows, colWidths=[LEBAR / 3] * 3, hAlign="LEFT")
+    support_grid.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2.4 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 2.0 * mm),
+    ]))
+
+    rate_chart_column = [
+        chart_heading("Rate Differential"),
+        Spacer(1, 0.8 * mm),
+        RateDifferentialChart(report, height=47 * mm),
+        Paragraph("Sumber: PHEI & Yahoo Finance.", gaya["Catatan"]),
+    ]
+    gold_chart_column = [
+        chart_heading("Gold Prices"),
+        Spacer(1, 0.8 * mm),
+        GoldPricesChart(report, height=47 * mm),
+        Paragraph("Sumber: Yahoo Finance & Logam Mulia ANTAM.", gaya["Catatan"]),
+    ]
+    charts_row = Table([[rate_chart_column, gold_chart_column]],
+                       colWidths=[LEBAR / 2, LEBAR / 2], hAlign="LEFT")
+    charts_row.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (0, 0), 2 * mm),
+        ("LEFTPADDING", (1, 0), (1, 0), 2 * mm),
+    ]))
+
+    story = [
+        header,
+        Spacer(1, 2.5 * mm),
+        Paragraph("PASAR INDONESIA & GLOBAL · RINGKASAN HARIAN", gaya["SubJudul"]),
+        Spacer(1, 3 * mm),
+        key_row,
+        Spacer(1, 2 * mm),
+        Paragraph("Nilai merah menunjukkan pergerakan yang perlu dicermati.", gaya["Catatan"]),
+        Spacer(1, 2.5 * mm),
+        summary_box,
+        Spacer(1, 2 * mm),
+        charts_row,
+        Spacer(1, 2 * mm),
+        Paragraph("Insight utama", gaya["BriefHeading"]),
+        Spacer(1, 1 * mm),
+        insight_grid,
+        Spacer(1, 2.5 * mm),
+        Paragraph("Indikator pendukung", gaya["BriefHeading"]),
+        Spacer(1, 1 * mm),
+        support_grid,
+    ]
+
+    canvas = partial(
+        KanvasLaporan,
+        judul="Market Today",
+        sub_judul=date_str,
+        sumber="Rincian sumber dan tanggal observasi per instrumen tersedia di dashboard.",
+    )
+    doc.build(story, canvasmaker=canvas)
+    if stream is not None:
+        return target.getvalue(), filename
+    print(f"PDF saved -> {out_path}")
     return out_path
 
 

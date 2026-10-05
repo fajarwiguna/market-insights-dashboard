@@ -116,6 +116,74 @@ def fetch_market_snapshot() -> Dict[str, Any]:
     return result
 
 
+def fetch_antam_gold_price() -> Dict[str, Any]:
+    """Ambil harga dasar emas batangan Antam 1 gram dari Logam Mulia."""
+    url = "https://www.logammulia.com/id/harga-emas-hari-ini"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=20)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "lxml")
+        page_text = soup.get_text(" ", strip=True)
+        date_match = re.search(
+            r"Harga Emas Hari Ini\s*,?\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
+            page_text,
+            re.I,
+        )
+        if not date_match:
+            raise ValueError("Tanggal harga pada halaman Logam Mulia tidak ditemukan.")
+
+        day, month, year = date_match.group(1).split()
+        month_names = {
+            "jan": 1, "january": 1, "feb": 2, "february": 2,
+            "mar": 3, "march": 3, "apr": 4, "april": 4,
+            "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
+            "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
+            "oct": 10, "october": 10, "nov": 11, "november": 11,
+            "dec": 12, "december": 12,
+            "januari": 1, "februari": 2, "maret": 3, "mei": 5,
+            "juni": 6, "juli": 7, "agustus": 8, "oktober": 10,
+            "desember": 12,
+        }
+        source_date = datetime(int(year), month_names[month.lower()], int(day)).strftime("%Y-%m-%d")
+
+        candidates: list[tuple[bool, int, int | None]] = []
+        for table in soup.find_all("table"):
+            table_text = table.get_text(" ", strip=True).lower()
+            if "harga dasar" not in table_text:
+                continue
+            standard_bullion = (
+                "emas batangan" in table_text
+                and not any(term in table_text for term in ("gift series", "batik", "seri kemerdekaan"))
+            )
+            for row in table.find_all("tr"):
+                cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])]
+                if len(cells) < 2 or not re.fullmatch(r"1\s*(?:gr|gram)", cells[0].strip(), re.I):
+                    continue
+                numbers = [re.sub(r"[^\d]", "", cell) for cell in cells[1:]]
+                if not numbers[0]:
+                    continue
+                price = int(numbers[0])
+                taxed_price = int(numbers[1]) if len(numbers) > 1 and numbers[1] else None
+                candidates.append((standard_bullion, price, taxed_price))
+        if not candidates:
+            raise ValueError("Baris harga dasar produk emas Antam 1 gram tidak ditemukan.")
+
+        # Pilih tabel emas batangan reguler, bukan Gift Series atau produk lain.
+        _, price, taxed_price = next((row for row in candidates if row[0]), candidates[0])
+        return {
+            "price": price,
+            "price_with_tax": taxed_price,
+            "weight_grams": 1,
+            "date": source_date,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "source": url,
+            "source_name": "Logam Mulia ANTAM",
+            "basis": "Harga dasar emas batangan 1 gram; sebelum PPh 0,25%.",
+        }
+    except Exception as error:
+        return {"error": str(error), "source": url, "source_name": "Logam Mulia ANTAM"}
+
+
 def fetch_fx_backup() -> Dict[str, Any]:
     """Cross-check USD rates from open.er-api.com."""
     try:
@@ -327,6 +395,9 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     if persist:
         _save("yfinance", market)
 
+    print("Fetching Logam Mulia ANTAM gold price...")
+    antam_gold = fetch_antam_gold_price()
+
     print("Fetching FX backup (open.er-api) …")
     fx_backup = fetch_fx_backup()
     if persist:
@@ -345,6 +416,7 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     snapshot = {
         "generated_at": datetime.now().isoformat(),
         "yfinance": market,
+        "antam_gold": antam_gold,
         "fx_backup": fx_backup,
         "phei": phei,
         "bi": bi,

@@ -64,7 +64,7 @@ button { font: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 
-.metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 0; }
+.metrics-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 0; }
 .metric-card { min-height: 157px; padding: 17px 17px 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--white); box-shadow: var(--shadow); }
 .metric-heading { display: flex; justify-content: space-between; color: #61777a; font-size: 12px; font-weight: 650; }
 .metric-arrow { color: #9bada9; font-size: 14px; }
@@ -203,6 +203,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .loading-grid { margin-top: 18px; }.loading-grid span { flex: 1; height: 150px; background-color: #fff; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
+@media (max-width: 1320px) {
+  .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 1180px) {
   .main-content { padding-right: 30px; padding-left: 30px; }
   .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

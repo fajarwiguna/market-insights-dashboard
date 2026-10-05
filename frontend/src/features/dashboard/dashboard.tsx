@@ -19,17 +19,16 @@ const groups: MarketGroup[] = [
   { key: "fx", title: "Kurs & mata uang", label: "01 / FX", description: "Nilai tukar dan indeks dolar" },
   { key: "indices", title: "Indeks saham", label: "02 / EQUITIES", description: "Pasar saham Indonesia dan global" },
   { key: "yields", title: "Imbal hasil obligasi", label: "03 / RATES", description: "Yield pemerintah dan benchmark" },
-  { key: "commodities", title: "Komoditas", label: "04 / COMMODITIES", description: "Harga komoditas yang dipantau" },
+  { key: "commodities", title: "Komoditas", label: "04 / COMMODITIES", description: "Gold Spot, energi, dan harga dasar Antam 1 gram sebelum pajak" },
 ];
 
 const numberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
-const preciseFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 });
+const wholeNumberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 
-function formatValue(value: unknown, section: MarketGroup["key"], name: string): string {
+function formatValue(value: unknown, section: MarketGroup["key"]): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   if (section === "yields") return `${numberFormat.format(value)}%`;
-  if (/idr/i.test(name) && Math.abs(value) >= 100) return numberFormat.format(value);
-  return preciseFormat.format(value);
+  return wholeNumberFormat.format(value);
 }
 
 function formatChange(reading: InstrumentReading): string {
@@ -39,7 +38,7 @@ function formatChange(reading: InstrumentReading): string {
   if (typeof reading.change_pct === "number" && Number.isFinite(reading.change_pct)) {
     return `${reading.change_pct > 0 ? "+" : ""}${numberFormat.format(reading.change_pct)}%`;
   }
-  return "Belum ada perubahan";
+  return "Belum ada data pembanding";
 }
 
 function findMetric(report: MarketReport, section: MarketGroup["key"], fragments: string[]): [string, InstrumentReading] | null {
@@ -73,7 +72,7 @@ function MetricCard({ title, metric, section }: {
     <article className="metric-card">
       <div className="metric-heading"><span>{title}</span><span className="metric-arrow" aria-hidden="true">↗</span></div>
       <p className="metric-name">{name}</p>
-      <p className="metric-value">{formatValue(reading.today, section, name)}</p>
+      <p className="metric-value">{formatValue(reading.today, section)}</p>
       <p className="metric-change">{formatChange(reading)}</p>
       <p className="metric-date">Data sumber · {reading.date || "tanggal tidak tersedia"}</p>
     </article>
@@ -96,7 +95,7 @@ function DataTable({ group, report }: { group: MarketGroup; report: MarketReport
               {rows.map(([name, reading]) => (
                 <tr key={name}>
                   <th scope="row">{name}</th>
-                  <td className="table-value">{formatValue(reading.today, group.key, name)}</td>
+                  <td className="table-value">{formatValue(reading.today, group.key)}</td>
                   <td>{formatChange(reading)}</td>
                   <td>{reading.date || "—"}</td>
                   <td className="source-cell">{reading.source || "—"}</td>
@@ -231,6 +230,7 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
     { title: "IHSG", section: "indices" as const, fragments: ["IHSG"] },
     { title: "SBN 10Y", section: "yields" as const, fragments: ["ID SBN 10 Tahun", "ID SBN 10Y"] },
     { title: "UST 10Y", section: "yields" as const, fragments: ["US Treasury 10 Tahun", "US Treasury 10Y"] },
+    { title: "Emas Antam", section: "commodities" as const, fragments: ["Emas Antam"] },
   ];
   const published = report.published_at || report.generated_at;
   const navigation = [

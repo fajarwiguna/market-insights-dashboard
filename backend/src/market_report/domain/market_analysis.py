@@ -67,7 +67,7 @@ def build_summary(report: dict) -> str:
         c = ihsg["change_pct"]
         kalimat.append(
             f"Di bursa saham, IHSG {_arah('naik', 'turun', c)} {fmt_mag(c)} "
-            f"ke {fmt_num(ihsg['today'], 2)}."
+            f"ke {fmt_num(ihsg['today'], 0)}."
         )
 
     for kunci, label in (("sbn10", "SBN 10 tahun"), ("ust10", "obligasi AS / UST 10 tahun")):
@@ -168,7 +168,7 @@ def build_insights(report: dict) -> list[dict]:
         out.append({
             "title": "Pasar saham (IHSG)", "tone": tone_of(c, higher_is_better=True),
             "text": (f"IHSG {_arah('naik', 'turun', c)} <b>{fmt_mag(c)}</b> ke "
-                     f"<b>{fmt_num(ihsg['today'], 2)}</b>."),
+                     f"<b>{fmt_num(ihsg['today'], 0)}</b>."),
             "dampak": ("Menggambarkan arah rata-rata harga saham di Bursa Efek Indonesia; naik biasanya "
                        "berarti investor lebih optimistis, turun berarti lebih berhati-hati."),
         })
@@ -282,7 +282,7 @@ def build_market_status(report: dict) -> list[dict]:
     if ihsg.get("change_pct") is not None:
         tone = tone_of(ihsg.get("change_pct"), higher_is_better=True, threshold=0.10)
         kata = {"good": "Saham naik", "bad": "Saham turun", "flat": "Saham stabil"}[tone]
-        out.append({"label": "Saham (IHSG)", "value": fmt_num(ihsg.get("today"), 2),
+        out.append({"label": "Saham (IHSG)", "value": fmt_num(ihsg.get("today"), 0),
                     "note": f"{kata} {fmt_pct(ihsg.get('change_pct'))}", "tone": tone})
 
     sbn = f["sbn10"]

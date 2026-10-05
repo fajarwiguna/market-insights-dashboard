@@ -69,7 +69,18 @@ Terapkan schema database satu kali:
 .\.venv\Scripts\python.exe backend/src/market_report/apply_schema_migrations.py
 ```
 
-Jalankan API dan worker pada terminal terpisah dari root proyek:
+Jalankan website, API, dan worker sekaligus di Windows dari root proyek:
+
+```powershell
+.\run-app.ps1
+```
+
+Script menjalankan API, worker, dan frontend; scheduler ikut dijalankan bila `REFRESH_TIMES`
+di `.env` berisi jadwal valid seperti `08:00,16:00`. Log disimpan di `runtime/logs/app/`.
+Tekan `Ctrl+C` pada terminal script untuk menghentikan seluruh proses. Migrasi schema database
+tetap dijalankan satu kali sebelum penggunaan pertama.
+
+Jika perlu menjalankan komponen satu per satu untuk debugging, jalankan dari root proyek:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn market_report.api.main:app --app-dir backend/src --host 127.0.0.1 --port 8000
@@ -81,7 +92,7 @@ Jalankan API dan worker pada terminal terpisah dari root proyek:
 
 Jalankan website dari direktori `frontend` dengan `npm run dev`. Bila database belum
 memiliki laporan, minta refresh dari menu **Pengelolaan** setelah API dan worker aktif.
-Worker juga dapat dijadwalkan dengan menjalankan
+Scheduler juga dapat dijalankan manual dengan
 `.\.venv\Scripts\python.exe backend/src/market_report/scheduler/main.py` secara terpisah.
 
 Kode aplikasi menggunakan `backend/requirements.txt`. Berkas Streamlit lama seperti root
@@ -322,32 +333,29 @@ nomor; tiap bagian ditandai pil kecil + judul besar.
 
 ### Tampilan PDF
 
-PDF disusun sebagai laporan korporat 3 halaman, memakai design token yang sama
-dengan dashboard agar terlihat satu produk:
+PDF unduhan merupakan ringkasan eksekutif A4 satu halaman agar pembaca dapat
+memahami kondisi pasar tanpa berpindah halaman:
 
 | Bagian | Isi |
 |--------|-----|
-| **Kop** | Bar aksen di tepi atas, judul *Market Today*, tanggal laporan + jam snapshot. |
-| **Angka Kunci** | Lima kartu (USD/IDR, IHSG, SBN 10Y, UST 10Y, Spread) dengan nilai besar dan perubahan berwarna. |
-| **Ringkasan Singkat** | Call-out dengan bar aksen kiri; versi bahasa sederhana untuk pembaca non-ekonom. |
-| **Sesi 1–5** | Tabel bernomor: Exchange Rate, Financial Market, Yield, Monetary Policy, Commodities. |
-| **Sesi 6–7** | Grafik *Rate Differential* dan *Pergerakan Kurs*, masing-masing berbingkai + caption sumber. |
-| **Sesi 8** | Tabel sumber per kelompok instrumen, catatan metode, dan disclaimer. |
-| **Setiap halaman** | Kepala halaman berjalan, footer sumber, dan nomor **Halaman X dari Y**. |
+| **Kop** | Nama *Market Today*, tanggal laporan, dan waktu snapshot. |
+| **Angka kunci** | USD/IDR, IHSG, SBN 10Y, UST 10Y, dan spread SBN/UST. |
+| **Ringkasan pasar** | Ikhtisar singkat dari data laporan yang sama dengan dashboard. |
+| **Grafik tren** | Perbandingan yield SBN 10Y dan UST 10Y dari tanggal observasi tersedia, dengan spread terbaru. |
+| **Insight utama** | Hingga tiga sorotan pasar dengan arah dan konteks dampak. |
+| **Indikator pendukung** | Dow Jones, DXY, emas, Brent, BI Rate, dan INDONIA. |
+| **Footer** | Catatan bahwa rincian sumber dan tanggal observasi tersedia di dashboard. |
 
-Detail yang disengaja:
-- **Warna mengikuti arah dampak.** Pada kurs, angka positif berarti rupiah melemah
-  sehingga merah; pada saham dan imbal hasil, naik = hijau.
-- **Panah arah digambar sebagai vektor**, bukan karakter Unicode, karena font
-  dasar PDF tidak menyediakan glyph segitiga.
-- **Grafik tidak diregangkan** — ukuran diambil dari berkas PNG itu sendiri.
-- **Font tetap Helvetica** agar teks bisa dicari/dicopy dan ukuran berkas kecil.
-- **Metadata PDF** (judul, penulis, subjek) ikut diisi agar rapi di file manager.
-- **`report_pdf` tidak mengimpor `app.py`.** Modul PDF tidak menggambar grafik
-  sendiri; pemanggil menggambarnya lalu meneruskan path-nya lewat
-  `chart_path` / `fx_chart_path`. Alasannya: Streamlit menjalankan `app.py`
-  sebagai `__main__`, sehingga `import app` dari dalam fungsi ber-`@st.cache_data`
-  akan mengeksekusi ulang seluruh skrip dan memicu `CachedWidgetWarning`.
+Tabel sumber, seri historis, metode, dan glosarium tetap dapat dibaca di dashboard.
+Ekspor PDF membuat ulang berkas untuk versi laporan yang dipilih, sehingga hasil
+unduhan menggunakan tata letak terbaru.
+
+- Nilai indeks, kurs, dan komoditas dibulatkan ke bilangan utuh; yield dan persentase
+  perubahan tetap menampilkan desimal yang relevan.
+- Warna perubahan mengikuti arah dampak pasar; panah digambar sebagai vektor agar
+  tetap tampil baik dengan font standar PDF.
+- Metadata dokumen (judul, penulis, dan subjek) diisi untuk memudahkan pengarsipan.
+- Modul PDF tidak mengimpor `app.py` dan tidak membuat grafik intraday.
 
 ### Angka langsung (grafik yang benar-benar bergerak)
 
@@ -533,6 +541,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 | SBN & SBSN yields | [PHEI HPW & Imbal Hasil](https://www.phei.co.id/Data/HPW-dan-Imbal-Hasil) | Update harian |
 | BI Rate, INDONIA, JISDOR | Bank Indonesia | BI Rate setelah RDG; INDONIA harian |
 | Gold / Oil | yfinance (`GC=F`, `CL=F`) | Logam Mulia ada CAPTCHA → fallback yfinance |
+| Harga emas Antam 1 gr | [Logam Mulia](https://www.logammulia.com/id/harga-emas-hari-ini) | Harga dasar harian, belum termasuk PPh 0,25%; riwayat mulai terkumpul setelah laporan harian diterbitkan |
 | Commodities lain | TradingEconomics / investing.com | Best-effort |
 
 ---

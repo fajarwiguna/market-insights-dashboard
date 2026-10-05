@@ -1,8 +1,8 @@
 # Project Brief — Daily Market Report / Market Today
 
-Versi dokumen: 1.1
+Versi dokumen: 1.2
 
-Tanggal acuan: 4 Oktober 2026
+Tanggal acuan: 5 Oktober 2026
 Status produk: MVP/prototype yang sedang digunakan; pengembangan menuju aplikasi production dilakukan bertahap.
 
 Dokumen ini menjadi acuan bersama untuk memahami produk, menetapkan prioritas, dan mengevaluasi perubahan. Kondisi implementasi dibedakan dari arah pengembangan. Target, peran pengguna, dan kebijakan operasional yang belum disepakati ditandai sebagai usulan atau keputusan terbuka.
@@ -67,8 +67,8 @@ Pemilik produk, penanggung jawab kualitas data, dan penanggung jawab operasional
 | Nilai | Bentuk dalam aplikasi |
 |---|---|
 | Informasi terkonsolidasi | FX, indeks, yield, komoditas, dan indikator BI dalam satu dashboard |
-| Konteks yang mudah dibaca | Insight harian, interpretasi, dan glosarium |
-| Detail yang dapat ditelusuri | Tabel, grafik, serta informasi sumber dan metode |
+| Konteks yang mudah dibaca | Insight harian dan interpretasi pasar |
+| Detail yang dapat ditelusuri | Tabel, grafik, tanggal observasi, serta metadata sumber dan metode |
 | Hasil yang dapat dibagikan | Unduhan laporan PDF |
 | Konsistensi penerbitan | Pipeline bersama, validasi laporan, dan penyimpanan versi |
 | Keberlanjutan pengembangan | Pemisahan domain, layanan, repository, API, dan frontend |
@@ -85,20 +85,57 @@ tidak menjadi bagian dari clone baru. Direktori source Next.js bernama `frontend
 | Area | Cakupan | Kondisi |
 |---|---|---|
 | Ringkasan pasar | Header, insight harian, interpretasi, angka kunci | Tersedia di dashboard Next.js |
-| Detail indikator | FX, indeks, yield, dan komoditas | Tersedia; kelengkapan bergantung pada sumber |
+| Detail indikator | FX, indeks, yield, komoditas, termasuk harga dasar emas Antam 1 gram | Tersedia; kelengkapan bergantung pada sumber |
 | Monitor pasar | Grafik dan data live dari penyedia | Tersedia; terpisah dari laporan harian |
 | Penjelasan | Glosarium, sumber, dan metode | Tersedia |
 | Tampilan | Tema terang/gelap dan pengaturan tampilan | Tersedia di frontend Next.js |
-| PDF | Mengunduh laporan dari aplikasi; pipeline CLI | Tersedia secara sinkron |
+| PDF | Ringkasan eksekutif A4 satu halaman dengan angka kunci, grafik Rate Differential dan Gold Prices (Gold Spot/Antam), insight, dan indikator pendukung | Renderer tersedia; ekspor melalui worker membuat ulang PDF dari versi laporan yang dipilih |
 | Laporan berversi | Laporan aktif, ID laporan, arsip versi | Tersedia melalui repository JSON/PostgreSQL |
 | API | Baca laporan, riwayat instrumen, data live | Implementasi tersedia; kontrak masih dalam tahap transisi |
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Dashboard Next.js meminta refresh melalui API; job diproses worker saat PostgreSQL aktif |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend aktif | Next.js + TypeScript | Dashboard di `frontend/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Integrasi runtime dan penerimaan pengguna belum diverifikasi |
+| Frontend aktif | Next.js + TypeScript | Dashboard di `frontend/` mencakup ringkasan, detail, sumber, glosarium, grafik riwayat, pengaturan tema/teks, dan alur ekspor PDF per versi melalui worker. Penghapusan panel sumber/glosarium dan perluasan kategori masih berupa rancangan |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.
+
+### Rancangan perluasan data dashboard — belum diimplementasikan
+
+Dashboard akan mengelompokkan data pasar ke dalam kategori berikut. Contoh angka yang diberikan untuk rancangan ini adalah acuan bentuk tabel, bukan nilai yang boleh ditanam sebagai data produksi.
+
+| Kategori | Instrumen/indikator | Kolom dan satuan yang direncanakan |
+|---|---|---|
+| Kurs | DXY, USD/IDR, CNY/IDR, SAR/IDR, EUR/IDR, JPY/IDR | Penutupan sebelumnya, terakhir, DtD %, YtD %, tanggal observasi |
+| Harga emas | Gold Spot USD/troy oz dan emas Antam Rp/gram | Harga sebelumnya, terakhir, DtD %, YtD %, tanggal observasi |
+| Arus modal | Saham dan obligasi, USD juta | 1D, 1W, MtD, QtD, YtD; arus bersih bertanda positif/negatif |
+| Yield obligasi | UST 5Y/10Y, SBN 5Y/10Y, SBSN seri benchmark | Yield sebelumnya/terakhir dalam %, perubahan DtD dan YtD dalam bp |
+| Indikator makro | Fed Funds Rate, BI Rate, inflasi Indonesia, M2, kredit/pembiayaan, DPK | Tiga bulan observasi dengan nama bulan dan tahun; nilai sesuai definisi seri |
+| Operasi moneter | Posisi Operasi Moneter BI | Terakhir dalam Rp triliun, MtD %, YtD % |
+| Indeks saham | IHSG dan sektor Energi, Bahan Baku, Industri, Konsumen Siklikal, Konsumen Non-Siklikal, Kesehatan, Keuangan, Properti, Teknologi, Infrastruktur, Transportasi dan Logistik | Penutupan sebelumnya, terakhir, DtD %, YtD %, tanggal observasi |
+| Komoditas | ICE Brent, Newcastle Coal, CPO Bursa Malaysia | Unit, terakhir, DtD %, WtD %, MtD %, YtD % |
+
+DJI yang sudah ada tetap ditampilkan pada subkelompok indeks global, terpisah dari IHSG dan indeks sektoral Indonesia. Tabel kategori memakai lebar penuh; pada layar kecil tabel dapat digeser horizontal dengan nama instrumen tetap terlihat. Sektor dapat diringkas dan dibuka ketika diperlukan. Lima kartu utama tetap menyorot USD/IDR, IHSG, SBN 10Y, UST 10Y, dan emas Antam.
+
+### Definisi periode perubahan
+
+Label periode ditampilkan di nama kolom dan tooltip singkat, tanpa panel Glosarium tersendiri.
+
+| Label | Definisi |
+|---|---|
+| DtD | Nilai terakhir dibanding penutupan sesi perdagangan sebelumnya yang tersedia untuk instrumen tersebut |
+| WtD | Nilai terakhir dibanding penutupan terakhir sebelum minggu berjalan |
+| MtD | Nilai terakhir dibanding penutupan terakhir sebelum bulan berjalan |
+| QtD | Nilai terakhir dibanding penutupan terakhir sebelum kuartal berjalan |
+| YtD | Nilai terakhir dibanding penutupan terakhir sebelum tahun berjalan |
+| MoM (atau MtM) | Observasi bulanan dibanding observasi bulan sebelumnya; gunakan label MoM secara konsisten di aplikasi |
+| YoY | Observasi dibanding periode yang sama satu tahun sebelumnya |
+
+MtD bukan MoM, dan YtD bukan YoY. Nilai `1W` untuk arus modal didefinisikan sebagai total lima sesi perdagangan terakhir; MtD/QtD/YtD adalah akumulasi arus sejak awal periode kalender. Arus modal merupakan nominal neto, bukan persentase perubahan. Untuk harga, kurs, dan indeks, perubahan dihitung dari angka asli sebelum pembulatan: `(terakhir / pembanding - 1) x 100`. Jika pembanding tidak tersedia, hasil ditampilkan sebagai `—`, bukan nol.
+
+Perubahan yield ditampilkan terutama dalam basis point: 1 bp = 0,01 poin persentase; kenaikan yield dari 7,00% ke 7,05% adalah +5 bp. Perubahan indikator yang sudah berupa persentase, seperti inflasi YoY dari 3,19% ke 3,28%, adalah +0,09 poin persentase, bukan perubahan inflasi bulanan. Kolom bulan memakai periode observasi yang benar; bulan berjalan tanpa publikasi ditampilkan `—`.
+
+Setiap baris menyimpan tanggal observasi dan pembanding masing-masing karena kalender valuta asing, obligasi, komoditas, dan statistik makro tidak selalu sama. Penyegaran aplikasi tanpa observasi pasar baru tidak boleh dianggap sebagai perubahan DtD.
 
 ## 7. Alur penggunaan utama
 
@@ -107,7 +144,7 @@ Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebut
 1. Pengguna membuka dashboard.
 2. Pengguna melihat tanggal laporan dan ringkasan kondisi pasar.
 3. Pengguna membaca insight serta perubahan indikator utama.
-4. Pengguna membuka detail tabel, grafik, glosarium, atau sumber sesuai kebutuhan.
+4. Pengguna membuka tabel kategori dan grafik sesuai kebutuhan. Pada dashboard saat ini, bagian sumber dan glosarium masih tersedia; rancangan target menghapus kedua bagian tersebut.
 5. Pengguna mengunduh PDF bila perlu membagikan atau mengarsipkan laporan.
 
 Pengalaman yang dituju: informasi utama mudah ditemukan, angka mudah dibandingkan, dan tanggal data dapat dibedakan dari waktu pembaruan aplikasi.
@@ -133,17 +170,35 @@ Repository dan API sudah menyediakan akses versi laporan. Pengalaman pengguna un
 | Sumber | Pemakaian saat ini |
 |---|---|
 | Yahoo Finance | FX, indeks, US Treasury, komoditas, dan monitor live melalui integrasi yang tersedia |
+| Logam Mulia ANTAM | Harga dasar emas batangan Antam 1 gram; riwayat terkumpul saat laporan harian diterbitkan |
 | PHEI | Yield SBN/SBSN |
 | Bank Indonesia | BI Rate, INDONIA, dan JISDOR |
 | open.er-api | Sumber cadangan kurs tertentu, termasuk derivasi SAR/IDR |
 
 Ketersediaan data bergantung pada respons penyedia, kalender pasar, dan keberhasilan parser. Tidak seluruh indikator memiliki tanggal observasi yang sama.
 
+### Prioritas sumber untuk cakupan yang direncanakan
+
+Sumber berikut menjadi prioritas pencarian dan integrasi jika tersedia, sesuai, dan dapat diakses secara sah. Keberadaan halaman publik tidak menjamin adanya API, histori yang cukup, atau hak penggunaan untuk pengambilan otomatis. Integrasi harus memeriksa format, satuan, tanggal observasi, kelengkapan histori, batas akses, dan ketentuan penyedia. Jangan melewati pembatas akses.
+
+| Kebutuhan | Prioritas yang diminta | Catatan penggunaan |
+|---|---|---|
+| Kutipan dan narasi pasar global | [TradingEconomics Stream](https://tradingeconomics.com/stream), [mata uang AS](https://tradingeconomics.com/united-states/currency), [emas](https://tradingeconomics.com/commodity/gold), [DJI](https://tradingeconomics.com/indu:ind), [yield obligasi AS](https://tradingeconomics.com/united-states/government-bond-yield) | Verifikasi basis harga, frekuensi, histori, akses otomatis, dan ketentuan lisensi sebelum menjadikannya adapter produksi. |
+| Agenda ekonomi | [TradingEconomics Calendar](https://tradingeconomics.com/calendar) | Simpan waktu rilis dan zona waktu; bedakan aktual, sebelumnya, konsensus, prakiraan, serta periode indikator. |
+| Konteks berita global | [Investing.com: komoditas](https://www.investing.com/news/commodities-news/), [ekonomi](https://www.investing.com/news/economy-news/), [valuta asing](https://www.investing.com/news/forex-news/), [indeks US 30](https://www.investing.com/indices/us-30-news) | Gunakan artikel sebagai konteks bertanggal, bukan sebagai pengganti data harga terverifikasi. |
+| Pasar dan kebijakan global | [Yahoo Finance: kebijakan ekonomi](https://finance.yahoo.com/economy/policy/article/), [berita pasar](https://finance.yahoo.com/topic/stock-market-news/), [live market](https://finance.yahoo.com/markets/live/), serta halaman berita indeks utama | Ketersediaan halaman dapat berbeda; siapkan fallback publik setara dan catat sumber artikel yang benar-benar dipakai. |
+| Konteks Indonesia | [Bloomberg Technoz: ekonomi](https://www.bloombergtechnoz.com/kanal/market/ekonomi), [investasi](https://www.bloombergtechnoz.com/kanal/market/investasi), [pasar modal](https://www.bloombergtechnoz.com/kanal/market/pasar-modal), [komoditas](https://www.bloombergtechnoz.com/kanal/market/komoditi), [valuta asing](https://www.bloombergtechnoz.com/kanal/market/valuta-asing), [IHSG](https://www.bloombergtechnoz.com/tag/ihsg) | Utamakan konteks yang menjelaskan Rupiah, saham Indonesia, SBN/SBSN, arus modal, dan komoditas domestik. |
+| Data domestik dan validasi angka | Bank Indonesia, BPS, BEI, PHEI/DJPPR, serta Logam Mulia | Gunakan sebagai sumber resmi atau pembanding untuk seri Indonesia saat sumber prioritas tidak memadai. |
+
+Narasi pasar direncanakan menyajikan sekitar 3–5 poin penting: pergerakan yang terukur, peristiwa atau agenda yang waktunya relevan, lalu implikasi yang mungkin terhadap Rupiah, IHSG, SBN/SBSN, atau komoditas. Tulis hubungan kausal sebagai interpretasi bila sumber hanya menunjukkan korelasi. Simpan URL, judul, penerbit, waktu publikasi, dan instrumen terkait pada metadata insight. Rancangan dashboard tidak menyediakan panel/kolom Sumber tersendiri; bila tautan artikel ditampilkan, tautan melekat pada insight yang dirujuk.
+
+Beberapa definisi instrumen perlu dipastikan sebelum publikasi. Kode `GC=F` yang saat ini digunakan merepresentasikan kontrak futures, sehingga tidak boleh diberi label Gold Spot tanpa mengganti atau memverifikasi serinya. Halaman TradingEconomics menjelaskan seri emas sebagai harga referensi OTC/CFD berunit USD/troy ounce; [seri Palm Oil TradingEconomics](https://tradingeconomics.com/commodity/palm-oil) menampilkan unit MYR/MT. CPO tidak boleh diberi label USD/ton kecuali memang dikonversi dengan kurs dan tanggal yang dinyatakan. Seri SBSN PBS030/PBS004 dari referensi perlu diverifikasi ketersediaannya; tenor ditentukan dari sisa waktu ke jatuh tempo, bukan label tenor yang dianggap tetap. Posisi operasi moneter BI, rentang/definisi Fed Funds Rate, serta definisi arus saham dan obligasi juga perlu ditetapkan sebelum adapter ditulis.
+
 ### Prinsip yang menjadi acuan
 
 - Bedakan **tanggal observasi sumber**, **waktu pengambilan**, dan **waktu publikasi laporan**.
 - Data kosong tidak boleh diperlakukan sebagai nilai nol.
-- Jelaskan unit, perubahan persentase, perubahan basis point, dan sumber sesuai indikator.
+- Tampilkan unit dan pembanding periode sesuai indikator; simpan asal, waktu pengambilan, dan metode sumber sebagai metadata untuk penelusuran kualitas.
 - Pisahkan data demo dari laporan aktif.
 - Dashboard dan PDF harus memakai versi laporan yang sama untuk angka laporan harian.
 - Publikasi versi baru tidak boleh merusak laporan aktif bila proses gagal.
@@ -160,12 +215,13 @@ Desain ditujukan untuk membaca laporan pasar secara profesional, dengan hierarki
 
 Pedoman pengembangan:
 
-- Urutan halaman: identitas/tanggal laporan dan unduh PDF → angka utama → indikator acuan → ringkasan/insight dan dampak → grafik historis → tabel detail → monitor live → sumber/metode → glosarium → footer.
-- Dashboard menampilkan tiga sorotan awal; sorotan tambahan, dampak praktis, dan glosarium dapat dibuka sesuai kebutuhan. Tanggal observasi tetap berada pada kartu serta tabel, dan sumber singkat tetap tersedia di tabel.
-- Grafik SBN memakai lebar penuh; USD/IDR dan IHSG berdampingan pada desktop. Tabel kategori memakai lebar penuh dan dapat digeser horizontal pada layar kecil.
+- Urutan target: identitas/tanggal laporan dan unduh PDF → angka utama → ringkasan/insight → navigasi kategori dan tabel detail → grafik historis → monitor live → agenda ekonomi → footer.
+- Hapus section, tautan navigasi, dan kolom Sumber/Glosarium dari dashboard. Simpan metadata sumber di backend untuk penelusuran dan pengendalian kualitas; bila artikel dijadikan dasar insight, tautan kontekstual dapat melekat pada insight tersebut.
+- Dashboard menampilkan tiga sorotan awal dan dampak praktis. Label periode (DtD, WtD, MtD, QtD, YtD, MoM, YoY) serta satuan dijelaskan langsung pada judul kolom atau tooltip singkat.
+- Grafik SBN memakai lebar penuh; USD/IDR dan IHSG berdampingan pada desktop. Tabel tiap kategori memakai lebar penuh dan dapat digeser horizontal pada layar kecil, dengan kolom instrumen tetap terlihat.
 - Navigasi mengikuti urutan konten dan menandai bagian yang sedang dibaca. Login serta refresh operator diakses melalui tombol **Pengelolaan** pada header.
 - Gunakan tipografi, jarak, warna, dan komponen yang konsisten.
-- Format angka mengikuti unit instrumen dan menggunakan presisi yang konsisten.
+- Format angka mengikuti unit instrumen dan menggunakan presisi yang konsisten: kurs/indeks dibulatkan untuk tampilan, yield dan persentase tetap menunjukkan desimal yang relevan, dan semua perhitungan memakai nilai mentah.
 - Warna membantu membaca perubahan; label atau simbol tetap menjelaskan maknanya.
 - Bedakan area laporan harian dan monitor live secara jelas.
 - Sediakan kondisi loading, data kosong, data sebagian, data lama, dan kegagalan yang mudah dipahami.
@@ -187,7 +243,7 @@ flowchart TD
     API --> Q[Antrean refresh PostgreSQL]
     Q --> W[Worker Python]
     W --> C
-    C --> P[Yahoo / PHEI / BI / sumber cadangan]
+    C --> P[Yahoo / PHEI / BI / Logam Mulia ANTAM / sumber cadangan]
     C --> R[Repository]
     R --> DB[(PostgreSQL bila dikonfigurasi)]
     R --> J[JSON untuk mode lokal]
@@ -260,7 +316,7 @@ Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`,
 
 Login operator membatasi lima kegagalan dalam 15 menit, lalu menahan percobaan selama 15 menit. Secara bawaan pembatas dibagi semua klien dan tidak mempercayai header IP. Pembatas per IP hanya aktif dengan `WEB_TRUST_PROXY=true` di belakang proxy yang menimpa `X-Real-IP` dan menutup akses langsung. Penyimpanan dibatasi 2.000 entri. Penghitung berada di memori proses Next.js; sebelum menjalankan beberapa instance, pindahkan pembatasan ke penyimpanan bersama.
 
-Grafik riwayat frontend mengambil data dengan `report_id` yang sama dengan dashboard. Laporan lama tanpa riwayat SBN tersimpan menampilkan seri kosong dan PDF tidak memakai riwayat terbaru sebagai pengganti. Ekspor memakai PDF yang sudah tersedia, mengunci pembuatan per versi di PostgreSQL, dan mempublikasikan berkas secara atomik. Permintaan ekspor tanpa berkas tersedia dibatasi 10 per menit per proses API, dengan respons `429` dan `Retry-After` saat batas tercapai.
+Grafik riwayat frontend mengambil data dengan `report_id` yang sama dengan dashboard. Laporan lama tanpa riwayat SBN tersimpan menampilkan seri kosong dan PDF tidak memakai riwayat terbaru sebagai pengganti. Ekspor PDF menghasilkan ringkasan eksekutif satu halaman dari versi laporan terpilih, mengunci pembuatan per versi di PostgreSQL, lalu memublikasikan berkas secara atomik. Permintaan ekspor dibatasi 10 per menit per proses API, dengan respons `429` dan `Retry-After` saat batas tercapai.
 
 Operasional yang dituju mencakup:
 
@@ -292,6 +348,22 @@ Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan sche
 
 Penguatan kualitas, keamanan, dan pengujian dilakukan sepanjang tahap; tidak seluruhnya ditunda sampai tahap terakhir.
 
+### Rencana kerja perluasan data dan dashboard
+
+Urutan ini melengkapi roadmap migrasi di atas. Perluasan kategori dilakukan setelah aturan metrik dan kemampuan mendapatkan data tervalidasi.
+
+| Urutan | Pekerjaan | Hasil dan kriteria selesai |
+|---|---|---|
+| A. Kontrak data | Tetapkan registry instrumen: ID, kategori, unit, jenis seri, kalender, zona waktu, presisi tampilan, sumber, dan aturan pembanding | Setiap instrumen memiliki definisi yang dapat diperiksa; seri yang berbeda basisnya tidak diberi label seolah setara |
+| B. Histori dan schema | Rancang penyimpanan observasi harian/bulanan dan arus modal; siapkan histori minimal sampai pembanding tahunan tersedia | Perubahan YtD/YoY dihitung dari observasi tersimpan, versi laporan dapat direproduksi, nama kolom tanggal fisik tetap `dates` |
+| C. Mesin periode dan validasi | Implementasikan DtD, WtD, MtD, QtD, YtD, MoM, YoY, bp, dan poin persentase | Periode melewati akhir pekan/hari libur dengan pembanding observasi terakhir yang valid; data kosong tetap null/`—`; tidak ada pembanding palsu |
+| D. Adapter data | Tambahkan kurs, indeks sektoral, komoditas, yield/SBSN, indikator makro, arus modal, dan operasi moneter sesuai prioritas sumber | Adapter mencatat sumber serta timestamp; cakupan dan satuan tervalidasi; sumber cadangan diumumkan di metadata; seri yang belum tersedia tetap kosong |
+| E. Agenda dan insight | Ambil agenda ekonomi dan berita yang relevan, lalu tautkan ke instrumen serta periode | Insight menyebut data/peristiwa/tanggal pendukung dan membedakan fakta dari interpretasi; agenda memisahkan aktual, konsensus, prakiraan, dan sebelumnya |
+| F. Dashboard | Hapus panel/tautan/kolom Sumber dan Glosarium; tampilkan delapan kategori, label periode, tooltip ringkas, serta kondisi data kosong/lama | Pembaca dapat membedakan perubahan harian, akumulasi kalender, dan pertumbuhan tahunan tanpa section sumber/glosarium |
+| G. Konsistensi kanal | Sesuaikan KPI, grafik, PDF satu halaman, API, dan validasi penerbitan dengan kontrak yang sama | Dashboard, API, dan PDF konsisten untuk `report_id` yang sama; laporan parsial tidak menyamarkan kategori yang gagal |
+
+Nilai harga dan indeks dibulatkan pada tampilan sesuai preferensi produk; yield dan persentase mempertahankan desimal yang bermakna. Angka mentah tidak dibulatkan sebelum perhitungan. Sumber aktual dan waktu observasi dapat berbeda per instrumen, sehingga satu tanggal global tidak menggantikan tanggal per baris.
+
 **Prioritas implementasi berikutnya:** memverifikasi antrean, ekspor artefak, dan scheduler melalui alur operasional lengkap; memeriksa kontrol akses deployment; lalu menguatkan penyimpanan artefak dan pembatasan login bersama untuk deployment multi-host. Pemulihan job sekarang memakai ulang ID versi laporan yang sama, sedangkan publikasi laporan dan penyelesaian job belum satu transaksi. Laporan baru menyimpan riwayat SBN yang dipakai saat PDF dibuat; laporan lama belum memiliki riwayat terikat versi.
 
 Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditetapkan.
@@ -301,7 +373,11 @@ Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditet
 ### Produk dan pengalaman pengguna
 
 - Pengguna dapat menemukan tanggal laporan, ringkasan, angka utama, detail, dan PDF tanpa arahan pengembang.
-- Tanggal data, sumber, dan kondisi data tidak tersedia dapat dipahami dari tampilan.
+- Tanggal observasi, satuan, pembanding periode, dan kondisi data tidak tersedia dapat dipahami tanpa panel Glosarium.
+- Panel dan navigasi Sumber/Glosarium tidak ditampilkan; metadata provenance tetap tersedia di backend untuk kontrol kualitas.
+- Delapan kategori memiliki label kolom/periode yang konsisten dan tidak menampilkan perubahan sebagai nol ketika pembanding tidak ada.
+- Seluruh persentase dihitung dari angka mentah; yield ditampilkan dengan perubahan bp dan indikator persen dengan perubahan poin persentase.
+- Harga komoditas menyebut unit/basis instrumen, dan berita yang dipakai sebagai konteks insight memiliki penerbit serta waktu rilis tersimpan.
 - Dashboard dan PDF memiliki angka harian yang sama untuk `report_id` yang sama.
 - Fitur penting MVP tetap tersedia pada dashboard Next.js yang menjadi antarmuka aktif.
 

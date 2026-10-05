@@ -258,6 +258,17 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "date": item.get("date"),
                 "source": item.get("source"),
             }
+    antam = snap.get("antam_gold", {})
+    if isinstance(antam, dict) and antam.get("price") is not None:
+        commodities["Emas Antam 1 gr (Rp)"] = {
+            "today": antam.get("price"),
+            "prev": antam.get("prev"),
+            "change_pct": antam.get("change_pct"),
+            "date": antam.get("date"),
+            "source": antam.get("source"),
+            "price_with_tax": antam.get("price_with_tax"),
+            "basis": antam.get("basis"),
+        }
     sources.append({
         "section": "Commodities",
         "items": [
@@ -265,6 +276,16 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
             for k, v in commodities.items()
         ],
         "primary": "Yahoo Finance Chart API — GC=F, CL=F, BZ=F",
+    })
+
+    sources.append({
+        "section": "Emas Antam",
+        "primary": antam.get("source_name", "Logam Mulia ANTAM") if isinstance(antam, dict) else "Logam Mulia ANTAM",
+        "url": antam.get("source") if isinstance(antam, dict) else None,
+        "as_of_label": antam.get("date") if isinstance(antam, dict) else None,
+        "as_of_date": antam.get("date") if isinstance(antam, dict) else None,
+        "fetched_at": antam.get("fetched_at") if isinstance(antam, dict) else None,
+        "note": antam.get("basis", "Harga dasar emas batangan Antam 1 gram.") if isinstance(antam, dict) else "Harga dasar emas batangan Antam 1 gram.",
     })
 
     # History for rate differential chart

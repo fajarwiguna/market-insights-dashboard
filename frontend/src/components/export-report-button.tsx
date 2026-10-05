@@ -48,7 +48,7 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
   async function createAndDownload() {
     if (!reportId) return;
     setBusy(true);
-    setMessage("Memasukkan PDF ke antrean…");
+    setMessage("Memasukkan pembuatan PDF terbaru ke antrean…");
     try {
       const pdfUrl = `/api/reports/${encodeURIComponent(reportId)}/pdf`;
       const queued = await fetch(`/api/reports/${encodeURIComponent(reportId)}/exports`, { method: "POST" });
@@ -90,8 +90,8 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
 
   return <div className="export-control">
     <button type="button" className="export-button" onClick={createAndDownload} disabled={disabled}>
-      {busy ? <><span className="button-spinner" aria-hidden="true" />{message || "Menyiapkan PDF…"}</> : "Unduh laporan PDF"}
+      {busy ? <><span className="button-spinner" aria-hidden="true" />{message || "Menyiapkan PDF…"}</> : "Buat ulang dan unduh PDF"}
     </button>
-    <span className="export-caption" aria-live="polite">{busy ? "" : message || (reportId ? "PDF dibuat untuk versi laporan ini." : "ID laporan belum tersedia.")}</span>
+    <span className="export-caption" aria-live="polite">{busy ? "" : message || (reportId ? "PDF dibuat ulang dari versi laporan ini dengan kode terbaru." : "ID laporan belum tersedia.")}</span>
   </div>;
 }
