@@ -94,6 +94,6 @@ export function LiveMarketMonitor({ report }: { report: MarketReport }) {
         {rows.map(([key]) => <LiveQuoteCard key={key} keyName={key} quote={quotes[key]} fallback={snapshotReading(report, key)} />)}
       </div></div>;
     })}
-    <p className="live-footnote">Harga intraday berasal dari Yahoo Finance dan dapat tertunda. Yield SBN mengikuti publikasi harian PHEI, sedangkan harga Antam mengikuti harga dasar harian Logam Mulia.</p>
+    <p className="live-footnote">Harga intraday berasal dari Yahoo Finance dan dapat tertunda. Yield SBN mengikuti publikasi harian PHEI, sedangkan harga Antam mengikuti seri harga beli Antam bertanggal.</p>
   </section>;
 }

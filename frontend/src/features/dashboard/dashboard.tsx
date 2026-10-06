@@ -7,41 +7,32 @@ import { LiveMarketMonitor } from "@/features/dashboard/live-market-monitor";
 import { OperatorMenu } from "@/components/operator-menu";
 import { DashboardNav } from "@/features/dashboard/dashboard-nav";
 import { ReloadPageButton } from "@/components/reload-page-button";
+import { MARKET_GROUPS, MarketDataSections } from "@/features/dashboard/market-data-sections";
 
-type MarketGroup = {
-  key: "fx" | "indices" | "yields" | "commodities";
-  title: string;
-  label: string;
-  description: string;
-};
-
-const groups: MarketGroup[] = [
-  { key: "fx", title: "Kurs & mata uang", label: "01 / FX", description: "Nilai tukar dan indeks dolar" },
-  { key: "indices", title: "Indeks saham", label: "02 / EQUITIES", description: "Pasar saham Indonesia dan global" },
-  { key: "yields", title: "Imbal hasil obligasi", label: "03 / RATES", description: "Yield pemerintah dan benchmark" },
-  { key: "commodities", title: "Komoditas", label: "04 / COMMODITIES", description: "Gold Spot, energi, dan harga dasar Antam 1 gram sebelum pajak" },
-];
+type MarketMetricSection = "fx" | "indices" | "yields" | "commodities";
 
 const numberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 const wholeNumberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 
-function formatValue(value: unknown, section: MarketGroup["key"]): string {
+function formatValue(value: unknown, section: MarketMetricSection): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   if (section === "yields") return `${numberFormat.format(value)}%`;
   return wholeNumberFormat.format(value);
 }
 
 function formatChange(reading: InstrumentReading): string {
-  if (typeof reading.change_bp === "number" && Number.isFinite(reading.change_bp)) {
-    return `${reading.change_bp > 0 ? "+" : ""}${numberFormat.format(reading.change_bp)} bp`;
+  const bp = reading.dtd_bp ?? reading.change_bp;
+  if (typeof bp === "number" && Number.isFinite(bp)) {
+    return `DtD ${bp > 0 ? "+" : ""}${numberFormat.format(bp)} bp`;
   }
-  if (typeof reading.change_pct === "number" && Number.isFinite(reading.change_pct)) {
-    return `${reading.change_pct > 0 ? "+" : ""}${numberFormat.format(reading.change_pct)}%`;
+  const percent = reading.dtd_pct ?? reading.change_pct;
+  if (typeof percent === "number" && Number.isFinite(percent)) {
+    return `DtD ${percent > 0 ? "+" : ""}${numberFormat.format(percent)}%`;
   }
-  return "Belum ada data pembanding";
+  return "DtD —";
 }
 
-function findMetric(report: MarketReport, section: MarketGroup["key"], fragments: string[]): [string, InstrumentReading] | null {
+function findMetric(report: MarketReport, section: MarketMetricSection, fragments: string[]): [string, InstrumentReading] | null {
   const values = report[section];
   if (!values) return null;
   for (const fragment of fragments) {
@@ -65,47 +56,17 @@ function formatPublishedAt(value: unknown): string {
 function MetricCard({ title, metric, section }: {
   title: string;
   metric: [string, InstrumentReading] | null;
-  section: MarketGroup["key"];
+  section: MarketMetricSection;
 }) {
   const [name, reading]: [string, InstrumentReading] = metric ?? ["Data belum tersedia", {}];
   return (
     <article className="metric-card">
-      <div className="metric-heading"><span>{title}</span><span className="metric-arrow" aria-hidden="true">↗</span></div>
+      <div className="metric-heading"><span>{title}</span><span>DtD</span></div>
       <p className="metric-name">{name}</p>
       <p className="metric-value">{formatValue(reading.today, section)}</p>
       <p className="metric-change">{formatChange(reading)}</p>
-      <p className="metric-date">Data sumber · {reading.date || "tanggal tidak tersedia"}</p>
+      <p className="metric-date">{reading.availability === "stale" ? "Terakhir tersedia · " : reading.availability === "partial" ? "Sumber alternatif · " : "Tanggal data · "}{reading.date || "tidak tersedia"}</p>
     </article>
-  );
-}
-
-function DataTable({ group, report }: { group: MarketGroup; report: MarketReport }) {
-  const rows = Object.entries(report[group.key] ?? {});
-  return (
-    <section className="market-section" id={group.key} aria-labelledby={`${group.key}-heading`}>
-      <div className="section-heading">
-        <div><p className="eyebrow">{group.label}</p><h2 id={`${group.key}-heading`}>{group.title}</h2></div>
-        <p>{group.description}</p>
-      </div>
-      {rows.length ? (
-        <div className="table-scroll">
-          <table>
-            <thead><tr><th>Instrumen</th><th>Terakhir</th><th>Perubahan</th><th>Tanggal data</th><th>Sumber</th></tr></thead>
-            <tbody>
-              {rows.map(([name, reading]) => (
-                <tr key={name}>
-                  <th scope="row">{name}</th>
-                  <td className="table-value">{formatValue(reading.today, group.key)}</td>
-                  <td>{formatChange(reading)}</td>
-                  <td>{reading.date || "—"}</td>
-                  <td className="source-cell">{reading.source || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : <p className="empty-section">Belum ada data untuk bagian ini pada laporan aktif.</p>}
-    </section>
   );
 }
 
@@ -129,20 +90,6 @@ function MarketReferences({ report }: { report: MarketReport }) {
   );
 }
 
-const glossary = [
-  ["USD/IDR", "Jumlah Rupiah untuk membeli 1 dolar AS. Kenaikan angka berarti Rupiah melemah."],
-  ["DXY", "Indeks kekuatan dolar AS terhadap sejumlah mata uang utama dunia."],
-  ["Yield", "Imbal hasil tahunan obligasi. Yield naik biasanya berarti harga obligasi turun."],
-  ["Spread", "Selisih imbal hasil SBN dan UST pada tenor yang sama."],
-  ["BI Rate", "Suku bunga acuan Bank Indonesia yang menjadi salah satu patokan bunga kredit dan deposito."],
-  ["INDONIA", "Suku bunga transaksi pinjam-meminjam Rupiah antarbank untuk tenor semalam."],
-  ["IHSG", "Indeks yang menggambarkan pergerakan harga saham di Bursa Efek Indonesia."],
-  ["Poin basis (bp)", "Satuan perubahan suku bunga. 1 bp = 0,01%; 25 bp = 0,25%."],
-  ["SBN", "Surat Berharga Negara, yaitu surat utang yang diterbitkan pemerintah Indonesia."],
-  ["UST", "Surat utang pemerintah Amerika Serikat yang sering menjadi acuan pasar global."],
-  ["JISDOR", "Kurs referensi dolar AS terhadap Rupiah yang diterbitkan Bank Indonesia."],
-];
-
 function ReportInsights({ report }: { report: MarketReport }) {
   const insights = report.insights ?? [];
   const impacts = report.impacts ?? [];
@@ -155,7 +102,7 @@ function ReportInsights({ report }: { report: MarketReport }) {
         {insights.length ? <div className="insight-grid">{insights.slice(0, 3).map((item, index) => (
           <article className={`insight-card tone-${item.tone || "flat"}`} key={`${item.title || "insight"}-${index}`}>
             <h3>{item.title || "Sorotan pasar"}</h3><p>{item.text || "—"}</p>
-            {item.dampak && <small><strong>Artinya:</strong> {item.dampak}</small>}
+            {item.dampak && <small><strong>Implikasi:</strong> {item.dampak}</small>}
           </article>
         ))}</div> : <p className="empty-section">Belum ada sorotan untuk laporan ini.</p>}
         {insights.length > 3 && <details className="reader-disclosure additional-insights">
@@ -163,7 +110,7 @@ function ReportInsights({ report }: { report: MarketReport }) {
           <div className="insight-grid">{insights.slice(3).map((item, index) => (
             <article className={`insight-card tone-${item.tone || "flat"}`} key={`${item.title || "insight"}-${index}`}>
               <h3>{item.title || "Sorotan pasar"}</h3><p>{item.text || "—"}</p>
-              {item.dampak && <small><strong>Artinya:</strong> {item.dampak}</small>}
+              {item.dampak && <small><strong>Implikasi:</strong> {item.dampak}</small>}
             </article>
           ))}</div>
         </details>}
@@ -171,56 +118,13 @@ function ReportInsights({ report }: { report: MarketReport }) {
 
       <section className="reader-section" id="impacts" aria-labelledby="impacts-heading">
         <details className="reader-disclosure" data-section-disclosure>
-        <summary><span className="eyebrow">KONTEKS PEMBACA</span><h2 id="impacts-heading">Apa Artinya untuk Anda</h2><span className="disclosure-hint">Buka penjelasan dampak praktis</span></summary>
+        <summary><span className="eyebrow">KONTEKS PASAR</span><h2 id="impacts-heading">Implikasi Praktis</h2><span className="disclosure-hint">Buka penjelasan dampak pasar</span></summary>
         {impacts.length ? <div className="impact-grid">{impacts.map((item, index) => (
           <article className="impact-card" key={`${item.title || "impact"}-${index}`}><h3>{item.title || "Dampak praktis"}</h3><p>{item.text || "—"}</p></article>
         ))}</div> : <p className="empty-section">Dampak praktis belum tersedia untuk laporan ini.</p>}
         </details>
       </section>
     </>
-  );
-}
-
-function DataSources({ report }: { report: MarketReport }) {
-  const sources = report.sources ?? [];
-  const phei = report.phei_meta;
-  return (
-      <section className="reader-section" id="sources" aria-labelledby="sources-heading">
-        <div className="section-heading"><div><p className="eyebrow">VERIFIKASI DATA</p><h2 id="sources-heading">Sumber Data & Metode</h2></div><p>Periksa asal angka dan tanggal observasinya.</p></div>
-        {sources.length ? <div className="source-list">{sources.map((source, index) => (
-          <details className="source-detail" key={`${source.section || "source"}-${index}`}>
-            <summary>{source.section || "Sumber data"}{source.items?.length ? <span>{source.items.length} instrumen</span> : null}</summary>
-            <div className="source-content">
-              {source.primary && <p><strong>Sumber utama:</strong> {source.primary}</p>}
-              {source.url && /^https?:\/\//i.test(source.url) && <p><strong>Tautan:</strong> <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a></p>}
-              {source.as_of_label && <p><strong>Per tanggal:</strong> {source.as_of_label}</p>}
-              {source.page_title && <p><strong>Judul halaman:</strong> {source.page_title}</p>}
-              {source.fetched_at && <p><strong>Diambil pada:</strong> {formatPublishedAt(source.fetched_at)}</p>}
-              {source.backup && <p><strong>Sumber pembanding:</strong> {source.backup}{source.backup_as_of ? ` (per ${source.backup_as_of})` : ""}</p>}
-              {source.note && <p><strong>Catatan:</strong> {source.note}</p>}
-              {!!source.items?.length && <ul>{source.items.map((item, itemIndex) => <li key={`${item.field || "field"}-${itemIndex}`}>
-                <code>{item.field || "Instrumen"}</code> · {item.source || source.primary || "sumber tidak dicatat"}
-                {item.as_of ? ` · per ${item.as_of}` : ""}{item.series ? ` · seri ${item.series}` : ""}{item.ttm ? ` · tenor ${item.ttm} tahun` : ""}
-              </li>)}</ul>}
-            </div>
-          </details>
-        ))}</div> : <p className="empty-section">Metadata sumber belum tersedia pada laporan ini.</p>}
-        {phei?.as_of_label && <p className="phei-note">Kurva imbal hasil PHEI yang dipakai bertanggal <strong>{phei.as_of_label}</strong>{phei.source_name ? ` · ${phei.source_name}` : ""}{phei.url ? <> · <a href={phei.url} target="_blank" rel="noreferrer">Lihat sumber</a></> : null}</p>}
-      </section>
-  );
-}
-
-function ReadingGlossary() {
-  return (
-      <section className="reader-section" id="glossary" aria-labelledby="glossary-heading">
-        <details className="reader-disclosure" data-section-disclosure>
-        <summary><span className="eyebrow">PANDUAN PEMBACA</span><h2 id="glossary-heading">Glosarium & Cara Membaca</h2><span className="disclosure-hint">Buka arti istilah dan panduan membaca angka</span></summary>
-        <div className="glossary-wrap"><table><thead><tr><th>Istilah</th><th>Arti sederhana</th></tr></thead><tbody>
-          {glossary.map(([term, meaning]) => <tr key={term}><th scope="row">{term}</th><td>{meaning}</td></tr>)}
-        </tbody></table></div>
-        <p className="guide-note"><strong>Cara membaca:</strong> perubahan harian dibandingkan dengan penutupan hari perdagangan sebelumnya. Arti “naik” bergantung pada indikator: kurs USD/IDR naik berarti Rupiah melemah, sedangkan indeks saham naik berarti pasar saham menguat. Tanggal data bisa berbeda antar sumber.</p>
-        </details>
-      </section>
   );
 }
 
@@ -239,10 +143,8 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
     { id: "insights", label: "Insight", icon: "✳" },
     { id: "impacts", label: "Dampak", icon: "⌁" },
     ...(!report.is_demo ? [{ id: "history", label: "Grafik historis", icon: "⌁" }] : []),
-    ...groups.map((group) => ({ id: group.key, label: group.title, icon: "◦" })),
+    ...MARKET_GROUPS.map((group) => ({ id: group.id, label: group.title, icon: "◦" })),
     ...(!report.is_demo ? [{ id: "live", label: "Monitor live", icon: "◉" }] : []),
-    { id: "sources", label: "Sumber & metode", icon: "◎" },
-    { id: "glossary", label: "Glosarium", icon: "?" },
   ];
 
   return (
@@ -276,12 +178,8 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
         <MarketReferences report={report} />
         <ReportInsights report={report} />
         {!report.is_demo && <HistoryCharts histories={histories} />}
-        <div className="market-sections">
-          {groups.map((group) => <DataTable key={group.key} group={group} report={report} />)}
-        </div>
+        <MarketDataSections report={report} />
         {!report.is_demo && <LiveMarketMonitor report={report} />}
-        <DataSources report={report} />
-        <ReadingGlossary />
 
         <footer className="page-footer"><span>Market Today · Daily Market Report</span>
           <span>ID laporan: {report.report_id || "belum tersedia"}</span></footer>

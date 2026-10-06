@@ -49,7 +49,7 @@ class ReportPipelineTests(unittest.TestCase):
 
             saved_report = json.loads(report_path.read_text(encoding="utf-8"))
             saved_snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
-            self.assertEqual(report["schema_version"], 1)
+            self.assertEqual(report["schema_version"], 2)
             self.assertFalse(report["is_demo"])
             self.assertEqual(report["_source_snapshot"], source_snapshot)
             self.assertEqual(saved_report["_source_snapshot"], saved_snapshot)

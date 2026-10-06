@@ -13,7 +13,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isMarketReport(value: unknown): value is MarketReport {
   if (!isRecord(value)) return false;
-  const sections = ["fx", "indices", "yields", "commodities"];
+  const sections = [
+    "fx", "indices", "index_sectors", "yields", "gold", "commodities",
+    "capital_flow", "macro_indicators", "monetary_operations",
+  ];
   const hasMarketSection = sections.some((section) => isRecord(value[section]));
   if (!hasMarketSection) return false;
 
@@ -23,9 +26,17 @@ function isMarketReport(value: unknown): value is MarketReport {
     if (!isRecord(readings)) return false;
     for (const reading of Object.values(readings)) {
       if (!isRecord(reading)) return false;
-      for (const key of ["today", "prev", "change_pct", "change_bp"]) {
+      for (const key of [
+        "today", "prev", "change_pct", "change_bp", "dtd_pct", "dtd_bp",
+        "wtd_pct", "mtd_pct", "qtd_pct", "ytd_pct", "ytd_bp",
+      ]) {
         const number = reading[key];
         if (number !== undefined && number !== null && (typeof number !== "number" || !Number.isFinite(number))) return false;
+      }
+      for (const key of ["periods", "observations"]) {
+        const series = reading[key];
+        if (series !== undefined && (!isRecord(series) || Object.values(series).some((number) =>
+          number !== null && (typeof number !== "number" || !Number.isFinite(number))))) return false;
       }
     }
   }

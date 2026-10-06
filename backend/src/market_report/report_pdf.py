@@ -1165,11 +1165,17 @@ def build_pdf(
         RateDifferentialChart(report, height=47 * mm),
         Paragraph("Sumber: PHEI & Yahoo Finance.", gaya["Catatan"]),
     ]
+    antam_source_note = ""
+    if antam.get("availability") == "stale":
+        antam_source_note = f" Harga Antam terakhir tersedia per {antam.get('date') or 'tanggal tidak tersedia'}."
+    elif antam.get("availability") == "partial":
+        antam_source_note = f" {antam.get('availability_note') or 'Harga memakai basis alternatif.'}"
+    antam_source_name = antam.get("source_name") or "OCEBSI ANTAM"
     gold_chart_column = [
         chart_heading("Gold Prices"),
         Spacer(1, 0.8 * mm),
         GoldPricesChart(report, height=47 * mm),
-        Paragraph("Sumber: Yahoo Finance & Logam Mulia ANTAM.", gaya["Catatan"]),
+        Paragraph(f"Sumber: Yahoo Finance & {antam_source_name}.{antam_source_note}", gaya["Catatan"]),
     ]
     charts_row = Table([[rate_chart_column, gold_chart_column]],
                        colWidths=[LEBAR / 2, LEBAR / 2], hAlign="LEFT")
@@ -1209,7 +1215,7 @@ def build_pdf(
         KanvasLaporan,
         judul="Market Today",
         sub_judul=date_str,
-        sumber="Rincian sumber dan tanggal observasi per instrumen tersedia di dashboard.",
+        sumber="Tanggal data mengikuti observasi terakhir tiap instrumen.",
     )
     doc.build(story, canvasmaker=canvas)
     if stream is not None:

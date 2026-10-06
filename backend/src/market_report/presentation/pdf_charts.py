@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from math import isfinite
 from typing import Any
 
@@ -37,11 +36,9 @@ def _pick(data: Any, *needles: str, exclude: tuple[str, ...] = ()) -> dict:
 
 
 def _iso_day(value: Any) -> str | None:
-    raw = str(value or "")[:10]
-    try:
-        return date.fromisoformat(raw).isoformat()
-    except ValueError:
-        return None
+    from market_report.services.history_service import source_date_iso
+
+    return source_date_iso(value)
 
 
 def _finite(value: Any) -> float | None:
@@ -79,8 +76,7 @@ def _asof(points: dict[str, float], day: str) -> float | None:
     prior = [key for key in points if key <= day]
     if prior:
         return points[max(prior)]
-    future = [key for key in points if key > day]
-    return points[min(future)] if future else None
+    return None
 
 
 def _date_label(day: str) -> str:
@@ -132,14 +128,13 @@ class RateDifferentialChart(Flowable):
             sbn_rows = nested_history if isinstance(nested_history, list) else []
         sbn = _read_history(sbn_rows)
         ust = _read_history(report.get("history_ust10"))
-        report_day = _iso_day(report.get("report_date_iso"))
         yfinance = snapshot.get("yfinance")
         yfinance = yfinance if isinstance(yfinance, dict) else {}
 
         sbn_today = _pick(report.get("yields"), "sbn", "10", exclude=("sbsn", "fr0"))
         ust_today = _pick(report.get("yields"), "treasury", "10")
-        sbn_day = _iso_day(sbn_today.get("date")) or report_day
-        ust_day = _iso_day((yfinance.get("US10Y") or {}).get("date")) or report_day
+        sbn_day = _iso_day(sbn_today.get("date"))
+        ust_day = _iso_day((yfinance.get("US10Y") or {}).get("date"))
         sbn_value = _finite(sbn_today.get("today"))
         ust_value = _finite(ust_today.get("today"))
         if sbn_day and sbn_value is not None:
@@ -291,7 +286,7 @@ class RateDifferentialChart(Flowable):
 
 
 class GoldPricesChart(Flowable):
-    """Gold Spot and Antam 1 g prices with independent axes."""
+    """Gold futures proxy and Antam 1 g prices with independent axes."""
 
     def __init__(self, report: dict, height: float = 31 * mm):
         super().__init__()
@@ -309,17 +304,20 @@ class GoldPricesChart(Flowable):
         gold_points = _read_history(quote.get("history"))
         gold_reading = _pick(report.get("commodities"), "gold", exclude=("antam",))
         gold_today = _finite(gold_reading.get("today"))
-        gold_day = _iso_day(quote.get("date")) or _iso_day(gold_reading.get("date")) \
-            or _iso_day(report.get("report_date_iso"))
+        gold_day = _iso_day(quote.get("date")) or _iso_day(gold_reading.get("date"))
         if gold_day and gold_today is not None:
             gold_points[gold_day] = gold_today
 
-        antam_points = _read_history(
-            report.get("_antam_gold_history") or snapshot.get("_antam_gold_history")
-        )
         antam_reading = _pick(report.get("commodities"), "emas", "antam")
+        antam_series = antam_reading.get("series_id") or "ocebsi_antam_buy_1g"
+        antam_history = report.get("_antam_gold_history") or snapshot.get("_antam_gold_history")
+        antam_history = [
+            point for point in antam_history if isinstance(point, dict)
+            and (point.get("series_id") or "legacy_antam") == antam_series
+        ] if isinstance(antam_history, list) else []
+        antam_points = _read_history(antam_history)
         antam_today = _finite(antam_reading.get("today"))
-        antam_day = _iso_day(antam_reading.get("date")) or _iso_day(report.get("report_date_iso"))
+        antam_day = _iso_day(antam_reading.get("date"))
         if antam_day and antam_today is not None:
             antam_points[antam_day] = antam_today
 
@@ -425,7 +423,7 @@ class GoldPricesChart(Flowable):
         canvas.circle(legend_start + 7, legend_y, 1.8, stroke=0, fill=1)
         canvas.setFillColor(BODY)
         canvas.setFont("Helvetica", 6.7)
-        canvas.drawString(legend_start + 18, legend_y - 2, "Gold Spot $/Oz")
+        canvas.drawString(legend_start + 18, legend_y - 2, "Gold Futures $/Oz")
         antam_legend_x = legend_start + 104
         canvas.setStrokeColor(SPREAD)
         canvas.line(antam_legend_x, legend_y, antam_legend_x + 14, legend_y)

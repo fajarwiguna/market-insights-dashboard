@@ -62,7 +62,7 @@ Isi `.env` dengan URL dan kredensial PostgreSQL serta token API. Isi `frontend/.
 dengan `DAILY_MARKET_API_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, kata sandi operator,
 dan secret sesi. Nilai token baca harus sama pada kedua file; rahasia operator hanya disimpan
 di lingkungan frontend. Jangan menimpa file konfigurasi yang sudah berisi nilai lokal.
-
+Harga Antam memakai seri harga beli 1 gram dengan tanggal observasi dari feed yang sudah dikonfigurasi pada backend. Jika feed tidak dapat dibaca, laporan mempertahankan observasi valid terakhir beserta tanggalnya. Setelah memperbarui data, restart proses lalu jalankan refresh laporan.
 Terapkan schema database satu kali:
 
 ```powershell
@@ -256,9 +256,12 @@ dikonfigurasi. Jangan menaruh rahasia ini di variabel `NEXT_PUBLIC_*` atau kode 
 Monitor live memperbarui tampilan setiap 60 detik dan menggunakan snapshot laporan sebagai
 cadangan ketika sumber live tidak tersedia. Endpoint API memakai cache singkat 30 detik.
 Dashboard menempatkan angka utama dan indikator acuan di atas, dilanjutkan insight,
-grafik historis, tabel detail, dan monitor live. Sumber serta glosarium berada di bawah;
-glosarium dan dampak praktis dapat dibuka sesuai kebutuhan. Klik **Pengelolaan** di header
-untuk membuka login operator dan kontrol refresh laporan.
+grafik historis, delapan kategori data, dan monitor live. Arti label periode dijelaskan
+dekat judul kolom; seri yang belum memiliki sumber tervalidasi dibiarkan kosong.
+Dampak praktis dapat dibuka sesuai kebutuhan. Klik **Pengelolaan** di header untuk
+membuka login operator dan kontrol refresh laporan.
+Perubahan perhitungan berlaku pada laporan baru setelah backend dan worker memakai kode
+terbaru lalu laporan di-refresh; arsip lama tidak ditulis ulang otomatis.
 Tombol refresh memasukkan job ke antrean dan menunggu status worker sebelum memuat laporan
 versi baru. Next.js merupakan antarmuka aktif; Streamlit hanya tersedia pada checkout lama
 yang masih memiliki berkas transisinya.
@@ -315,21 +318,20 @@ python tools/cek_kontras.py   # mengukur rasio kontras WCAG di kedua mode
 
 ## 3. Susunan halaman & cara membacanya
 
-Halaman disusun mengikuti cara orang membaca: **inti lebih dulu, detail kemudian** — dan memakai
-**jarak putih + tab** supaya tidak terasa seperti laporan bertumpuk. Bagian tidak lagi diberi
-nomor; tiap bagian ditandai pil kecil + judul besar.
+Halaman disusun mengikuti cara orang membaca: **inti lebih dulu, detail kemudian**. Kartu,
+bagian, dan tabel memakai jarak serta hierarki judul yang konsisten. Tabel dapat digeser
+horizontal pada layar kecil; tanggal observasi dan label periode ditampilkan di dekat nilai.
 
 | Bagian | Isi |
 |--------|-----|
-| **Header** | Angka paling penting (Rupiah, IHSG, SBN 10Y, spread SBN–UST) + sentimen harian. |
-| **Insight Hari Ini** | Satu paragraf ringkasan otomatis, lalu 3 kartu sorotan (angka + artinya). Sisanya dilipat di "Sorotan lain hari ini". |
-| **Apa Artinya untuk Anda** | Dampak praktis: belanja luar negeri, cicilan/kredit, tabungan & obligasi, harga barang. |
-| **Angka Kunci Hari Ini** | 4 kartu besar (USD/IDR, IHSG, SBN 10Y, spread) + 4 kartu pendukung (DXY, UST 10Y, emas, Brent) + baris chip BI Rate / INDONIA / JISDOR. |
-| **Grafik** | Dua grafik dengan **angka yang diambil ulang otomatis** + tombol **🔄 Perbarui sekarang**. |
-| **Detail Pasar** | Empat tabel dalam tab: Nilai Tukar, Pasar Saham, Imbal Hasil Obligasi, Komoditas. |
-| **Glossarium Istilah & Cara Membaca** | Kamus istilah + panduan membaca 30 detik (bertab). |
-| **Unduh Laporan (PDF)** | PDF disusun dari angka yang sedang tampil (tombol 📄 Unduh PDF), plus tombol ambil data terbaru & simpan arsip. |
-| **Sumber Data & Metode** | Bagian teknis (opsional): sumber per instrumen, seri, dan waktu pengambilan data. |
+| **Header laporan** | Tanggal dan waktu publikasi, status laporan, pengaturan tampilan, serta tombol ekspor PDF. |
+| **Angka utama** | Rupiah, IHSG, SBN 10Y, UST 10Y, dan emas Antam, beserta perubahan DtD. |
+| **Indikator acuan** | BI Rate, INDONIA, dan spread SBN 10Y–UST 10Y. |
+| **Insight Hari Ini** | Ringkasan otomatis dan hingga tiga kartu sorotan; sorotan tambahan dapat dibuka. |
+| **Implikasi Praktis** | Penjelasan dampak pasar yang dapat dibuka sesuai kebutuhan. |
+| **Grafik historis** | Riwayat yield SBN/UST, kurs, indeks, dan emas sesuai data yang tersimpan. |
+| **Data pasar** | Delapan kategori: Kurs, Harga Emas, Capital Flow, Bond Yield, Indicators, Operasi Moneter, Index, dan Commodity. Periode/satuan ditulis pada kolom atau keterangan kategori. |
+| **Monitor live** | Snapshot pasar langsung yang terpisah dari laporan harian. |
 
 ### Tampilan PDF
 
@@ -344,11 +346,12 @@ memahami kondisi pasar tanpa berpindah halaman:
 | **Grafik tren** | Perbandingan yield SBN 10Y dan UST 10Y dari tanggal observasi tersedia, dengan spread terbaru. |
 | **Insight utama** | Hingga tiga sorotan pasar dengan arah dan konteks dampak. |
 | **Indikator pendukung** | Dow Jones, DXY, emas, Brent, BI Rate, dan INDONIA. |
-| **Footer** | Catatan bahwa rincian sumber dan tanggal observasi tersedia di dashboard. |
+| **Footer** | Tanggal data mengikuti observasi terakhir tiap instrumen. |
 
-Tabel sumber, seri historis, metode, dan glosarium tetap dapat dibaca di dashboard.
 Ekspor PDF membuat ulang berkas untuk versi laporan yang dipilih, sehingga hasil
-unduhan menggunakan tata letak terbaru.
+unduhan menggunakan tata letak terbaru. Panel Sumber dan Glosarium tidak ditampilkan
+pada dashboard; metadata asal data tetap disimpan oleh backend. Kategori baru pada
+dashboard tidak otomatis menambah baris ke PDF.
 
 - Nilai indeks, kurs, dan komoditas dibulatkan ke bilangan utuh; yield dan persentase
   perubahan tetap menampilkan desimal yang relevan.
@@ -537,12 +540,13 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 
 | Data | Sumber | Keterangan |
 |------|--------|------------|
-| FX, DXY, IHSG, DJI, US yields | Yahoo Finance (`yfinance`) | Real-time / delayed |
+| FX, DXY, IHSG, DJI, US yields | Yahoo Finance Chart API | Real-time / delayed; data history is tied to the source's trading calendar |
 | SBN & SBSN yields | [PHEI HPW & Imbal Hasil](https://www.phei.co.id/Data/HPW-dan-Imbal-Hasil) | Update harian |
 | BI Rate, INDONIA, JISDOR | Bank Indonesia | BI Rate setelah RDG; INDONIA harian |
-| Gold / Oil | yfinance (`GC=F`, `CL=F`) | Logam Mulia ada CAPTCHA → fallback yfinance |
-| Harga emas Antam 1 gr | [Logam Mulia](https://www.logammulia.com/id/harga-emas-hari-ini) | Harga dasar harian, belum termasuk PPh 0,25%; riwayat mulai terkumpul setelah laporan harian diterbitkan |
-| Commodities lain | TradingEconomics / investing.com | Best-effort |
+| Gold futures / Oil | Yahoo Finance Chart (`GC=F`, `CL=F`, `BZ=F`) | `GC=F` adalah futures COMEX, bukan Gold Spot; Brent tersedia melalui `BZ=F` |
+| Harga emas Antam 1 gr | Seri harga beli harian yang dikonfigurasi pada backend | Tanggal observasi mengikuti data sumber; observasi terakhir dipertahankan saat feed tidak tersedia |
+| Newcastle Coal, CPO Bursa Malaysia | Trading Economics | Harga terakhir, DtD, dan MtD; WtD dan YtD belum disediakan feed yang digunakan |
+| Arus modal, indeks sektoral, indikator makro lengkap, Operasi Moneter | Belum terhubung | Dashboard menunjukkan nilai kosong sampai adapter dan seri tervalidasi tersedia |
 
 ---
 
@@ -561,8 +565,8 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 | Masalah | Solusi |
 |---------|--------|
 | Data pasar kosong / pembaruan ditolak | Periksa pesan error dan `runtime/data/snapshot.json`; pastikan terminal memiliki akses internet ke Yahoo Finance dan PHEI, lalu klik **🔄 Perbarui data dari sumber (live)** lagi. Pembaruan dengan kurang dari dua instrumen berhasil ditolak agar tidak menimpa laporan yang ada. |
-| Hanya sebagian instrumen yang muncul | Sumber berbeda dapat gagal secara terpisah. Cek bagian **Sumber Data & Metode** dan `runtime/data/snapshot.json`, lalu coba pembaruan lagi. |
-| BI Rate / INDONIA / JISDOR tampak lama | Jika halaman BI tidak merespons, pipeline memakai angka cadangan; periksa tanggal pada bagian Sumber Data & Metode. |
+| Hanya sebagian instrumen yang memiliki nilai | Feed dapat gagal terpisah atau adapter belum tersedia. Periksa tanggal laporan dan `runtime/data/snapshot.json`; kategori yang belum terhubung tetap ditampilkan kosong, bukan diisi angka perkiraan. |
+| BI Rate / INDONIA / JISDOR tampak lama | Jika halaman BI tidak merespons, pipeline dapat memakai angka cadangan; periksa tanggal data di payload laporan atau `runtime/data/snapshot.json`. |
 | Perlu melihat data contoh | Jalankan `python backend/src/market_report/run_pipeline.py --demo` untuk demonstrasi lokal. Mode demo menulis `runtime/data/demo_report_data.json` secara terpisah dari laporan aktif. |
 | Pembaruan data gagal | Cek koneksi dan akses jaringan ke sumber; coba lagi. Dashboard mempertahankan laporan terakhir yang berhasil disimpan. |
 | Tampilan terasa berubah / tidak nyaman dibaca | Klik tombol **🎨** di pojok kanan bawah → **↺ Kembalikan tampilan asli**, atau refresh halaman (pengaturan tampilan tidak disimpan) |

@@ -7,10 +7,12 @@ import json
 import os
 import tempfile
 from datetime import datetime
+import math
 from pathlib import Path
 from typing import Dict, Any, Optional
 
 from market_report.config import market_data_directory
+from market_report.domain.market_periods import period_changes, yield_ytd_bp
 
 DATA_DIR = market_data_directory()
 
@@ -28,6 +30,59 @@ def _g(d: dict, *keys, default=None):
         else:
             return default
     return d
+
+
+def _period_data(item: dict, *, is_yield: bool = False) -> dict:
+    """Build dated comparison fields from a source's own observation history."""
+    values = period_changes(item.get("history"), item.get("date"), item.get("last"))
+    if is_yield:
+        values["ytd_bp"] = yield_ytd_bp(item.get("history"), item.get("date"), item.get("last"))
+    return values
+
+
+def _unavailable_reading(unit: str, note: str = "Sumber data belum tersedia") -> dict:
+    return {
+        "today": None,
+        "prev": None,
+        "change_pct": None,
+        "change_bp": None,
+        "ytd_pct": None,
+        "ytd_bp": None,
+        "date": None,
+        "unit": unit,
+        "availability": "unavailable",
+        "availability_note": note,
+    }
+
+
+def _month_key(value: Any) -> str | None:
+    """Normalize the Indonesian/English source date into a YYYY-MM key."""
+    if not value:
+        return None
+    raw = str(value).strip()
+    try:
+        return datetime.fromisoformat(raw[:10]).strftime("%Y-%m")
+    except ValueError:
+        pass
+    try:
+        from market_report.services.history_service import source_date_iso
+
+        normalized = source_date_iso(raw)
+        return normalized[:7] if normalized else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _source_day(value: Any) -> str | None:
+    if not value:
+        return None
+    raw = str(value)
+    try:
+        return datetime.fromisoformat(raw[:10]).strftime("%Y-%m-%d")
+    except ValueError:
+        from market_report.services.history_service import source_date_iso
+
+        return source_date_iso(raw)
 
 
 def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
@@ -56,9 +111,18 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
             fx[label] = {
                 "today": item["last"],
                 "prev": item.get("prev"),
+                "dtd_pct": item.get("change_pct"),
                 "change_pct": item.get("change_pct"),
                 "date": item.get("date"),
+                "unit": {
+                    "DXY": "indeks",
+                    "USD/IDR": "IDR/USD",
+                    "CNY/IDR": "IDR/CNY",
+                    "EUR/IDR": "IDR/EUR",
+                    "JPY/IDR": "IDR/JPY",
+                }.get(label),
                 "source": item.get("source"),
+                **_period_data(item),
             }
     # SAR from backup if available
     if fx_backup.get("USDSAR") and fx.get("USD/IDR"):
@@ -68,8 +132,13 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
             fx["SAR/IDR"] = {
                 "today": round(sar_idr, 3),
                 "prev": None,
+                "dtd_pct": None,
                 "change_pct": None,
+                "ytd_pct": None,
                 "date": fx_backup.get("time_last_update_utc"),
+                "unit": "IDR/SAR",
+                "availability": "partial",
+                "availability_note": "Nilai turunan tersedia; histori pembanding belum tersedia.",
                 "source": "Derived from open.er-api.com (USD/IDR ÷ USD/SAR)",
             }
         except Exception:
@@ -94,9 +163,12 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
             indices[label] = {
                 "today": item["last"],
                 "prev": item.get("prev"),
+                "dtd_pct": item.get("change_pct"),
                 "change_pct": item.get("change_pct"),
                 "date": item.get("date"),
+                "unit": "poin indeks",
                 "source": item.get("source"),
+                **_period_data(item),
             }
     sources.append({
         "section": "Financial Market (Indices)",
@@ -116,8 +188,11 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "today": item["last"],
                 "prev": item.get("prev"),
                 "change_bp": round((item["last"] - item["prev"]) * 100, 1) if item.get("prev") else None,
+                "dtd_bp": round((item["last"] - item["prev"]) * 100, 1) if item.get("prev") else None,
                 "date": item.get("date"),
+                "unit": "%",
                 "source": item.get("source"),
+                **_period_data(item, is_yield=True),
             }
 
     curve = phei.get("yield_curve", {})
@@ -129,35 +204,44 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "today": c["today"],
                 "prev": c["yesterday"],
                 "change_bp": c.get("change_bp"),
+                "dtd_bp": c.get("change_bp"),
+                "ytd_bp": None,
                 "date": phei.get("as_of_date"),
+                "unit": "%",
                 "source": phei.get("source_name"),
                 "as_of_label": phei.get("as_of_label"),
             }
 
     for b in phei.get("benchmarks", {}).get("SBSN", []):
-        series = b.get("series", "")
-        if "PBS040" in series:
-            yields["ID SBSN 4 Tahun Benchmark (PBS040)"] = {
-                "today": b.get("yield_today"),
-                "prev": b.get("yield_yest"),
-                "change_bp": b.get("change_bp"),
-                "date": phei.get("as_of_date"),
-                "source": phei.get("source_name"),
-                "as_of_label": phei.get("as_of_label"),
-                "series": series,
-                "ttm": b.get("ttm"),
-            }
-        if "PBS034" in series:
-            yields["ID SBSN 13 Tahun Benchmark (PBS034)"] = {
-                "today": b.get("yield_today"),
-                "prev": b.get("yield_yest"),
-                "change_bp": b.get("change_bp"),
-                "date": phei.get("as_of_date"),
-                "source": phei.get("source_name"),
-                "as_of_label": phei.get("as_of_label"),
-                "series": series,
-                "ttm": b.get("ttm"),
-            }
+        series = str(b.get("series") or "").upper()
+        if not series.startswith("PBS"):
+            continue
+        ttm_raw = b.get("ttm")
+        try:
+            ttm = float(str(ttm_raw).replace(",", "."))
+        except (TypeError, ValueError):
+            ttm = None
+        tenor_label = f" (TTM {ttm:g}Y)" if ttm is not None else ""
+        label = f"ID SBSN {series}{tenor_label}"
+        yields[label] = {
+            "today": b.get("yield_today"),
+            "prev": b.get("yield_yest"),
+            "change_bp": b.get("change_bp"),
+            "dtd_bp": b.get("change_bp"),
+            "ytd_bp": None,
+            "date": phei.get("as_of_date"),
+            "unit": "%",
+            "source": phei.get("source_name"),
+            "as_of_label": phei.get("as_of_label"),
+            "series": series,
+            "ttm": ttm,
+        }
+
+    sbn_history = snap.get("_sbn_history") or []
+    sbn10 = yields.get("ID SBN 10 Tahun")
+    if isinstance(sbn10, dict):
+        sbn_day = _source_day(sbn10.get("date"))
+        sbn10["ytd_bp"] = yield_ytd_bp(sbn_history, sbn_day, sbn10.get("today"))
 
     # SBN Benchmark Series — FR0109 (~5Y) & FR0108 (~10Y)
     for b in phei.get("benchmarks", {}).get("SBN", []):
@@ -167,7 +251,10 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "today": b.get("yield_today"),
                 "prev": b.get("yield_yest"),
                 "change_bp": b.get("change_bp"),
+                "dtd_bp": b.get("change_bp"),
+                "ytd_bp": None,
                 "date": phei.get("as_of_date"),
+                "unit": "%",
                 "source": phei.get("source_name"),
                 "as_of_label": phei.get("as_of_label"),
                 "series": series,
@@ -180,7 +267,10 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "today": b.get("yield_today"),
                 "prev": b.get("yield_yest"),
                 "change_bp": b.get("change_bp"),
+                "dtd_bp": b.get("change_bp"),
+                "ytd_bp": None,
                 "date": phei.get("as_of_date"),
+                "unit": "%",
                 "source": phei.get("source_name"),
                 "as_of_label": phei.get("as_of_label"),
                 "series": series,
@@ -254,21 +344,110 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
             commodities[label] = {
                 "today": item["last"],
                 "prev": item.get("prev"),
+                "dtd_pct": item.get("change_pct"),
                 "change_pct": item.get("change_pct"),
                 "date": item.get("date"),
                 "source": item.get("source"),
+                "unit": "USD/troy oz (COMEX futures)" if key == "GOLD" else "USD/barrel",
+                **_period_data(item),
+            }
+    for key, label, unit in (
+        ("NEWCASTLE_COAL", "Coal (Newcastle)", "USD/ton"),
+        ("CPO", "CPO (Bursa Malaysia)", "MYR/ton"),
+    ):
+        item = yf.get(key, {})
+        if isinstance(item.get("last"), (int, float)) and math.isfinite(item["last"]):
+            commodities[label] = {
+                "today": item["last"],
+                "prev": None,
+                "dtd_pct": item.get("dtd_pct"),
+                "change_pct": item.get("dtd_pct"),
+                "wtd_pct": None,
+                "mtd_pct": item.get("mtd_pct"),
+                "ytd_pct": None,
+                "date": item.get("date"),
+                "source": item.get("source"),
+                "source_name": item.get("source_name"),
+                "availability": item.get("availability", "partial"),
+                "availability_note": item.get("availability_note"),
+                "unit": unit,
             }
     antam = snap.get("antam_gold", {})
     if isinstance(antam, dict) and antam.get("price") is not None:
+        antam_series = antam.get("series_id") or "ocebsi_antam_buy_1g"
+        saved_antam_history = snap.get("_antam_gold_history")
+        antam_history = [
+            point for point in saved_antam_history if isinstance(point, dict)
+            and (point.get("series_id") or "legacy_antam") == antam_series
+        ] if isinstance(saved_antam_history, list) else []
+        antam_periods = period_changes(
+            antam_history, antam.get("date"), antam.get("price")
+        )
         commodities["Emas Antam 1 gr (Rp)"] = {
             "today": antam.get("price"),
             "prev": antam.get("prev"),
+            "dtd_pct": antam.get("change_pct"),
             "change_pct": antam.get("change_pct"),
             "date": antam.get("date"),
             "source": antam.get("source"),
+            "unit": "Rp/gram",
+            "series_id": antam_series,
+            "availability": antam.get("availability", "available"),
+            "availability_note": antam.get("availability_note"),
+            **antam_periods,
             "price_with_tax": antam.get("price_with_tax"),
             "basis": antam.get("basis"),
         }
+
+    # Keep rows visible and show the feed error if a connected commodity source fails.
+    for key, unit, label in (
+        ("NEWCASTLE_COAL", "USD/ton", "Coal (Newcastle)"),
+        ("CPO", "MYR/ton", "CPO (Bursa Malaysia)"),
+    ):
+        item = yf.get(key, {})
+        if label not in commodities:
+            note = item.get("error") or "Harga belum tersedia dari feed yang terhubung."
+            commodities[label] = _unavailable_reading(unit, note)
+    commodities.setdefault("Gold Spot (USD/troy oz)", _unavailable_reading("USD/troy oz", "Feed spot belum tersedia; GC=F adalah futures."))
+
+    gold = {
+        "Gold Spot (USD/troy oz)": commodities["Gold Spot (USD/troy oz)"],
+    }
+    if "Gold (USD/oz)" in commodities:
+        gold["Gold Futures COMEX (GC=F, USD/troy oz)"] = commodities["Gold (USD/oz)"]
+    if "Emas Antam 1 gr (Rp)" in commodities:
+        gold["Emas Antam (Rp/gram)"] = commodities["Emas Antam 1 gr (Rp)"]
+
+    index_sectors = {
+        name: _unavailable_reading("poin", "Seri indeks sektor IDX-IC belum terhubung ke sumber data.")
+        for name in (
+            "Energi", "Bahan Baku", "Industri", "Konsumen Siklikal",
+            "Konsumen Non-Siklikal", "Kesehatan", "Keuangan", "Properti",
+            "Teknologi", "Infrastruktur", "Transportasi dan Logistik",
+        )
+    }
+    capital_flow = {
+        "Saham": {"unit": "USD juta", "periods": {key: None for key in ("1D", "1W", "MtD", "QtD", "YtD")}, "availability": "unavailable"},
+        "Obligasi": {"unit": "USD juta", "periods": {key: None for key in ("1D", "1W", "MtD", "QtD", "YtD")}, "availability": "unavailable"},
+    }
+    macro_indicators = {
+        "FED Fund Rate (%)": {"unit": "%", "observations": {}, "availability": "unavailable"},
+        "BI Rate (%)": {"unit": "%", "observations": {}, "availability": "unavailable"},
+        "Inflasi Indonesia YoY (%)": {"unit": "% YoY", "observations": {}, "availability": "unavailable"},
+        "M2 (% YoY)": {"unit": "% YoY", "observations": {}, "availability": "unavailable"},
+        "Kredit/Pembiayaan (% YoY) - BI": {"unit": "% YoY", "observations": {}, "availability": "unavailable"},
+        "DPK (% YoY) - BI": {"unit": "% YoY", "observations": {}, "availability": "unavailable"},
+    }
+    bi_rate_month = _month_key(bi.get("bi_rate_date"))
+    if bi_rate_month and isinstance(bi.get("bi_rate"), (int, float)):
+        macro_indicators["BI Rate (%)"]["observations"][bi_rate_month] = bi["bi_rate"]
+        macro_indicators["BI Rate (%)"]["availability"] = "partial"
+    monetary_operations = {
+        "Posisi OM BI (Rp T)": {
+            **_unavailable_reading("Rp triliun", "Seri posisi operasi moneter BI belum terhubung."),
+            "mtd_pct": None,
+        }
+    }
     sources.append({
         "section": "Commodities",
         "items": [
@@ -280,8 +459,10 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
 
     sources.append({
         "section": "Emas Antam",
-        "primary": antam.get("source_name", "Logam Mulia ANTAM") if isinstance(antam, dict) else "Logam Mulia ANTAM",
+        "primary": antam.get("source_name", "OCEBSI ANTAM") if isinstance(antam, dict) else "OCEBSI ANTAM",
         "url": antam.get("source") if isinstance(antam, dict) else None,
+        "series_id": antam.get("series_id") if isinstance(antam, dict) else None,
+        "availability": antam.get("availability") if isinstance(antam, dict) else None,
         "as_of_label": antam.get("date") if isinstance(antam, dict) else None,
         "as_of_date": antam.get("date") if isinstance(antam, dict) else None,
         "fetched_at": antam.get("fetched_at") if isinstance(antam, dict) else None,
@@ -293,15 +474,20 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
     hist_sbn_curve = curve  # only point-in-time from PHEI
 
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "report_date": datetime.now().strftime("%d %B %Y"),
         "report_date_iso": datetime.now().strftime("%Y-%m-%d"),
         "generated_at": datetime.now().isoformat(),
         "fx": fx,
         "indices": indices,
+        "index_sectors": index_sectors,
         "yields": yields,
         "spread_sbn10_ust10_bp": spread_bp,
         "bi": bi_info,
+        "macro_indicators": macro_indicators,
+        "capital_flow": capital_flow,
+        "monetary_operations": monetary_operations,
+        "gold": gold,
         "commodities": commodities,
         "sources": sources,
         "phei_meta": {

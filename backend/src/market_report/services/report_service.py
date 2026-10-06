@@ -4,6 +4,7 @@ import json
 import logging
 import math
 from contextlib import nullcontext
+from datetime import datetime, timezone
 from pathlib import Path
 
 from market_report.infrastructure.repositories.report_repository import (
@@ -39,6 +40,113 @@ def load_report_version(report_id: str, path: Path | None = None) -> dict | None
 def list_report_versions(limit: int = 30, path: Path | None = None) -> list[dict]:
     """Daftar versi laporan terbaru yang tersimpan."""
     return _repository(path).list_versions(limit)
+
+
+def _valid_price(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) \
+        and math.isfinite(value) and value > 0
+
+
+def _saved_antam_observation(report: dict) -> dict | None:
+    """Ambil observasi Antam terakhir yang tersimpan pada versi laporan."""
+    from market_report.services.history_service import source_date_iso
+
+    snapshot = report.get("_source_snapshot")
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    source_reading = snapshot.get("antam_gold")
+    source_reading = source_reading if isinstance(source_reading, dict) else {}
+    candidates = [source_reading]
+
+    commodities = report.get("commodities")
+    if isinstance(commodities, dict):
+        candidates.extend(
+            reading for name, reading in commodities.items()
+            if "antam" in str(name).lower() and isinstance(reading, dict)
+        )
+
+    gold = report.get("gold")
+    if isinstance(gold, dict):
+        candidates.extend(
+            reading for name, reading in gold.items()
+            if "antam" in str(name).lower() and isinstance(reading, dict)
+        )
+
+    for reading in candidates:
+        price = reading.get("price") if reading.get("price") is not None else reading.get("today")
+        day = source_date_iso(reading.get("date"))
+        series_id = reading.get("series_id")
+        if series_id != "ocebsi_antam_buy_1g":
+            continue
+        if _valid_price(price) and day:
+            return {
+                "price": price,
+                "date": day,
+                "source": reading.get("source") or "https://ocebsi.com/macro/gold-antam/",
+                "source_name": reading.get("source_name") or "Antam price feed",
+                "series_id": series_id,
+                "basis": reading.get("basis") or "Harga beli Antam 1 gram.",
+            }
+
+    # Some report versions contain the cumulative series but not the Antam row itself.
+    for history in (
+        report.get("_antam_gold_history"),
+        snapshot.get("_antam_gold_history"),
+    ):
+        points = []
+        for point in history if isinstance(history, list) else []:
+            if not isinstance(point, dict):
+                continue
+            day = source_date_iso(point.get("date") or point.get("dates"))
+            price = point.get("close")
+            if day and _valid_price(price) and point.get("series_id") == "ocebsi_antam_buy_1g":
+                points.append((day, price, point.get("series_id") or "legacy_antam"))
+        if points:
+            day, price, series_id = max(points, key=lambda point: point[0])
+            return {
+                "price": price,
+                "date": day,
+                "series_id": series_id,
+                "source": "https://ocebsi.com/macro/gold-antam/",
+                "source_name": "OCEBSI ANTAM (histori tersimpan)",
+                "basis": "Harga beli Antam 1 gram.",
+            }
+    return None
+
+
+def _latest_saved_antam_observation() -> dict | None:
+    """Cari harga Antam valid terakhir tanpa mengandalkan urutan ID versi."""
+    reports = list_report_versions(limit=420)
+    active = load_report()
+    active_id = active.get("report_id") if isinstance(active, dict) else None
+    if isinstance(active, dict) and not any(
+        item.get("report_id") == active_id for item in reports
+    ):
+        reports.append(active)
+
+    def published_timestamp(item: dict) -> float:
+        raw = item.get("published_at") or item.get("generated_at")
+        try:
+            value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            return value.timestamp()
+        except (TypeError, ValueError, OverflowError):
+            return float("inf") if active_id and item.get("report_id") == active_id else float("-inf")
+
+    ordered = sorted(
+        enumerate(reports),
+        key=lambda pair: (
+            active_id is not None and pair[1].get("report_id") == active_id,
+            published_timestamp(pair[1]),
+            pair[0],
+        ),
+        reverse=True,
+    )
+    for _, report in ordered:
+        observation = _saved_antam_observation(report)
+        if observation:
+            return observation
+    return None
 
 
 def load_snapshot(path: Path | None = None) -> dict:
@@ -88,7 +196,7 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     from market_report.calculate import build_report_data, persist_json_data
 
     report = build_report_data(snapshot)
-    report["schema_version"] = 1
+    report["schema_version"] = 2
     report["_source_snapshot"] = snapshot
     if isinstance(snapshot.get("_sbn_history"), list):
         report["_sbn_history"] = snapshot["_sbn_history"]
@@ -121,35 +229,109 @@ def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -
     from market_report.domain.market_analysis import market_facts
     from market_report.services.history_service import load_sbn_history, record_sbn_history
 
-    # Reuse published report versions as the durable daily history for Antam.
-    # The official source exposes today's price; older points are collected by
-    # this pipeline as each dated report is published.
+    antam = snapshot.get("antam_gold")
+    if not isinstance(antam, dict) or not _valid_price(antam.get("price")):
+        last_antam = _latest_saved_antam_observation()
+        if last_antam:
+            fetch_error = antam.get("error") if isinstance(antam, dict) else None
+            last_antam["availability"] = "stale"
+            if fetch_error:
+                last_antam["fetch_error"] = str(fetch_error)
+            last_antam["availability_note"] = (
+                f"Harga Antam belum berhasil diperbarui. Menampilkan observasi "
+                f"{last_antam.get('basis') or last_antam.get('source_name')} per {last_antam['date']}."
+            )
+            snapshot["antam_gold"] = last_antam
+
+    # Seed published history from OCEBSI and continue carrying it across versions.
     antam = snapshot.get("antam_gold")
     if isinstance(antam, dict) and isinstance(antam.get("price"), (int, float)) \
             and not isinstance(antam.get("price"), bool) and math.isfinite(antam["price"]):
-        from market_report.services.history_service import source_date_iso
+        from market_report.services.history_service import MAX_HISTORY_POINTS, source_date_iso
 
         antam_day = source_date_iso(antam.get("date"))
-        observations: dict[str, float] = {}
-        for prior_report in list_report_versions(limit=90):
+        series_id = antam.get("series_id") or "ocebsi_antam_buy_1g"
+        observations: dict[tuple[str, str], float] = {}
+        for point in antam.get("history", []):
+            if not isinstance(point, dict):
+                continue
+            point_day = source_date_iso(point.get("date"))
+            point_price = point.get("close")
+            if point_day and _valid_price(point_price):
+                observations[(series_id, point_day)] = float(point_price)
+
+        prior_reports = list_report_versions(limit=MAX_HISTORY_POINTS)
+        active_report = load_report()
+        active_report_id = active_report.get("report_id") if isinstance(active_report, dict) else None
+        if isinstance(active_report, dict) and not any(
+            prior.get("report_id") == active_report.get("report_id") for prior in prior_reports
+        ):
+            # JSON and PostgreSQL repositories may order versions by ID. Always
+            # include the active version, which carries the latest cumulative history.
+            prior_reports.append(active_report)
+
+        def publication_order(item: tuple[int, dict]) -> tuple[float, int]:
+            index, prior_report = item
+            if active_report_id and prior_report.get("report_id") == active_report_id:
+                return float("inf"), index
+            raw_timestamp = prior_report.get("published_at") or prior_report.get("generated_at")
+            try:
+                timestamp = datetime.fromisoformat(str(raw_timestamp).replace("Z", "+00:00"))
+                if timestamp.tzinfo is None:
+                    timestamp = timestamp.replace(tzinfo=timezone.utc)
+                return timestamp.timestamp(), index
+            except (TypeError, ValueError, OverflowError):
+                return float("-inf"), index
+
+        # Version repositories can return rows in ID order, which is not
+        # necessarily publication order (especially for worker-generated IDs).
+        ordered_reports = sorted(enumerate(reversed(prior_reports)), key=publication_order)
+        for _, prior_report in ordered_reports:
+            # Newer report versions carry a cumulative history. Merge it first;
+            # the current reading below remains authoritative for its date.
+            prior_history = prior_report.get("_antam_gold_history")
+            for point in prior_history if isinstance(prior_history, list) else []:
+                if not isinstance(point, dict):
+                    continue
+                prior_day = source_date_iso(point.get("date") or point.get("dates"))
+                prior_value = point.get("close")
+                prior_series = point.get("series_id") or "legacy_antam"
+                if prior_day and isinstance(prior_value, (int, float)) \
+                        and not isinstance(prior_value, bool) and math.isfinite(prior_value):
+                    observations[(prior_series, prior_day)] = float(prior_value)
+
+            prior_snapshot = prior_report.get("_source_snapshot")
+            prior_snapshot = prior_snapshot if isinstance(prior_snapshot, dict) else {}
+            prior_source_reading = prior_snapshot.get("antam_gold")
+            if isinstance(prior_source_reading, dict):
+                prior_day = source_date_iso(prior_source_reading.get("date"))
+                prior_value = prior_source_reading.get("price")
+                prior_series = prior_source_reading.get("series_id") or "legacy_antam"
+                if prior_day and _valid_price(prior_value):
+                    observations[(prior_series, prior_day)] = float(prior_value)
+
             prior_reading = (prior_report.get("commodities") or {}).get("Emas Antam 1 gr (Rp)", {})
             prior_day = source_date_iso(prior_reading.get("date"))
             prior_value = prior_reading.get("today")
+            prior_series = prior_reading.get("series_id") or "legacy_antam"
             if prior_day and isinstance(prior_value, (int, float)) and not isinstance(prior_value, bool) \
                     and math.isfinite(prior_value):
-                observations[prior_day] = float(prior_value)
+                observations[(prior_series, prior_day)] = float(prior_value)
 
-        previous_days = [day for day in observations if antam_day and day < antam_day]
+        previous_days = [day for source, day in observations if source == series_id and antam_day and day < antam_day]
         if previous_days:
-            antam["prev"] = observations[max(previous_days)]
+            antam["prev"] = observations[(series_id, max(previous_days))]
             antam["change_pct"] = round(
                 (float(antam["price"]) - antam["prev"]) / antam["prev"] * 100, 4
             ) if antam["prev"] else None
         if antam_day:
-            observations[antam_day] = float(antam["price"])
+            observations[(series_id, antam_day)] = float(antam["price"])
             snapshot["_antam_gold_history"] = [
-                {"date": day, "close": value}
-                for day, value in sorted(observations.items())[-30:]
+                {"date": day, "close": value, "series_id": source}
+                for source in sorted({key[0] for key in observations})
+                for day, value in sorted(
+                    (key[1], value) for key, value in observations.items() if key[0] == source
+                )[-MAX_HISTORY_POINTS:]
             ]
 
     candidate = build_report_data(snapshot)
@@ -163,7 +345,7 @@ def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -
             history = [point for point in history if point.get("date") != date]
             history.append({"date": date, "close": float(sbn10["today"])})
             history.sort(key=lambda point: point.get("date", ""), reverse=True)
-            history = history[:30]
+            history = history[:420]
     snapshot["_sbn_history"] = history
     guard = publication_guard() if publication_guard else nullcontext()
     with guard:

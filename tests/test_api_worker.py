@@ -165,7 +165,7 @@ class WorkerAndSchedulerTests(unittest.TestCase):
         run_pipeline.assert_called_once()
         self.assertTrue(repository.publication_guard_used)
         self.assertEqual(repository.artifacts[0]["storage_key"], pdf_path.name)
-        self.assertEqual(repository.completed[0][2], "report-test")
+        self.assertEqual(repository.completed[0][2], "job-job-test")
         self.assertFalse(repository.failed)
 
     @patch("market_report.worker.main.report_artifact_directory")

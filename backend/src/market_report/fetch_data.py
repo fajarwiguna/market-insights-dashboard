@@ -9,6 +9,7 @@ Sources:
 
 from __future__ import annotations
 import json
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +30,11 @@ HEADERS = {
     ),
     "Accept": "text/html,application/json,*/*",
 }
+
+
+def _valid_antam_price(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) \
+        and math.isfinite(value) and value > 0
 
 
 def _save(name: str, obj: Any) -> Path:
@@ -93,6 +99,54 @@ def _yahoo_chart(symbol: str, range_: str = "5d") -> Dict[str, Any]:
         return {"error": str(e), "symbol": symbol}
 
 
+def _trading_economics_commodity(slug: str, *, name: str, unit: str) -> Dict[str, Any]:
+    """Read the public actual/date/period changes from a Trading Economics page."""
+    url = f"https://tradingeconomics.com/commodity/{slug}"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=20)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "lxml")
+        description = soup.select_one("meta#metaDesc")
+        actual = soup.select_one("#market_last")
+        daily_pct = soup.select_one("#market_daily_Pchg")
+        if not description or not actual or not daily_pct:
+            raise ValueError("Halaman tidak memuat harga aktual dan perubahan harian.")
+
+        summary = description.get("content", "")
+        actual_match = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?", actual.get_text(" ", strip=True))
+        daily_match = re.search(r"\d+(?:\.\d+)?", daily_pct.get_text(" ", strip=True))
+        date_match = re.search(r"\bon\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\b", summary)
+        direction_match = re.search(r"\b(up|down)\s+\d+(?:\.\d+)?%\s+from the previous day", summary, re.I)
+        monthly_match = re.search(r"past month.*?\b(risen|fallen)\s+(\d+(?:\.\d+)?)%", summary, re.I)
+        if not all((actual_match, daily_match, date_match, direction_match)):
+            raise ValueError("Harga, tanggal, atau perubahan harian tidak lengkap.")
+
+        try:
+            source_date = datetime.strptime(date_match.group(1), "%B %d, %Y").date().isoformat()
+        except ValueError as error:
+            raise ValueError("Tanggal observasi tidak dapat dibaca.") from error
+
+        price = float(actual_match.group(0).replace(",", ""))
+        dtd_pct = float(daily_match.group(0)) * (1 if direction_match.group(1).lower() == "up" else -1)
+        mtd_pct = None
+        if monthly_match:
+            mtd_pct = float(monthly_match.group(2)) * (1 if monthly_match.group(1).lower() == "risen" else -1)
+        return {
+            "last": price,
+            "date": source_date,
+            "dtd_pct": dtd_pct,
+            "mtd_pct": mtd_pct,
+            "unit": unit,
+            "name": name,
+            "source": url,
+            "source_name": "Trading Economics",
+            "availability": "partial",
+            "availability_note": "Harga, DtD, dan MtD tersedia. WtD serta YtD tidak disajikan pada feed ini.",
+        }
+    except Exception as error:
+        return {"error": str(error), "source": url, "source_name": "Trading Economics"}
+
+
 def fetch_market_snapshot() -> Dict[str, Any]:
     tickers = {
         "USDIDR": "USDIDR=X",
@@ -112,76 +166,64 @@ def fetch_market_snapshot() -> Dict[str, Any]:
     }
     result = {}
     for name, symbol in tickers.items():
-        result[name] = _yahoo_chart(symbol)
+        # Annual history is required for YtD and calendar-period comparisons.
+        # Live quotes keep their shorter 5d window in fetch_live_spot().
+        result[name] = _yahoo_chart(symbol, range_="1y")
+    result["NEWCASTLE_COAL"] = _trading_economics_commodity(
+        "coal", name="Coal (Newcastle)", unit="USD/ton",
+    )
+    result["CPO"] = _trading_economics_commodity(
+        "palm-oil", name="CPO (Bursa Malaysia)", unit="MYR/ton",
+    )
     return result
 
 
 def fetch_antam_gold_price() -> Dict[str, Any]:
-    """Ambil harga dasar emas batangan Antam 1 gram dari Logam Mulia."""
-    url = "https://www.logammulia.com/id/harga-emas-hari-ini"
+    """Ambil harga beli Antam 1g terbaru dari seri historis OCEBSI."""
+    url = "https://ocebsi.com/macro/gold-antam/"
     try:
         response = requests.get(url, headers=HEADERS, timeout=20)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, "lxml")
-        page_text = soup.get_text(" ", strip=True)
-        date_match = re.search(
-            r"Harga Emas Hari Ini\s*,?\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
-            page_text,
-            re.I,
-        )
-        if not date_match:
-            raise ValueError("Tanggal harga pada halaman Logam Mulia tidak ditemukan.")
+        payload = response.json()
+        if isinstance(payload, dict) and isinstance(payload.get("data"), list):
+            payload = payload["data"]
+        if not isinstance(payload, list):
+            raise ValueError("Respons OCEBSI bukan daftar observasi harga emas.")
 
-        day, month, year = date_match.group(1).split()
-        month_names = {
-            "jan": 1, "january": 1, "feb": 2, "february": 2,
-            "mar": 3, "march": 3, "apr": 4, "april": 4,
-            "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
-            "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
-            "oct": 10, "october": 10, "nov": 11, "november": 11,
-            "dec": 12, "december": 12,
-            "januari": 1, "februari": 2, "maret": 3, "mei": 5,
-            "juni": 6, "juli": 7, "agustus": 8, "oktober": 10,
-            "desember": 12,
-        }
-        source_date = datetime(int(year), month_names[month.lower()], int(day)).strftime("%Y-%m-%d")
-
-        candidates: list[tuple[bool, int, int | None]] = []
-        for table in soup.find_all("table"):
-            table_text = table.get_text(" ", strip=True).lower()
-            if "harga dasar" not in table_text:
+        observations = {}
+        for item in payload:
+            if not isinstance(item, dict) or str(item.get("type", "")).strip().lower() != "beli":
                 continue
-            standard_bullion = (
-                "emas batangan" in table_text
-                and not any(term in table_text for term in ("gift series", "batik", "seri kemerdekaan"))
-            )
-            for row in table.find_all("tr"):
-                cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])]
-                if len(cells) < 2 or not re.fullmatch(r"1\s*(?:gr|gram)", cells[0].strip(), re.I):
-                    continue
-                numbers = [re.sub(r"[^\d]", "", cell) for cell in cells[1:]]
-                if not numbers[0]:
-                    continue
-                price = int(numbers[0])
-                taxed_price = int(numbers[1]) if len(numbers) > 1 and numbers[1] else None
-                candidates.append((standard_bullion, price, taxed_price))
-        if not candidates:
-            raise ValueError("Baris harga dasar produk emas Antam 1 gram tidak ditemukan.")
+            date = str(item.get("date", ""))[:10]
+            price = item.get("price")
+            try:
+                date = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
+            except ValueError:
+                continue
+            if _valid_antam_price(price):
+                observations[date] = float(price)
+        if not observations:
+            raise ValueError("OCEBSI tidak menyediakan observasi harga beli Antam yang valid.")
 
-        # Pilih tabel emas batangan reguler, bukan Gift Series atau produk lain.
-        _, price, taxed_price = next((row for row in candidates if row[0]), candidates[0])
+        source_date = max(observations)
+        price = observations[source_date]
         return {
             "price": price,
-            "price_with_tax": taxed_price,
+            "price_with_tax": None,
             "weight_grams": 1,
             "date": source_date,
+            "series_id": "ocebsi_antam_buy_1g",
+            "history": [
+                {"date": date, "close": value, "series_id": "ocebsi_antam_buy_1g"}
+                for date, value in sorted(observations.items())[-420:]
+            ],
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "source": url,
-            "source_name": "Logam Mulia ANTAM",
-            "basis": "Harga dasar emas batangan 1 gram; sebelum PPh 0,25%.",
+            "source_name": "OCEBSI ANTAM (harga beli 1 gram)",
+            "basis": "Harga beli Antam 1 gram dari seri historis OCEBSI.",
         }
     except Exception as error:
-        return {"error": str(error), "source": url, "source_name": "Logam Mulia ANTAM"}
+        return {"error": str(error), "source": url, "source_name": "OCEBSI ANTAM"}
 
 
 def fetch_fx_backup() -> Dict[str, Any]:
@@ -317,9 +359,31 @@ def fetch_bi_rates() -> Dict[str, Any]:
         r = requests.get(url, headers=HEADERS, timeout=20)
         if r.ok:
             text = r.text
-            m = re.search(r"BI-Rate.*?(\d+[,\.]\d+)\s*%", text, re.I | re.S)
-            if m:
-                result["bi_rate"] = float(m.group(1).replace(",", "."))
+            visible_text = BeautifulSoup(text, "lxml").get_text(" ", strip=True)
+            # Keep the rate and its date from the same BI indicator block.
+            # The page may contain other dated indicators after BI-Rate.
+            bi_markers = list(re.finditer(r"BI[- ]Rate", visible_text, re.I))
+            for marker in reversed(bi_markers):
+                block_start = marker.end()
+                next_markers = [
+                    match.start() for match in re.finditer(
+                        r"\b(?:INDONIA|JISDOR|Inflasi IHK|Target Inflasi|Cadangan Devisa)\b",
+                        visible_text[block_start:], re.I,
+                    )
+                ]
+                block_end = block_start + min(next_markers) if next_markers else len(visible_text)
+                bi_block = visible_text[block_start:block_end]
+                rate_match = re.search(r"(\d{1,2}[,.]\d+)\s*%", bi_block)
+                if not rate_match:
+                    continue
+                result["bi_rate"] = float(rate_match.group(1).replace(",", "."))
+                date_match = re.search(
+                    r"(\d{4}-\d{2}-\d{2}|\d{1,2}\s+\w+\s+\d{4}|\d{1,2}[-/]\w+[-/]\d{4})",
+                    bi_block, re.I,
+                )
+                if date_match:
+                    result["bi_rate_date"] = date_match.group(1)
+                break
             m = re.search(r"INDONIA.*?(\d+[,\.]\d+)\s*%", text, re.I | re.S)
             if m:
                 result["indonia"] = float(m.group(1).replace(",", "."))
@@ -395,7 +459,7 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     if persist:
         _save("yfinance", market)
 
-    print("Fetching Logam Mulia ANTAM gold price...")
+    print("Fetching ANTAM buy price feed...")
     antam_gold = fetch_antam_gold_price()
 
     print("Fetching FX backup (open.er-api) …")

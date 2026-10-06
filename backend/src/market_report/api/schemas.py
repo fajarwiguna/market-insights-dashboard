@@ -20,7 +20,12 @@ class ReportResponse(BaseModel):
     fx: dict[str, dict[str, Any]] = Field(default_factory=dict)
     indices: dict[str, dict[str, Any]] = Field(default_factory=dict)
     yields: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    index_sectors: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    gold: dict[str, dict[str, Any]] = Field(default_factory=dict)
     commodities: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    capital_flow: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    macro_indicators: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    monetary_operations: dict[str, dict[str, Any]] = Field(default_factory=dict)
     summary: str | None = None
     insights: list[dict[str, Any]] = Field(default_factory=list)
     impacts: list[dict[str, Any]] = Field(default_factory=list)
