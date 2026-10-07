@@ -3,6 +3,7 @@ pandas>=2.0
 numpy>=1.24
 matplotlib>=3.7
 requests>=2.31
+PyMuPDF>=1.24
 beautifulsoup4>=4.12
 lxml>=4.9
 reportlab>=4.0

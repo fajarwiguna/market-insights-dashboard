@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 import math
 import re
-from datetime import datetime, timezone
+import calendar
+from urllib.parse import urljoin
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -19,6 +21,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from market_report.config import market_data_directory
+from market_report.domain.index_sectors import IDX_IC_SECTOR_INDEXES
 
 DATA_DIR = market_data_directory()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -147,6 +150,375 @@ def _trading_economics_commodity(slug: str, *, name: str, unit: str) -> Dict[str
         return {"error": str(error), "source": url, "source_name": "Trading Economics"}
 
 
+_MONTH_NUMBERS = {
+    "january": 1, "jan": 1, "february": 2, "feb": 2,
+    "march": 3, "mar": 3, "april": 4, "apr": 4,
+    "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
+    "august": 8, "aug": 8, "september": 9, "sep": 9,
+    "october": 10, "oct": 10, "november": 11, "nov": 11,
+    "december": 12, "dec": 12,
+    "januari": 1, "februari": 2, "maret": 3, "mei": 5,
+    "juni": 6, "juli": 7, "agustus": 8, "oktober": 10,
+    "desember": 12,
+}
+
+
+def _te_monthly_observations(slug: str, *, series_pattern: str | None = None) -> Dict[str, Any]:
+    """Read released monthly actuals from a Trading Economics calendar table."""
+    url = f"https://tradingeconomics.com/indonesia/{slug}"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=25)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "lxml")
+        if series_pattern and not re.search(series_pattern, soup.get_text(" ", strip=True), re.I):
+            raise ValueError("Halaman tidak cocok dengan seri indikator yang diminta.")
+
+        observations: Dict[str, float] = {}
+        for row in soup.select("tr"):
+            cells = [cell.get_text(" ", strip=True) for cell in row.select("th, td")]
+            if len(cells) < 4:
+                continue
+            release_date = re.search(r"\b(20\d{2})-(\d{2})-(\d{2})\b", " ".join(cells))
+            if not release_date:
+                continue
+            row_text = " ".join(cells)
+            # Calendar rows identify the reference month (e.g. Aug) separately
+            # from the release date. Skip forecasts with an empty Actual cell.
+            month_match = re.search(
+                r"\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+                r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b",
+                row_text, re.I,
+            )
+            if not month_match:
+                continue
+            year, release_month = int(release_date.group(1)), int(release_date.group(2))
+            month_name = month_match.group(1).lower()
+            reference_month = _MONTH_NUMBERS[month_name]
+            # Year-boundary releases use the release year unless the reference
+            # month is clearly in the prior December.
+            reference_year = year - 1 if release_month == 1 and reference_month == 12 else year
+            month_key = f"{reference_year:04d}-{reference_month:02d}"
+            # TE's calendar columns are: release date, time, event, reference
+            # month, Actual, Previous, Consensus, Forecast. Do not mistake
+            # Previous/Forecast values for an unreleased Actual.
+            month_cell_index = next(
+                (index for index, cell in enumerate(cells)
+                 if re.search(rf"\b{re.escape(month_match.group(1))}\b", cell, re.I)),
+                None,
+            )
+            if month_cell_index is None or month_cell_index + 1 >= len(cells):
+                continue
+            actual_cell = cells[month_cell_index + 1].strip()
+            actual_match = re.fullmatch(r"([-+]?\d+(?:\.\d+)?)\s*%", actual_cell)
+            if actual_match:
+                observations[month_key] = float(actual_match.group(1))
+        if not observations:
+            raise ValueError("Tidak ada observasi aktual bulanan yang berhasil dibaca.")
+        return {"observations": dict(sorted(observations.items())), "source": url,
+                "source_name": "Trading Economics (rilis aktual)", "availability": "available"}
+    except Exception as error:
+        return {"observations": {}, "source": url, "source_name": "Trading Economics",
+                "availability": "unavailable", "error": str(error)}
+
+
+def _te_fed_funds_policy() -> Dict[str, Any]:
+    """Fetch the latest released US Fed Funds target rate and carry it forward."""
+    url = "https://tradingeconomics.com/united-states/interest-rate"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=25)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "lxml")
+        observations: Dict[str, float] = {}
+        last_actual = None
+        for row in soup.select("tr"):
+            cells = [cell.get_text(" ", strip=True) for cell in row.select("th, td")]
+            if len(cells) < 5 or not re.search(r"Fed Interest Rate Decision", " ".join(cells), re.I):
+                continue
+            date_match = re.search(r"\b(20\d{2})-(\d{2})-\d{2}\b", cells[0])
+            if not date_match:
+                continue
+            values = [float(match.group(1)) for cell in cells
+                      if (match := re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*%\s*", cell))]
+            if not values:
+                continue
+            observations[f"{date_match.group(1)}-{date_match.group(2)}"] = values[0]
+            if len(values) > 1:
+                prior_month = int(date_match.group(2)) - 1
+                prior_year = int(date_match.group(1))
+                if prior_month == 0:
+                    prior_month, prior_year = 12, prior_year - 1
+                observations.setdefault(f"{prior_year:04d}-{prior_month:02d}", values[1])
+            last_actual = values[0]
+        if not observations:
+            raise ValueError("Kalender Fed Funds tidak memuat keputusan aktual.")
+        # A policy rate remains in force until a new FOMC decision. Fill the
+        # current month from the latest announced rate, while excluding future
+        # months and limiting the payload to the dashboard's recent history.
+        now = datetime.now()
+        current_key = now.strftime("%Y-%m")
+        latest_key = max(observations)
+        if latest_key <= current_key:
+            last_actual = observations[latest_key]
+            year, month = map(int, latest_key.split("-"))
+            while f"{year:04d}-{month:02d}" < current_key:
+                month += 1
+                if month == 13:
+                    year, month = year + 1, 1
+                observations[f"{year:04d}-{month:02d}"] = last_actual
+        observations = {key: value for key, value in observations.items()
+                        if key <= current_key}
+        return {"observations": dict(sorted(observations.items())), "source": url,
+                "source_name": "Trading Economics (Federal Reserve/FOMC)", "availability": "available"}
+    except Exception as error:
+        return {"observations": {}, "source": url, "source_name": "Trading Economics",
+                "availability": "unavailable", "error": str(error)}
+
+
+def _fetch_latest_bi_macro_release() -> Dict[str, Any]:
+    """Read the newest BI policy press release for credit, DPK, and BI Rate."""
+    index_url = "https://www.bi.go.id/id/publikasi/ruang-media/news-release/Pages/default.aspx"
+    try:
+        response = requests.get(index_url, headers=HEADERS, timeout=25)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "lxml")
+        candidates = []
+        for anchor in soup.select("a[href]"):
+            href = anchor.get("href", "")
+            title = anchor.get_text(" ", strip=True)
+            if re.search(r"/Pages/sp_\d+\.aspx", href, re.I) and "rate" in title.lower():
+                href = urljoin(index_url, href)
+                candidates.append((title, href))
+        if not candidates:
+            # BI's SharePoint listing sometimes renders its latest-news links
+            # client-side. Keep a dated official fallback so the current
+            # report still receives the last verified BI release; once the
+            # listing is accessible, its newest matching link takes precedence.
+            candidates = [(
+                "BI-Rate Tetap 5,75% (RDG September 2026)",
+                "https://www.bi.go.id/id/publikasi/ruang-media/news-release/Pages/sp_2819326.aspx",
+            )]
+        if not candidates:
+            raise ValueError("Tautan siaran pers kebijakan BI terbaru tidak ditemukan.")
+        title, url = candidates[0]
+        page = requests.get(url, headers=HEADERS, timeout=25)
+        page.raise_for_status()
+        visible = BeautifulSoup(page.text, "lxml").get_text(" ", strip=True)
+        rate = re.search(r"BI[- ]Rate\s+(?:sebesar|at)\s+(\d+(?:[,.]\d+)?)\s*%", visible, re.I)
+        credit = re.search(r"Kredit perbankan pada\s+([A-Za-z]+)\s+(20\d{2})\s+tumbuh\s+(\d+(?:[,.]\d+)?)%\s*\(yoy\).*?pada\s+([A-Za-z]+)\s+(20\d{2})\s+sebesar\s+(\d+(?:[,.]\d+)?)%\s*\(yoy\)", visible, re.I)
+        dpk = re.search(r"pertumbuhan DPK yang mencapai\s+(\d+(?:[,.]\d+)?)%\s*\(yoy\)", visible, re.I)
+        published = re.search(r"\b(\d{1,2})/(\d{1,2})/(20\d{2})\b", visible)
+        # The source page's article date is rendered as M/D/YYYY or D/M/YYYY;
+        # use the credit paragraph's explicit reference month when available.
+        result: Dict[str, Any] = {"observations": {}, "source": url,
+                                  "source_name": "Bank Indonesia", "availability": "partial"}
+        if rate:
+            if published:
+                month = int(published.group(1))
+                rate_year = int(published.group(3))
+            elif credit:
+                month = _MONTH_NUMBERS[credit.group(1).lower()] + 1
+                rate_year = int(credit.group(2))
+                if month == 13:
+                    month, rate_year = 1, rate_year + 1
+            else:
+                month = datetime.now().month
+                rate_year = datetime.now().year
+            result["bi_rate"] = float(rate.group(1).replace(",", "."))
+            result["bi_rate_month"] = f"{rate_year}-{month:02d}"
+        if credit:
+            month = _MONTH_NUMBERS[credit.group(1).lower()]
+            key = f"{credit.group(2)}-{month:02d}"
+            result["observations"]["credit"] = {key: float(credit.group(3).replace(",", "."))}
+            prior_month = _MONTH_NUMBERS[credit.group(4).lower()]
+            prior_key = f"{credit.group(5)}-{prior_month:02d}"
+            result["observations"]["credit"][prior_key] = float(credit.group(6).replace(",", "."))
+            result["availability"] = "available"
+        if dpk and credit:
+            result["observations"]["dpk"] = {key: float(dpk.group(1).replace(",", "."))}
+            result["availability"] = "available"
+        result["title"] = title
+        return result
+    except Exception as error:
+        return {"observations": {}, "source": index_url, "source_name": "Bank Indonesia",
+                "availability": "unavailable", "error": str(error)}
+
+
+def fetch_macro_indicators() -> Dict[str, Any]:
+    """Fetch recent released macro observations for dashboard monthly columns."""
+    inflation = _te_monthly_observations("inflation-cpi", series_pattern=r"inflation")
+    m2 = _te_monthly_observations("money-supply-m2", series_pattern=r"money supply m2")
+    credit = _fetch_latest_bi_macro_release()
+    fed = _te_fed_funds_policy()
+    return {
+        "FED Fund Rate (%)": fed,
+        "Inflasi Indonesia YoY (%)": inflation,
+        "M2 (% YoY)": m2,
+        "Kredit/Pembiayaan (% YoY) - BI": {
+            "observations": credit.get("observations", {}).get("credit", {}),
+            "source": credit.get("source"), "source_name": credit.get("source_name"),
+            "availability": credit.get("availability", "unavailable"), "error": credit.get("error"),
+        },
+        "DPK (% YoY) - BI": {
+            "observations": credit.get("observations", {}).get("dpk", {}),
+            "source": credit.get("source"), "source_name": credit.get("source_name"),
+            "availability": credit.get("availability", "unavailable"), "error": credit.get("error"),
+        },
+        "BI Rate (%)": {
+            "observations": ({credit["bi_rate_month"]: credit["bi_rate"]}
+                              if credit.get("bi_rate_month") and credit.get("bi_rate") is not None else {}),
+            "source": credit.get("source"), "source_name": credit.get("source_name"),
+            "availability": "partial",
+        },
+    }
+
+
+_BI_MONETARY_OPERATIONS_URL = "https://www.bi.go.id/SEKI/tabel/TABEL3_1_1.pdf"
+_BI_MONTHS = {
+    "jan": 1, "january": 1, "feb": 2, "february": 2,
+    "mar": 3, "march": 3, "apr": 4, "april": 4, "may": 5,
+    "jun": 6, "june": 6, "jul": 7, "july": 7, "aug": 8,
+    "august": 8, "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10, "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
+}
+
+
+def _bi_month_header(page_text: str) -> list[int]:
+    """Find the longest consecutive-month run used by a SEKI table header."""
+    tokens = re.findall(
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December|"
+        r"Sept|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b",
+        page_text,
+        flags=re.IGNORECASE,
+    )
+    months = [_BI_MONTHS[token.lower()] for token in tokens]
+    runs: list[list[int]] = []
+    run: list[int] = []
+    for month in months:
+        if run and month != (run[-1] % 12) + 1:
+            runs.append(run)
+            run = []
+        run.append(month)
+    if run:
+        runs.append(run)
+    return max(runs, key=len, default=[])
+
+
+def _bi_monetary_row(line: str) -> list[float]:
+    """Extract the total monetary-operation row from either SEKI language."""
+    normalized = re.sub(r"\s+", " ", line).strip()
+    english = re.search(r"\bMonetary Operation\b", normalized, re.IGNORECASE)
+    indonesian = re.search(r"\bOperasi Moneter\b", normalized, re.IGNORECASE)
+    if english:
+        tail = normalized[english.end():].strip()
+        if re.match(r"^(?:Conventional|Sharia)\b", tail, re.IGNORECASE):
+            return []
+        # Some PDF extractors put the total values before the row label,
+        # others put them after the row number. Support both text orders.
+        before = normalized[:english.start()].strip()
+        before_tokens = re.findall(
+            r"(?<![\w/])(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w/])",
+            before,
+        )
+        if before_tokens and before_tokens != ["1"]:
+            raw_values = before
+        else:
+            raw_values = re.sub(r"^1\s+", "", tail)
+    elif indonesian and re.match(r"^\s*1\s+Operasi Moneter\b", normalized, re.IGNORECASE):
+        raw_values = normalized[indonesian.end():]
+    else:
+        return []
+
+    # SEKI expresses this table in billions of rupiah, usually with comma
+    # thousands separators. Convert to Rp trillion after validating the row.
+    values = re.findall(r"(?<![\w/])(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w/])", raw_values)
+    return [float(value.replace(",", "")) / 1000 for value in values]
+
+
+def _bi_pdf_lines(page) -> list[str]:
+    """Join PDF cell fragments sharing a baseline into visual table rows."""
+    rows: dict[float, list[tuple[float, str]]] = {}
+    for word in page.get_text("words"):
+        x, y, text = float(word[0]), float(word[1]), str(word[4])
+        baseline = round(y * 2) / 2
+        rows.setdefault(baseline, []).append((x, text))
+    return [
+        " ".join(text for _, text in sorted(words))
+        for _, words in sorted(rows.items())
+    ]
+
+
+def fetch_monetary_operations() -> Dict[str, Any]:
+    """Fetch BI's monthly end-period monetary-operation total from SEKI PDF."""
+    try:
+        response = requests.get(_BI_MONETARY_OPERATIONS_URL, headers=HEADERS, timeout=30)
+        response.raise_for_status()
+        if not response.content.startswith(b"%PDF"):
+            raise ValueError("BI SEKI tidak mengembalikan berkas PDF yang valid.")
+
+        # PyMuPDF is an explicit backend dependency; import it here so the rest
+        # of market-data fetching can still proceed if the source/parser fails.
+        import pymupdf
+
+        document = pymupdf.open(stream=response.content, filetype="pdf")
+        candidates: list[tuple[str, list[dict[str, Any]]]] = []
+        for page in document:
+            page_text = page.get_text("text")
+            month_numbers = _bi_month_header(page_text)
+            if not month_numbers:
+                continue
+            years = [int(value) for value in re.findall(r"\b(20\d{2})\b", page_text)]
+            if not years:
+                continue
+            latest_year = max(years)
+            first_year = latest_year - 1 if month_numbers[0] > month_numbers[-1] else latest_year
+            dates: list[str] = []
+            year = first_year
+            previous_month = month_numbers[0]
+            for index, month in enumerate(month_numbers):
+                if index and month < previous_month:
+                    year += 1
+                day = calendar.monthrange(year, month)[1]
+                dates.append(date(year, month, day).isoformat())
+                previous_month = month
+
+            # In the BI PDF, each table cell is a separate text block. Read
+            # words by shared baseline so the total row's values and label are
+            # combined before we identify the series.
+            for line in _bi_pdf_lines(page):
+                values = _bi_monetary_row(line)
+                if not values:
+                    continue
+                aligned_count = min(len(values), len(dates))
+                history = [
+                    {"date": day, "close": value}
+                    for day, value in zip(dates[-aligned_count:], values[-aligned_count:])
+                ]
+                if history:
+                    candidates.append((history[-1]["date"], history))
+
+        if not candidates:
+            raise ValueError("Baris total Operasi Moneter tidak ditemukan pada tabel SEKI BI.")
+        _, history = max(candidates, key=lambda item: item[0])
+        return {
+            "history": history,
+            "unit": "Rp triliun",
+            "source": _BI_MONETARY_OPERATIONS_URL,
+            "source_name": "Bank Indonesia — SEKI Tabel III.1",
+            "availability": "available",
+            "availability_note": "Posisi akhir periode; frekuensi bulanan sesuai publikasi SEKI BI.",
+        }
+    except Exception as error:
+        return {
+            "history": [],
+            "unit": "Rp triliun",
+            "source": _BI_MONETARY_OPERATIONS_URL,
+            "source_name": "Bank Indonesia — SEKI Tabel III.1",
+            "availability": "unavailable",
+            "error": str(error),
+        }
+
+
 def fetch_market_snapshot() -> Dict[str, Any]:
     tickers = {
         "USDIDR": "USDIDR=X",
@@ -164,11 +536,12 @@ def fetch_market_snapshot() -> Dict[str, Any]:
         "WTI": "CL=F",
         "BRENT": "BZ=F",
     }
-    result = {}
-    for name, symbol in tickers.items():
-        # Annual history is required for YtD and calendar-period comparisons.
-        # Live quotes keep their shorter 5d window in fetch_live_spot().
-        result[name] = _yahoo_chart(symbol, range_="1y")
+    # IDX-IC sector indices are published under their JATS index codes.
+    tickers.update({key: symbol for key, symbol, _, _ in IDX_IC_SECTOR_INDEXES})
+    # Annual history is required for YtD and calendar-period comparisons.
+    # Fetch concurrently so the additional IDX-IC series do not make refreshes
+    # wait through a long sequence of independent network timeouts.
+    result = fetch_live_spot(tickers, range_="1y")
     result["NEWCASTLE_COAL"] = _trading_economics_commodity(
         "coal", name="Coal (Newcastle)", unit="USD/ton",
     )
@@ -477,6 +850,8 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     if persist:
         _save("bi", bi)
 
+    macro_indicators = fetch_macro_indicators()
+    monetary_operations = fetch_monetary_operations()
     snapshot = {
         "generated_at": datetime.now().isoformat(),
         "yfinance": market,
@@ -484,6 +859,8 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
         "fx_backup": fx_backup,
         "phei": phei,
         "bi": bi,
+        "macro_indicators": macro_indicators,
+        "monetary_operations": monetary_operations,
     }
     if persist:
         _save("snapshot", snapshot)

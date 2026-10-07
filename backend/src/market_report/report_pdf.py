@@ -1015,11 +1015,7 @@ def build_pdf(
     stream=None,
     fx_chart_path: Optional[Path] = None,
 ) -> "Path | tuple[bytes, str]":
-    """Buat PDF ringkas satu halaman dengan grafik dari riwayat versi laporan.
-
-    `chart_path` dan `fx_chart_path` tetap diterima untuk kompatibilitas caller lama;
-    grafik brief digambar dari data historis yang terikat pada `report`.
-    """
+    """Buat executive brief satu halaman dengan susunan editorial yang ringkas."""
     if report is None:
         with open(DATA_DIR / "report_data.json", encoding="utf-8") as source:
             report = json.load(source)
@@ -1034,188 +1030,364 @@ def build_pdf(
         target = str(out_path)
 
     doc = SimpleDocTemplate(
-        target,
-        pagesize=A4,
-        leftMargin=MARGIN_X,
-        rightMargin=MARGIN_X,
-        topMargin=MARGIN_TOP,
-        bottomMargin=MARGIN_BOTTOM,
-        title="Market Today - Ringkasan Pasar Harian",
-        author="Market Today",
-        subject=f"Ringkasan pasar harian per {date_str}",
-        creator="Daily Market Report Automation",
+        target, pagesize=A4, leftMargin=MARGIN_X, rightMargin=MARGIN_X,
+        topMargin=13 * mm, bottomMargin=MARGIN_BOTTOM,
+        title="Market Today - Ringkasan Pasar Harian", author="Market Today",
+        subject=f"Ringkasan pasar harian per {date_str}", creator="Market Today",
     )
-    gaya = _gaya_dokumen()
     fx = report.get("fx") or {}
     indices = report.get("indices") or {}
     yields = report.get("yields") or {}
     commodities = report.get("commodities") or {}
-    bi = report.get("bi") or {}
-
     usd = _cari(fx, "usd/idr")
     ihsg = _cari(indices, "ihsg")
     sbn10 = _cari(yields, "sbn", "10", exclude=("sbsn", "fr0"))
     ust10 = _cari(yields, "treasury", "10")
-    spread = report.get("spread_sbn10_ust10_bp")
 
-    header = Table(
-        [[Paragraph("Market Today", gaya["Judul"]),
-          Paragraph(f"<b>{escape(date_str)}</b><br/>"
-                    f"<font size=8 color='#64748b'>Diperbarui {_jam_snapshot(report)}</font>",
-                    ParagraphStyle("BriefDate", fontName="Helvetica", fontSize=9.5,
-                                   leading=13.5, textColor=INK, alignment=TA_RIGHT))]],
-        colWidths=[LEBAR * 0.58, LEBAR * 0.42],
-    )
+    body = ParagraphStyle("ExecBody", fontName="Helvetica", fontSize=7.8,
+                          leading=9.6, textColor=BODY)
+    body_small = ParagraphStyle("ExecSmall", parent=body, fontSize=7.1, leading=8.6,
+                                textColor=MUTED)
+    body_bold = ParagraphStyle("ExecBold", parent=body, fontName="Helvetica-Bold",
+                               textColor=INK)
+    white_heading = ParagraphStyle("ExecWhiteHeading", fontName="Helvetica-Bold",
+                                   fontSize=8.7, leading=10.2, textColor=colors.white)
+
+    def p(text, style=body):
+        return Paragraph(_brief_paragraph_text(text), style)
+
+    def band(title: str, width: float) -> Table:
+        table = Table([[Paragraph(escape(title), white_heading)]], colWidths=[width])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), ACCENT),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2.4 * mm),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2.4 * mm),
+            ("TOPPADDING", (0, 0), (-1, -1), 1.6 * mm),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6 * mm),
+        ]))
+        return table
+
+    def panel(title: str, content, width: float) -> Table:
+        table = Table([[band(title, width)], [content]], colWidths=[width])
+        table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.5, BORDER),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, 0), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 0),
+            ("LEFTPADDING", (0, 1), (-1, -1), 2 * mm),
+            ("RIGHTPADDING", (0, 1), (-1, -1), 2 * mm),
+            ("TOPPADDING", (0, 1), (-1, -1), 2.3 * mm),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 2.3 * mm),
+        ]))
+        return table
+
+    def show_value(value, kind: str) -> str:
+        if not isinstance(value, (int, float)):
+            return "-"
+        if kind == "yield":
+            return f"{_fmt_num(value, 2)}%"
+        if kind == "decimal":
+            return _fmt_num(value, 2)
+        if kind in ("fx", "index"):
+            return _fmt_num(value, 0 if kind == "fx" else 0)
+        return _fmt_num(value, 0 if abs(value) >= 100 else 2)
+
+    def delta_for(row: dict, kind: str) -> tuple[str, colors.Color]:
+        if kind == "yield":
+            value = row.get("change_bp")
+            return _fmt_bp(value), (_warna_yield(value) or MUTED)
+        value = row.get("change_pct")
+        return _fmt_pct(value), (_warna_arah(value, naik_baik=kind != "fx") or MUTED)
+
+    # Cover line and report headline.
+    brand = ParagraphStyle("ExecBrand", fontName="Helvetica-Bold", fontSize=12,
+                           leading=14, textColor=ACCENT_DARK)
+    date_style = ParagraphStyle("ExecDate", fontName="Helvetica-Bold", fontSize=8.2,
+                                leading=10.4, alignment=TA_RIGHT, textColor=INK)
+    header = Table([[
+        Paragraph("MARKET TODAY<br/><font size=6.5 color='#64748b'>DAILY MARKET INTELLIGENCE</font>", brand),
+        Paragraph(f"RINGKASAN PASAR HARIAN<br/><font size=8>{escape(date_str)}</font>", date_style),
+    ]], colWidths=[LEBAR * 0.59, LEBAR * 0.41])
     header.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
-        ("LINEBELOW", (0, 0), (-1, -1), 1.6, ACCENT),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.8 * mm),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.3, ACCENT),
     ]))
 
-    key_cards = [
-        _kartu_angka(gaya, "USD / IDR", _fmt_num(usd.get("today"), 0),
-                     _fmt_pct(usd.get("change_pct")), _arah_panah(usd.get("change_pct")),
-                     _warna_arah(usd.get("change_pct"), naik_baik=False)),
-        _kartu_angka(gaya, "IHSG", _fmt_num(ihsg.get("today"), 0),
-                     _fmt_pct(ihsg.get("change_pct")), _arah_panah(ihsg.get("change_pct")),
-                     _warna_arah(ihsg.get("change_pct"))),
-        _kartu_angka(gaya, "SBN 10Y", _fmt_num(sbn10.get("today"), 2, suffix="%"),
-                     _fmt_bp(sbn10.get("change_bp")), _arah_panah(sbn10.get("change_bp")),
-                     _warna_yield(sbn10.get("change_bp"))),
-        _kartu_angka(gaya, "UST 10Y", _fmt_num(ust10.get("today"), 2, suffix="%"),
-                     _fmt_bp(ust10.get("change_bp")), _arah_panah(ust10.get("change_bp")),
-                     _warna_yield(ust10.get("change_bp"))),
-        _kartu_angka(gaya, "Spread SBN / UST", _fmt_num(spread, 0, suffix=" bp"),
-                     "", 0, ACCENT),
+    usd_change, ihsg_change = usd.get("change_pct"), ihsg.get("change_pct")
+    usd_direction = "melemah" if isinstance(usd_change, (int, float)) and usd_change > 0 else "menguat"
+    ihsg_direction = "menguat" if isinstance(ihsg_change, (int, float)) and ihsg_change > 0 else "melemah"
+    if usd.get("today") is not None and ihsg.get("today") is not None:
+        headline = f"Rupiah {usd_direction.capitalize()}, IHSG {ihsg_direction.capitalize()}"
+    elif usd.get("today") is not None:
+        headline = f"Rupiah {usd_direction.capitalize()}"
+    elif ihsg.get("today") is not None:
+        headline = f"IHSG {ihsg_direction.capitalize()}"
+    else:
+        headline = "Ringkasan Pasar Hari Ini"
+    headline_style = ParagraphStyle("ExecHeadline", fontName="Helvetica-Bold", fontSize=24,
+                                    leading=27, textColor=INK)
+    summary_style = ParagraphStyle("ExecSummary", fontName="Helvetica", fontSize=8.7,
+                                   leading=11.5, textColor=BODY)
+    headline_block = [
+        Paragraph(escape(headline), headline_style),
+        Spacer(1, 0.8 * mm),
+        Paragraph(escape(summary_text(report) or "Pergerakan pasar utama dan indikator ekonomi terbaru."), summary_style),
     ]
-    key_row = Table([key_cards], colWidths=[LEBAR_KARTU] * 5, hAlign="LEFT")
-    key_row.setStyle(TableStyle([
+
+    # Three clear KPIs; text-only changes keep the values easy to scan.
+    def kpi(label: str, value: str, change: str, accent, change_color, fill, width: float) -> Table:
+        label_style = ParagraphStyle(f"KpiLabel{label}", fontName="Helvetica-Bold",
+                                     fontSize=7.6, leading=9.1, textColor=accent)
+        value_style = ParagraphStyle(f"KpiValue{label}", fontName="Helvetica-Bold",
+                                     fontSize=20, leading=23, textColor=INK)
+        change_style = ParagraphStyle(f"KpiChange{label}", fontName="Helvetica-Bold",
+                                      fontSize=7.8, leading=9.2, textColor=change_color)
+        table = Table([[Paragraph(escape(label.upper()), label_style)],
+                       [Paragraph(value, value_style)],
+                       [Paragraph(escape(change), change_style)]], colWidths=[width])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), fill), ("BOX", (0, 0), (-1, -1), 0.5, BORDER),
+            ("LINEBEFORE", (0, 0), (0, -1), 2, accent),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2.8 * mm),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 1.8 * mm),
+            ("TOPPADDING", (0, 0), (-1, 0), 1.5 * mm),
+            ("TOPPADDING", (0, 1), (-1, -1), 0.6 * mm),
+            ("BOTTOMPADDING", (0, -1), (-1, -1), 1.5 * mm),
+        ]))
+        return table
+
+    def kpi_delta(row: dict, kind: str) -> tuple[str, colors.Color]:
+        value, tone = delta_for(row, kind)
+        return (f"DtD {value}", tone) if value != "-" else ("Perubahan harian belum tersedia", MUTED)
+
+    kpi_width = LEBAR / 3
+    usd_delta, usd_tone = kpi_delta(usd, "fx")
+    ihsg_delta, ihsg_tone = kpi_delta(ihsg, "index")
+    sbn_delta, sbn_tone = kpi_delta(sbn10, "yield")
+    kpis = Table([[
+        kpi("Kurs dolar AS", f"Rp{_fmt_num(usd.get('today'), 0)}", usd_delta,
+            ACCENT, usd_tone, ACCENT_SOFT, kpi_width - 2 * mm),
+        kpi("Pasar saham", _fmt_num(ihsg.get("today"), 0), ihsg_delta,
+            GOOD, ihsg_tone, colors.HexColor("#edf7f0"), kpi_width - 2 * mm),
+        kpi("Obligasi pemerintah", f"{_fmt_num(sbn10.get('today'), 2)}%", sbn_delta,
+            AMBER, sbn_tone, colors.HexColor("#fff7e8"), kpi_width - 2 * mm),
+    ]], colWidths=[kpi_width] * 3)
+    kpis.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), JEDA_KARTU),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+
+    # Market drivers as three short editorial columns.
+    insights = _brief_insights(report)[:3]
+    driver_style = ParagraphStyle("DriverText", fontName="Helvetica", fontSize=7.2,
+                                  leading=8.8, textColor=BODY)
+    driver_title_style = ParagraphStyle("DriverTitle", fontName="Helvetica-Bold",
+                                        fontSize=7.7, leading=9.2, textColor=ACCENT_DARK)
+    driver_cells = []
+    for number, item in enumerate(insights, start=1):
+        driver_cells.append(Table([
+            [Paragraph(f"<font color='#0f766e'><b>{number:02d}</b></font>  "
+                       f"{_brief_paragraph_text(item.get('title'))}", driver_title_style)],
+            [Paragraph(_brief_paragraph_text(item.get("text")), driver_style)],
+        ], colWidths=[LEBAR / 3 - 4 * mm]))
+    if not driver_cells:
+        driver_cells = [[p("Sorotan pasar belum tersedia.", body_small)]]
+    drivers = Table([driver_cells], colWidths=[LEBAR / 3] * 3)
+    drivers.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBEFORE", (1, 0), (-1, -1), 0.6, BORDER),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.8 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.8 * mm),
+    ]))
+
+    # Compact market table with previous close, latest value, and daily move.
+    market_specs = [
+        ("USD/IDR", usd, "fx"), ("DXY", _cari(fx, "dxy"), "decimal"),
+        ("IHSG", ihsg, "index"), ("Dow Jones", _cari(indices, "dji"), "index"),
+        ("UST 10 tahun", ust10, "yield"), ("SBN 10 tahun", sbn10, "yield"),
+        ("SBN 5 tahun", _cari(yields, "sbn", "5", exclude=("sbsn", "fr0")), "yield"),
+    ]
+    market_rows = [[p("Indikator", body_bold), p("Sebelum", body_bold),
+                    p("Terakhir", body_bold), p("DtD", body_bold)]]
+    for label, row, kind in market_specs:
+        if not isinstance(row, dict) or row.get("today") is None:
+            continue
+        delta, tone = delta_for(row, kind)
+        delta_style = ParagraphStyle(f"Delta{label}", parent=body_bold, alignment=TA_RIGHT, textColor=tone)
+        market_rows.append([p(label), p(show_value(row.get("prev"), kind)),
+                            p(show_value(row.get("today"), kind), body_bold),
+                            Paragraph(escape(delta), delta_style)])
+    gutter_width = 4 * mm
+    left_width = (LEBAR - gutter_width) * 0.535
+    left_inner = left_width - 4 * mm
+    market_table = Table(market_rows, colWidths=[left_inner * .34, left_inner * .21,
+                                                left_inner * .23, left_inner * .22], repeatRows=1)
+    market_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), ACCENT_SOFT),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.35, BORDER),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafb")]),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 1.2 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 1.2 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.4 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.4 * mm),
+    ]))
+    market_panel = panel("DATA PASAR", market_table, left_width)
+
+    # Three practical implications, as available in the report payload.
+    impacts = report.get("impacts") or []
+    if not impacts:
+        from market_report.domain.market_analysis import build_impacts
+        impacts = build_impacts(report)
+    impact_rows = []
+    right_width = LEBAR - gutter_width - left_width
+    right_inner = right_width - 4 * mm
+    impact_title = ParagraphStyle("ImpactTitleCompact", fontName="Helvetica-Bold",
+                                  fontSize=7.5, leading=9, textColor=INK)
+    impact_text = ParagraphStyle("ImpactTextCompact", fontName="Helvetica",
+                                 fontSize=7, leading=8.7, textColor=BODY)
+    for item in impacts[:3]:
+        impact_rows.append([
+            Paragraph(_brief_paragraph_text(item.get("title")), impact_title),
+            Paragraph(_brief_paragraph_text(item.get("text")), impact_text),
+        ])
+    if not impact_rows:
+        impact_rows = [[p("Dampak pasar belum tersedia.", body_small), p("")]]
+    impact_table = Table(impact_rows, colWidths=[right_inner * .36, right_inner * .64])
+    impact_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 0), (-1, -2), 0.4, BORDER),
+        ("LEFTPADDING", (0, 0), (-1, -1), 1.2 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 1.2 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.9 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.9 * mm),
+    ]))
+    impacts_panel = panel("MAKNA BAGI BISNIS", impact_table, right_width)
+    primary_grid = Table([[market_panel, "", impacts_panel]],
+                         colWidths=[left_width, gutter_width, right_width])
+    primary_grid.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
 
-    summary_box = Table(
-        [[Paragraph("Ringkasan pasar", gaya["InsightTitle"])],
-         [Paragraph(escape(summary_text(report)), gaya["Ringkasan"])]],
-        colWidths=[LEBAR - 4 * mm],
-    )
-    summary_box.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), ACCENT_SOFT),
-        ("LINEBEFORE", (0, 0), (0, -1), 2.2, ACCENT),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4 * mm),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm),
-        ("TOPPADDING", (0, 0), (-1, 0), 2.2 * mm),
-        ("TOPPADDING", (0, 1), (-1, -1), 0.8 * mm),
-        ("BOTTOMPADDING", (0, -1), (-1, -1), 2.4 * mm),
+    # Monthly macro table uses only published observations; unreleased months stay blank.
+    try:
+        report_date = date.fromisoformat(report_day[:10])
+    except ValueError:
+        report_date = date.today()
+    month_keys = []
+    year, month = report_date.year, report_date.month
+    for _ in range(3):
+        month_keys.insert(0, f"{year:04d}-{month:02d}")
+        month -= 1
+        if month == 0:
+            year, month = year - 1, 12
+    month_names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+    macro = report.get("macro_indicators") or {}
+    macro_specs = [
+        ("Fed Funds", "FED Fund Rate (%)"), ("BI Rate", "BI Rate (%)"),
+        ("Inflasi Indonesia YoY", "Inflasi Indonesia YoY (%)"), ("M2 YoY", "M2 (% YoY)"),
+        ("Kredit perbankan YoY", "Kredit/Pembiayaan (% YoY) - BI"), ("DPK YoY", "DPK (% YoY) - BI"),
+    ]
+    macro_rows = [[p("Indikator", body_bold)] + [p(month_names[int(key[5:7]) - 1], body_bold) for key in month_keys]]
+    for label, key in macro_specs:
+        observations = (macro.get(key) or {}).get("observations") or {}
+        macro_rows.append([p(label)] + [
+            p(f"{_fmt_num(observations[period], 2)}%" if observations.get(period) is not None else "-")
+            for period in month_keys
+        ])
+    secondary_available = LEBAR - gutter_width
+    macro_width = secondary_available * .51
+    macro_inner = macro_width - 4 * mm
+    macro_table = Table(macro_rows, colWidths=[macro_inner * .46] + [macro_inner * .18] * 3)
+    macro_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), ACCENT_SOFT), ("LINEBELOW", (0, 0), (-1, -1), 0.35, BORDER),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafb")]),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 1.2 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 1.2 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.3 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3 * mm),
     ]))
+    macro_panel = panel("INDIKATOR EKONOMI", macro_table, macro_width)
 
-    insights = _brief_insights(report)
-    insight_cards = [_brief_insight_card(gaya, item) for item in insights]
-    insight_grid = Table([[card] for card in insight_cards], colWidths=[LEBAR])
-    insight_grid_styles = [
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    global_specs = [
+        ("DXY", _cari(fx, "dxy"), "dxy"), ("Emas spot (US$/ons)", _cari(commodities, "gold"), "gold"),
+        ("Emas Antam 1 gr", _cari(commodities, "emas", "antam"), "antam"),
+        ("Minyak Brent (US$/barel)", _cari(commodities, "brent"), "brent"),
+        ("Batu bara Newcastle", _cari(commodities, "coal"), "commodity"),
+        ("CPO", _cari(commodities, "cpo"), "commodity"),
     ]
-    insight_grid_styles.extend(
-        ("BOTTOMPADDING", (0, row), (-1, row), 1.6 * mm)
-        for row in range(max(0, len(insight_cards) - 1))
-    )
-    insight_grid.setStyle(TableStyle(insight_grid_styles))
-
-    dji = _cari(indices, "dji")
-    dxy = _cari(fx, "dxy")
-    gold = _cari(commodities, "gold")
-    antam = _cari(commodities, "emas", "antam")
-    brent = _cari(commodities, "brent")
-    support_items = [
-        ("Dow Jones", dji.get("today"), 0, "", dji.get("change_pct"), True),
-        ("DXY", dxy.get("today"), 0, "", dxy.get("change_pct"), False),
-        ("Emas Antam 1 gr", antam.get("today"), 0, "", antam.get("change_pct"), True),
-        ("Brent · USD/barel", brent.get("today"), 0, "", brent.get("change_pct"), False),
-        ("BI Rate", bi.get("BI Rate"), 2, "%", None, True),
-        ("INDONIA", bi.get("INDONIA"), 2, "%", None, True),
-    ]
-    support_cards = [
-        _brief_support_card(
-            gaya, label, value, decimals=decimals, suffix=suffix, change=change,
-            higher_is_better=higher_is_better,
-        )
-        for label, value, decimals, suffix, change, higher_is_better in support_items
-    ]
-    support_rows = [support_cards[:3], support_cards[3:]]
-    support_grid = Table(support_rows, colWidths=[LEBAR / 3] * 3, hAlign="LEFT")
-    support_grid.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 2.4 * mm),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 2.0 * mm),
+    global_rows = []
+    for label, row, kind in global_specs:
+        if not isinstance(row, dict) or row.get("today") is None:
+            continue
+        value = row["today"]
+        if kind == "antam":
+            value_text = f"Rp{_fmt_num(value, 0)}"
+        elif kind in ("gold", "brent"):
+            value_text = f"US${_fmt_num(value, 0)}"
+        elif kind == "dxy":
+            value_text = f"{_fmt_num(value, 2)} indeks"
+        else:
+            value_text = f"{_fmt_num(value, 0)} {row.get('unit') or ''}".strip()
+        delta, _ = delta_for(row, "fx" if kind == "dxy" else "index" if kind == "index" else "commodity")
+        global_rows.append([p(label), p(value_text, body_bold), p(delta, body_small)])
+    if not global_rows:
+        global_rows = [[p("Data lintas aset belum tersedia.", body_small), p(""), p("")]]
+    global_width = secondary_available - macro_width
+    global_inner = global_width - 4 * mm
+    global_table = Table(global_rows, colWidths=[global_inner * .47, global_inner * .35, global_inner * .18])
+    global_table.setStyle(TableStyle([
+        ("LINEBELOW", (0, 0), (-1, -2), 0.35, BORDER),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f8fafb")]),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 1.2 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 1.2 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.7 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.7 * mm),
     ]))
-
-    rate_chart_column = [
-        chart_heading("Rate Differential"),
-        Spacer(1, 0.8 * mm),
-        RateDifferentialChart(report, height=47 * mm),
-        Paragraph("Sumber: PHEI & Yahoo Finance.", gaya["Catatan"]),
-    ]
-    antam_source_note = ""
-    if antam.get("availability") == "stale":
-        antam_source_note = f" Harga Antam terakhir tersedia per {antam.get('date') or 'tanggal tidak tersedia'}."
-    elif antam.get("availability") == "partial":
-        antam_source_note = f" {antam.get('availability_note') or 'Harga memakai basis alternatif.'}"
-    antam_source_name = antam.get("source_name") or "OCEBSI ANTAM"
-    gold_chart_column = [
-        chart_heading("Gold Prices"),
-        Spacer(1, 0.8 * mm),
-        GoldPricesChart(report, height=47 * mm),
-        Paragraph(f"Sumber: Yahoo Finance & {antam_source_name}.{antam_source_note}", gaya["Catatan"]),
-    ]
-    charts_row = Table([[rate_chart_column, gold_chart_column]],
-                       colWidths=[LEBAR / 2, LEBAR / 2], hAlign="LEFT")
-    charts_row.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    global_panel = panel("PASAR GLOBAL & KOMODITAS", global_table, global_width)
+    secondary_grid = Table([[macro_panel, "", global_panel]],
+                           colWidths=[macro_width, gutter_width, global_width])
+    secondary_grid.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (0, 0), 2 * mm),
-        ("LEFTPADDING", (1, 0), (1, 0), 2 * mm),
+    ]))
+
+    guide = Table([[
+        Paragraph("CARA MEMBACA", ParagraphStyle("GuideLabelExec", fontName="Helvetica-Bold",
+                  fontSize=7.1, leading=8.5, textColor=ACCENT_DARK)),
+        Paragraph("USD/IDR naik berarti Rupiah melemah. Yield obligasi naik biasanya menekan harga obligasi. 1 bp = 0,01 poin persentase.",
+                  ParagraphStyle("GuideTextExec", fontName="Helvetica", fontSize=6.8,
+                                 leading=8.2, textColor=INK)),
+    ]], colWidths=[LEBAR * .19, LEBAR * .81])
+    guide.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), ACCENT_SOFT), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LINEBEFORE", (1, 0), (1, 0), .8, ACCENT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2.3 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 2.3 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.8 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.8 * mm),
+    ]))
+    disclaimer = Table([[
+        Paragraph("<b>Informasi ini merupakan referensi pasar dan bukan jaminan hasil investasi.</b><br/>"
+                  "Nilai mengikuti observasi terakhir dari sumber data; periode yang belum dirilis ditampilkan sebagai tanda kosong.",
+                  ParagraphStyle("DisclaimerExec", fontName="Helvetica", fontSize=6.4,
+                                 leading=7.8, textColor=BODY))
+    ]], colWidths=[LEBAR])
+    disclaimer.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#fff6df")),
+        ("BOX", (0, 0), (-1, -1), .45, colors.HexColor("#f0d79f")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2.4 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 2.4 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.6 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6 * mm),
     ]))
 
     story = [
-        header,
-        Spacer(1, 2.5 * mm),
-        Paragraph("PASAR INDONESIA & GLOBAL · RINGKASAN HARIAN", gaya["SubJudul"]),
-        Spacer(1, 3 * mm),
-        key_row,
-        Spacer(1, 2 * mm),
-        Paragraph("Nilai merah menunjukkan pergerakan yang perlu dicermati.", gaya["Catatan"]),
-        Spacer(1, 2.5 * mm),
-        summary_box,
-        Spacer(1, 2 * mm),
-        charts_row,
-        Spacer(1, 2 * mm),
-        Paragraph("Insight utama", gaya["BriefHeading"]),
-        Spacer(1, 1 * mm),
-        insight_grid,
-        Spacer(1, 2.5 * mm),
-        Paragraph("Indikator pendukung", gaya["BriefHeading"]),
-        Spacer(1, 1 * mm),
-        support_grid,
+        header, Spacer(1, 2.4 * mm), *headline_block, Spacer(1, 2.8 * mm), kpis,
+        Spacer(1, 3 * mm), band("APA YANG MENGGERAKKAN PASAR?", LEBAR), drivers,
+        Spacer(1, 3 * mm), primary_grid, Spacer(1, 3 * mm), secondary_grid,
+        Spacer(1, 2.8 * mm), guide, Spacer(1, 2.2 * mm), disclaimer,
     ]
 
     canvas = partial(
-        KanvasLaporan,
-        judul="Market Today",
-        sub_judul=date_str,
-        sumber="Tanggal data mengikuti observasi terakhir tiap instrumen.",
+        KanvasLaporan, judul="Market Today", sub_judul=date_str,
+        sumber=f"Market Today | Disusun {_jam_snapshot(report)} | Data mengikuti observasi terakhir sumber.",
     )
     doc.build(story, canvasmaker=canvas)
     if stream is not None:

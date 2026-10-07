@@ -47,6 +47,73 @@ def _valid_price(value) -> bool:
         and math.isfinite(value) and value > 0
 
 
+def _index_sector_history(snapshot: dict) -> dict[str, list[dict]]:
+    """Carry sector closes across report versions so YtD remains calculable."""
+    from market_report.domain.index_sectors import (
+        IDX_IC_SECTOR_INDEXES,
+        IDX_SECTOR_INITIAL_HISTORY,
+        IDX_SECTOR_INITIAL_HISTORY_YEAR,
+    )
+    from market_report.services.history_service import MAX_HISTORY_POINTS, source_date_iso
+
+    observations: dict[str, dict[str, float]] = {
+        label: {} for _, _, label, _ in IDX_IC_SECTOR_INDEXES
+    }
+
+    def add(label, raw_date, value, *, overwrite=False):
+        if label not in observations or not _valid_price(value):
+            return
+        day = source_date_iso(raw_date)
+        if not day:
+            return
+        if overwrite or day not in observations[label]:
+            observations[label][day] = float(value)
+
+    versions = list_report_versions(limit=MAX_HISTORY_POINTS)
+    active = load_report()
+    if active and not any(item.get("report_id") == active.get("report_id") for item in versions):
+        versions.append(active)
+
+    # New reports carry their compact cumulative history. Older versions still
+    # contribute one close each, allowing the series to bootstrap on upgrade.
+    for report in versions:
+        source_snapshot = report.get("_source_snapshot")
+        source_snapshot = source_snapshot if isinstance(source_snapshot, dict) else {}
+        saved_history = source_snapshot.get("_index_sector_history")
+        if isinstance(saved_history, dict):
+            for label, points in saved_history.items():
+                for point in points if isinstance(points, list) else []:
+                    if isinstance(point, dict):
+                        add(label, point.get("date") or point.get("dates"), point.get("close"))
+        for label, reading in (report.get("index_sectors") or {}).items():
+            if isinstance(reading, dict):
+                add(label, reading.get("date"), reading.get("today"))
+
+    current_dates = []
+    market = snapshot.get("yfinance") or {}
+    for key, _, label, _ in IDX_IC_SECTOR_INDEXES:
+        reading = market.get(key) if isinstance(market, dict) else None
+        if not isinstance(reading, dict):
+            continue
+        day = source_date_iso(reading.get("date"))
+        if day:
+            current_dates.append(day)
+        add(label, day, reading.get("last"), overwrite=True)
+
+    current_year = max(current_dates, default=datetime.now().strftime("%Y-%m-%d"))[:4]
+    if current_year == str(IDX_SECTOR_INITIAL_HISTORY_YEAR):
+        for label, point in IDX_SECTOR_INITIAL_HISTORY.items():
+            add(label, point["date"], point["close"])
+
+    return {
+        label: [
+            {"date": day, "close": close}
+            for day, close in sorted(points.items())[-MAX_HISTORY_POINTS:]
+        ]
+        for label, points in observations.items()
+    }
+
+
 def _saved_antam_observation(report: dict) -> dict | None:
     """Ambil observasi Antam terakhir yang tersimpan pada versi laporan."""
     from market_report.services.history_service import source_date_iso
@@ -347,6 +414,7 @@ def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -
             history.sort(key=lambda point: point.get("date", ""), reverse=True)
             history = history[:420]
     snapshot["_sbn_history"] = history
+    snapshot["_index_sector_history"] = _index_sector_history(snapshot)
     guard = publication_guard() if publication_guard else nullcontext()
     with guard:
         report = publish_snapshot(snapshot, report_id=report_id)

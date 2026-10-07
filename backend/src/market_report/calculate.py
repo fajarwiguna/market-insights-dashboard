@@ -5,6 +5,7 @@ Calculate daily changes from REAL snapshot. Produce report_data + sources metada
 from __future__ import annotations
 import json
 import os
+import re
 import tempfile
 from datetime import datetime
 import math
@@ -13,6 +14,7 @@ from typing import Dict, Any, Optional
 
 from market_report.config import market_data_directory
 from market_report.domain.market_periods import period_changes, yield_ytd_bp
+from market_report.domain.index_sectors import IDX_IC_SECTOR_INDEXES, IDX_SECTOR_HISTORY_SOURCE
 
 DATA_DIR = market_data_directory()
 
@@ -418,14 +420,52 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
     if "Emas Antam 1 gr (Rp)" in commodities:
         gold["Emas Antam (Rp/gram)"] = commodities["Emas Antam 1 gr (Rp)"]
 
-    index_sectors = {
-        name: _unavailable_reading("poin", "Seri indeks sektor IDX-IC belum terhubung ke sumber data.")
-        for name in (
-            "Energi", "Bahan Baku", "Industri", "Konsumen Siklikal",
-            "Konsumen Non-Siklikal", "Kesehatan", "Keuangan", "Properti",
-            "Teknologi", "Infrastruktur", "Transportasi dan Logistik",
-        )
-    }
+    sector_index_map = tuple((key, label) for key, _, label, _ in IDX_IC_SECTOR_INDEXES)
+    sector_history = snap.get("_index_sector_history", {})
+    index_sectors = {}
+    for source_key, label in sector_index_map:
+        item = yf.get(source_key, {})
+        if not isinstance(item, dict) or item.get("last") is None:
+            reading = _unavailable_reading(
+                "poin", (item.get("error") if isinstance(item, dict) else None)
+                or f"Data indeks sektor {source_key} belum tersedia dari Yahoo Finance."
+            )
+            reading["source"] = item.get("source") if isinstance(item, dict) else None
+            index_sectors[label] = reading
+            continue
+
+        history = sector_history.get(label) if isinstance(sector_history, dict) else None
+        period_item = {**item, "history": history} if isinstance(history, list) else item
+        periods = _period_data(period_item)
+        index_sectors[label] = {
+            "today": item["last"],
+            "prev": item.get("prev"),
+            "change_pct": item.get("change_pct"),
+            "dtd_pct": item.get("change_pct"),
+            "ytd_pct": periods.get("ytd_pct"),
+            "date": item.get("date"),
+            "unit": "poin indeks",
+            "source": item.get("source"),
+            "ytd_source": IDX_SECTOR_HISTORY_SOURCE if periods.get("ytd_pct") is not None else None,
+            "availability": "available",
+            **periods,
+        }
+    sources.append({
+        "section": "IDX-IC Sectoral Indices",
+        "items": [
+            {
+                "field": label,
+                "source": reading.get("source"),
+                "history_source": reading.get("ytd_source"),
+                "as_of": reading.get("date"),
+            }
+            for label, reading in index_sectors.items()
+        ],
+        "primary": "Yahoo Finance Chart API (IDX-IC sector quotes)",
+        "history_source": "IDX Daily Indices (official year-end close used for YtD baseline)",
+        "reference": "Indonesia Stock Exchange (IDX-IC sector indices)",
+        "url": IDX_SECTOR_HISTORY_SOURCE,
+    })
     capital_flow = {
         "Saham": {"unit": "USD juta", "periods": {key: None for key in ("1D", "1W", "MtD", "QtD", "YtD")}, "availability": "unavailable"},
         "Obligasi": {"unit": "USD juta", "periods": {key: None for key in ("1D", "1W", "MtD", "QtD", "YtD")}, "availability": "unavailable"},
@@ -438,16 +478,93 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
         "Kredit/Pembiayaan (% YoY) - BI": {"unit": "% YoY", "observations": {}, "availability": "unavailable"},
         "DPK (% YoY) - BI": {"unit": "% YoY", "observations": {}, "availability": "unavailable"},
     }
+    fetched_macro = snap.get("macro_indicators", {})
+    for label, reading in macro_indicators.items():
+        source_reading = fetched_macro.get(label, {}) if isinstance(fetched_macro, dict) else {}
+        if not isinstance(source_reading, dict):
+            continue
+        raw_observations = source_reading.get("observations", {})
+        if isinstance(raw_observations, dict):
+            reading["observations"] = {
+                str(month): value for month, value in raw_observations.items()
+                if re.fullmatch(r"20\d{2}-(0[1-9]|1[0-2])", str(month))
+                and isinstance(value, (int, float)) and math.isfinite(value)
+            }
+        reading["availability"] = (
+            "available" if reading["observations"] else
+            source_reading.get("availability", "unavailable")
+        )
+        reading["source"] = source_reading.get("source")
+        reading["source_name"] = source_reading.get("source_name")
+        if source_reading.get("error"):
+            reading["availability_note"] = source_reading["error"]
+
+    macro_sources = [
+        {
+            "field": label,
+            "source": reading.get("source"),
+            "source_name": reading.get("source_name"),
+            "as_of": max(reading.get("observations", {}), default=None),
+        }
+        for label, reading in macro_indicators.items()
+        if reading.get("observations")
+    ]
+    if macro_sources:
+        sources.append({"section": "Macro Indicators", "items": macro_sources})
+
     bi_rate_month = _month_key(bi.get("bi_rate_date"))
-    if bi_rate_month and isinstance(bi.get("bi_rate"), (int, float)):
+    if not macro_indicators["BI Rate (%)"]["observations"] and bi_rate_month and isinstance(bi.get("bi_rate"), (int, float)):
         macro_indicators["BI Rate (%)"]["observations"][bi_rate_month] = bi["bi_rate"]
         macro_indicators["BI Rate (%)"]["availability"] = "partial"
-    monetary_operations = {
-        "Posisi OM BI (Rp T)": {
-            **_unavailable_reading("Rp triliun", "Seri posisi operasi moneter BI belum terhubung."),
-            "mtd_pct": None,
+    om_source = snap.get("monetary_operations", {})
+    om_source = om_source if isinstance(om_source, dict) else {}
+    om_points: dict[str, float] = {}
+    for point in om_source.get("history", []):
+        if not isinstance(point, dict):
+            continue
+        day = _source_day(point.get("date") or point.get("dates"))
+        value = point.get("close")
+        if day and isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+            om_points[day] = float(value)
+    om_history = [{"date": day, "close": value} for day, value in sorted(om_points.items())]
+    om_latest = om_history[-1] if om_history else None
+    monetary_operations = {"Posisi OM BI (Rp T)": {
+        **_unavailable_reading(
+            "Rp triliun",
+            om_source.get("error") or "Data posisi Operasi Moneter belum tersedia dari SEKI BI.",
+        ),
+        "mtd_pct": None,
+        "ytd_pct": None,
+        "source": om_source.get("source"),
+        "source_name": om_source.get("source_name"),
+    }}
+    if om_latest:
+        om_periods = period_changes(om_history, om_latest["date"], om_latest["close"])
+        previous = om_history[-2] if len(om_history) > 1 else None
+        monetary_operations["Posisi OM BI (Rp T)"] = {
+            "today": om_latest["close"],
+            "prev": previous["close"] if previous else None,
+            "prev_date": previous["date"] if previous else None,
+            "mtd_pct": om_periods.get("mtd_pct"),
+            "ytd_pct": om_periods.get("ytd_pct"),
+            "date": om_latest["date"],
+            "unit": om_source.get("unit", "Rp triliun"),
+            "availability": om_source.get("availability", "available"),
+            "availability_note": om_source.get("availability_note"),
+            "source": om_source.get("source"),
+            "source_name": om_source.get("source_name"),
         }
-    }
+    sources.append({
+        "section": "Monetary Operations",
+        "items": [{
+            "field": "Posisi OM BI (Rp T)",
+            "source": om_source.get("source"),
+            "source_name": om_source.get("source_name"),
+            "as_of": om_latest.get("date") if om_latest else None,
+            "availability": om_source.get("availability", "unavailable"),
+        }],
+        "note": om_source.get("availability_note") or om_source.get("error"),
+    })
     sources.append({
         "section": "Commodities",
         "items": [

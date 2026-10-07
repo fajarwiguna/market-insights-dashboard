@@ -168,7 +168,7 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
             <p className="intro-copy">Ringkasan pergerakan pasar dalam satu tampilan.</p>
           </div>
           <div className="report-date"><span>TANGGAL LAPORAN</span><strong>{report.report_date || report.report_date_iso || "—"}</strong>
-            <small>Dipublikasikan {formatPublishedAt(published)}</small><ExportReportButton reportId={report.report_id} /></div>
+            <small>Dipublikasikan {formatPublishedAt(published)}</small></div>
         </section>
 
         <section className="metrics-grid" aria-label="Angka utama">
@@ -180,6 +180,15 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
         {!report.is_demo && <HistoryCharts histories={histories} />}
         <MarketDataSections report={report} />
         {!report.is_demo && <LiveMarketMonitor report={report} />}
+
+        <section className="bottom-export" aria-label="Unduh laporan">
+          <div className="bottom-export-copy">
+            <p className="eyebrow">EKSPOR LAPORAN</p>
+            <h2>Unduh laporan PDF</h2>
+            <p>Simpan ringkasan pasar ini untuk dibaca atau dibagikan.</p>
+          </div>
+          <ExportReportButton reportId={report.report_id} />
+        </section>
 
         <footer className="page-footer"><span>Market Today · Daily Market Report</span>
           <span>ID laporan: {report.report_id || "belum tersedia"}</span></footer>
