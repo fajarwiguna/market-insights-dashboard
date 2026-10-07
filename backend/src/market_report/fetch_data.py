@@ -111,6 +111,7 @@ def _trading_economics_commodity(slug: str, *, name: str, unit: str) -> Dict[str
         soup = BeautifulSoup(response.text, "lxml")
         description = soup.select_one("meta#metaDesc")
         actual = soup.select_one("#market_last")
+        daily_change_value = soup.select_one("#market_daily_chg")
         daily_pct = soup.select_one("#market_daily_Pchg")
         if not description or not actual or not daily_pct:
             raise ValueError("Halaman tidak memuat harga aktual dan perubahan harian.")
@@ -131,20 +132,35 @@ def _trading_economics_commodity(slug: str, *, name: str, unit: str) -> Dict[str
 
         price = float(actual_match.group(0).replace(",", ""))
         dtd_pct = float(daily_match.group(0)) * (1 if direction_match.group(1).lower() == "up" else -1)
+        daily_change = None
+        if daily_change_value:
+            change_match = re.search(
+                r"[-+]?\d[\d,]*(?:\.\d+)?",
+                daily_change_value.get_text(" ", strip=True),
+            )
+            if change_match:
+                daily_change = float(change_match.group(0).replace(",", ""))
         mtd_pct = None
         if monthly_match:
             mtd_pct = float(monthly_match.group(2)) * (1 if monthly_match.group(1).lower() == "risen" else -1)
         return {
             "last": price,
+            "prev": round(price - daily_change, 8) if daily_change is not None else None,
             "date": source_date,
             "dtd_pct": dtd_pct,
+            "change": daily_change,
             "mtd_pct": mtd_pct,
             "unit": unit,
             "name": name,
             "source": url,
             "source_name": "Trading Economics",
             "availability": "partial",
-            "availability_note": "Harga, DtD, dan MtD tersedia. WtD serta YtD tidak disajikan pada feed ini.",
+            "availability_note": (
+                "Harga referensi Trading Economics berbasis OTC/CFD, bukan benchmark resmi. "
+                  "DtD tersedia dari sumber. YtD menunggu baseline historis yang sebanding."
+                if name == "Gold Spot (USD/troy oz)"
+                else "Harga, DtD, dan MtD tersedia. WtD serta YtD tidak disajikan pada feed ini."
+            ),
         }
     except Exception as error:
         return {"error": str(error), "source": url, "source_name": "Trading Economics"}
@@ -506,7 +522,7 @@ def fetch_monetary_operations() -> Dict[str, Any]:
             "source": _BI_MONETARY_OPERATIONS_URL,
             "source_name": "Bank Indonesia — SEKI Tabel III.1",
             "availability": "available",
-            "availability_note": "Posisi akhir periode; frekuensi bulanan sesuai publikasi SEKI BI.",
+            "availability_note": "Posisi akhir periode. Frekuensi bulanan sesuai publikasi SEKI BI.",
         }
     except Exception as error:
         return {
@@ -542,6 +558,9 @@ def fetch_market_snapshot() -> Dict[str, Any]:
     # Fetch concurrently so the additional IDX-IC series do not make refreshes
     # wait through a long sequence of independent network timeouts.
     result = fetch_live_spot(tickers, range_="1y")
+    result["GOLD_SPOT"] = _trading_economics_commodity(
+        "gold", name="Gold Spot (USD/troy oz)", unit="USD/troy oz",
+    )
     result["NEWCASTLE_COAL"] = _trading_economics_commodity(
         "coal", name="Coal (Newcastle)", unit="USD/ton",
     )

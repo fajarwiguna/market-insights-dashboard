@@ -67,10 +67,10 @@ def spread_word(spread) -> tuple[str, str]:
     if spread is None:
         return "belum tersedia", "flat"
     if spread < 250:
-        return "relatif sempit — risiko Indonesia dinilai lebih rendah", "good"
+        return "relatif sempit", "good"
     if spread <= 450:
         return "tergolong sedang", "flat"
-    return "relatif lebar — investor meminta kompensasi risiko lebih besar", "warn"
+    return "relatif lebar", "warn"
 
 
 # ── Kepingan tampilan (HTML) ─────────────────────────────────

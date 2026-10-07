@@ -67,7 +67,7 @@ function sectionRows(group: MarketGroup, report: MarketReport): [string, Instrum
           legacy.push([name, { ...emptyReading(unit), availability_note: note }]);
         }
       };
-      ensure("Gold Spot (USD/troy oz)", "USD/troy oz", "Feed spot belum tersedia; GC=F adalah futures.");
+      ensure("Gold Spot (USD/troy oz)", "USD/troy oz", "Feed Trading Economics belum menyediakan harga Gold Spot. COMEX futures ditampilkan terpisah.");
       ensure("Gold Futures COMEX", "USD/troy oz", "Feed futures belum tersedia.");
       ensure("Emas Antam", "Rp/gram", "Feed harga Antam belum tersedia.");
       return [
@@ -148,7 +148,7 @@ function columnsFor(group: MarketGroup, months: { key: string; label: string }[]
   if (group.kind === "yield") return [
     { key: "prev", label: "Sebelumnya (%)", kind: "value" },
     { key: "today", label: "Terakhir (%)", kind: "value" },
-    { key: "dtd_bp", label: "DtD (bp)", kind: "basis-points", title: "Perubahan yield dari observasi sebelumnya; 1 bp = 0,01 poin persentase." },
+    { key: "dtd_bp", label: "DtD (bp)", kind: "basis-points", title: "Perubahan yield dari observasi sebelumnya. 1 bp = 0,01 poin persentase." },
     { key: "ytd_bp", label: "YtD (bp)", kind: "basis-points", title: "Perubahan yield sejak akhir tahun sebelumnya." },
     { key: "date", label: "Tanggal (pembanding → terakhir)", kind: "date" },
   ];

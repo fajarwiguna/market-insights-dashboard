@@ -3,6 +3,7 @@ import { AppearanceControls } from "@/components/appearance-controls";
 import { OperatorMenu } from "@/components/operator-menu";
 import { StatusPill } from "@/components/status-pill";
 import { DashboardViewSwitcher } from "@/features/dashboard/dashboard-view-switcher";
+import { formatReportDate } from "@/features/dashboard/report-format";
 import { LiveMarketMonitor } from "@/features/dashboard/live-market-monitor";
 
 export function MarketMonitorPage({ report }: { report: MarketReport }) {
@@ -19,7 +20,7 @@ export function MarketMonitorPage({ report }: { report: MarketReport }) {
     <section className="page-intro monitor-intro">
       <div><p className="eyebrow">PEMANTAUAN INTRADAY</p><h1>Monitor <span>Pasar</span></h1>
         <p className="intro-copy">Pergerakan live diperbarui terpisah dari laporan harian yang telah diterbitkan.</p></div>
-      <div className="report-date"><span>TANGGAL LAPORAN TERAKHIR</span><strong>{report.report_date || report.report_date_iso || "—"}</strong>
+      <div className="report-date"><span>TANGGAL LAPORAN TERAKHIR</span><strong>{formatReportDate(report)}</strong>
         <small>Snapshot laporan tidak berubah saat monitor diperbarui.</small></div>
     </section>
     <LiveMarketMonitor report={report} />

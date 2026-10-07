@@ -9,6 +9,7 @@ import { DashboardNav } from "@/features/dashboard/dashboard-nav";
 import { ReloadPageButton } from "@/components/reload-page-button";
 import { MARKET_GROUPS } from "@/features/dashboard/market-groups";
 import { MarketDataSections } from "@/features/dashboard/market-data-sections";
+import { formatObservationDate, formatPublishedAt, formatReportDate } from "@/features/dashboard/report-format";
 
 type MarketMetricSection = "fx" | "indices" | "yields" | "commodities";
 
@@ -43,17 +44,6 @@ function findMetric(report: MarketReport, section: MarketMetricSection, fragment
   return null;
 }
 
-function formatPublishedAt(value: unknown): string {
-  if (typeof value !== "string" || !value) return "Waktu publikasi tidak tersedia";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Jakarta",
-  }).format(date) + " WIB";
-}
-
 function MetricCard({ title, metric, section, variant = "primary" }: {
   title: string;
   metric: [string, InstrumentReading] | null;
@@ -67,7 +57,7 @@ function MetricCard({ title, metric, section, variant = "primary" }: {
       <p className="metric-name">{name}</p>
       <p className="metric-value">{formatValue(reading.today, section)}</p>
       <p className="metric-change">{formatChange(reading)}</p>
-      <p className="metric-date">Observasi {reading.date || "tidak tersedia"}</p>
+      <p className="metric-date">Observasi {formatObservationDate(reading.date)}</p>
     </article>
   );
 }
@@ -173,7 +163,7 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
             <h1>Market <span>Today</span></h1>
             <p className="intro-copy">Ringkasan pergerakan pasar dalam satu tampilan.</p>
           </div>
-          <div className="report-date"><span>TANGGAL LAPORAN</span><strong>{report.report_date || report.report_date_iso || "—"}</strong>
+          <div className="report-date"><span>TANGGAL LAPORAN</span><strong>{formatReportDate(report)}</strong>
             <small>Dipublikasikan {formatPublishedAt(published)}</small></div>
         </section>
 

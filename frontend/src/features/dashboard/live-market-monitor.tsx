@@ -85,7 +85,7 @@ export function LiveMarketMonitor({ report }: { report: MarketReport }) {
     </div>
     <div className={`live-status live-status-${data?.status || (error ? "unavailable" : "loading")}`} role="status" aria-live="polite">
       <span className="live-status-dot" />
-      {error || (data?.status === "available" ? "Data live tersedia" : data?.status === "partial" ? "Sebagian sumber live tersedia" : data?.status === "unavailable" ? "Sumber live tidak tersedia; menampilkan snapshot bila ada" : "Menghubungi sumber live…")}
+      {error || (data?.status === "available" ? "Data live tersedia" : data?.status === "partial" ? "Sebagian sumber live tersedia" : data?.status === "unavailable" ? "Sumber live tidak tersedia. Snapshot ditampilkan bila tersedia" : "Menghubungi sumber live…")}
       {data?.fetched_at ? <span> · diperbarui {formatDate(data.fetched_at)}</span> : null}
     </div>
     {groups.map((group) => {

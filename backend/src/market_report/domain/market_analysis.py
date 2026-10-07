@@ -135,8 +135,8 @@ def build_insights(report: dict) -> list[dict]:
                 "title": "Nilai tukar Rupiah", "tone": "good",
                 "text": (f"Rupiah <b>menguat {fmt_mag(chg)}</b> menjadi "
                          f"<b>Rp{fmt_num(usd, 0)}</b> per dolar AS."),
-                "dampak": ("Menguntungkan importir dan siapa pun yang punya kewajiban dalam dolar AS; "
-                           "biaya belanja luar negeri relatif lebih ringan."),
+                "dampak": ("Menguntungkan importir dan siapa pun yang punya kewajiban dalam dolar AS. "
+                           "Biaya belanja luar negeri relatif lebih ringan."),
             })
         else:
             out.append({
@@ -169,8 +169,8 @@ def build_insights(report: dict) -> list[dict]:
             "title": "Pasar saham (IHSG)", "tone": tone_of(c, higher_is_better=True),
             "text": (f"IHSG {_arah('naik', 'turun', c)} <b>{fmt_mag(c)}</b> ke "
                      f"<b>{fmt_num(ihsg['today'], 0)}</b>."),
-            "dampak": ("Menggambarkan arah rata-rata harga saham di Bursa Efek Indonesia; naik biasanya "
-                       "berarti investor lebih optimistis, turun berarti lebih berhati-hati."),
+            "dampak": ("Menggambarkan arah rata-rata harga saham di Bursa Efek Indonesia. Kenaikan biasanya "
+                       "menunjukkan investor lebih optimistis, sedangkan penurunan menunjukkan sikap lebih berhati-hati."),
         })
 
     dxy = f["dxy"]
@@ -193,8 +193,8 @@ def build_insights(report: dict) -> list[dict]:
         out.append({
             "title": "Harga komoditas", "tone": "flat",
             "text": ", ".join(komoditas) + ".",
-            "dampak": ("Emas naik biasanya menandakan investor mencari aset aman; minyak naik menaikkan "
-                       "biaya energi & transportasi sehingga bisa menekan inflasi."),
+            "dampak": ("Kenaikan emas biasanya menandakan investor mencari aset aman. Kenaikan minyak "
+                       "menambah biaya energi dan transportasi sehingga dapat menekan inflasi."),
         })
 
     if not out:
@@ -228,8 +228,8 @@ def build_impacts(report: dict) -> list[dict]:
         out.append({
             "title": "Cicilan kredit, KPR, dan deposito",
             "text": (f"BI Rate ada di {fmt_num(f['bi_rate'], 2)}%. Angka ini acuan bank. Selama tidak berubah, "
-                     "bunga kredit dan deposito umumnya stabil; bila BI Rate turun, bunga kredit biasanya "
-                     "menyusul turun (dengan jeda waktu), dan sebaliknya bila BI Rate naik."),
+                     "bunga kredit dan deposito umumnya stabil. Bila BI Rate turun, bunga kredit biasanya "
+                     "menyusul turun dengan jeda waktu. Sebaliknya, kenaikan BI Rate dapat mendorong bunga kredit naik."),
         })
 
     if f["spread"] is not None and f["sbn10"].get("today") is not None:
@@ -240,8 +240,8 @@ def build_impacts(report: dict) -> list[dict]:
             "title": "Tabungan, obligasi, dan sukuk",
             "text": (f"Surat utang negara Indonesia menawarkan imbal hasil "
                      f"{fmt_num(f['sbn10']['today'], 2)}%{pembanding}. Selisihnya {fmt_num(f['spread'], 0)} bp "
-                     f"({kata}) — menarik untuk pemburu pendapatan tetap, tetapi tetap membawa risiko harga "
-                     "dan nilai tukar."),
+                     f"({kata}). Instrumen ini dapat menarik bagi pemburu pendapatan tetap, tetapi tetap "
+                     "membawa risiko harga dan nilai tukar."),
         })
 
     komoditas = []
@@ -250,11 +250,11 @@ def build_impacts(report: dict) -> list[dict]:
         row = f[kunci]
         c = row.get("change_pct")
         if c is not None and abs(c) > 0.5:
-            komoditas.append(f"{nama} {'naik' if c > 0 else 'turun'} {fmt_mag(c)} — memengaruhi {efek}")
+            komoditas.append(f"{nama.capitalize()} {'naik' if c > 0 else 'turun'} {fmt_mag(c)} dan dapat memengaruhi {efek}")
     if komoditas:
         out.append({
             "title": "Harga barang sehari-hari",
-            "text": "; ".join(komoditas) + ".",
+            "text": ". ".join(komoditas) + ".",
         })
 
     return out
@@ -295,7 +295,7 @@ def build_market_status(report: dict) -> list[dict]:
     if f["spread"] is not None:
         kata, tone = spread_word(f["spread"])
         out.append({"label": "Selisih RI–AS", "value": f"{fmt_num(f['spread'], 0)} bp",
-                    "note": kata.split(" — ")[0].capitalize(), "tone": tone})
+                    "note": kata.capitalize(), "tone": tone})
 
     dxy = f["dxy"]
     if dxy.get("change_pct") is not None:

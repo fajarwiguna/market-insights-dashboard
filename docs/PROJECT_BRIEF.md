@@ -1,6 +1,6 @@
 # Project Brief — Daily Market Report / Market Today
 
-Versi dokumen: 1.3
+Versi dokumen: 1.6
 
 Tanggal acuan: 7 Oktober 2026
 Status produk: MVP/prototype yang sedang digunakan; pengembangan menuju aplikasi production dilakukan bertahap.
@@ -102,14 +102,14 @@ Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebut
 
 ### Perluasan data dashboard — tampilan tersedia, integrasi masih bertahap
 
-Dashboard mengelompokkan data pasar ke dalam kategori berikut. Contoh angka yang diberikan untuk rancangan ini adalah acuan bentuk tabel, bukan nilai yang boleh ditanam sebagai data produksi. Data Yahoo Finance, PHEI, BI, dan Antam yang sudah terhubung tetap dipakai; seri yang belum memiliki adapter tervalidasi menampilkan `—` beserta keterangan ketersediaan.
+Dashboard mengelompokkan data pasar ke dalam kategori berikut. Contoh angka yang diberikan untuk rancangan ini adalah acuan bentuk tabel, bukan nilai yang boleh ditanam sebagai data produksi. Data Yahoo Finance, PHEI, BI, dan Antam yang sudah terhubung tetap dipakai. Gold Spot kini memakai harga referensi Trading Economics berbasis OTC/CFD; sumber menyatakan harga ini bukan benchmark resmi. Harga, pembanding, dan DtD tersedia, sedangkan YtD baru dapat dihitung ketika histori yang tersimpan mencakup baseline akhir tahun. Seri yang belum memiliki adapter tervalidasi tetap menampilkan `—` beserta keterangan ketersediaan.
 
 Perubahan mesin hitung berlaku pada laporan baru setelah backend dan worker memakai versi kode terbaru lalu laporan di-refresh. Arsip lama tidak ditulis ulang otomatis, dan perbandingan YtD tetap kosong sampai histori sumber mencakup pembanding yang diperlukan.
 
 | Kategori | Instrumen/indikator | Kolom dan satuan yang direncanakan |
 |---|---|---|
 | Kurs | DXY, USD/IDR, CNY/IDR, SAR/IDR, EUR/IDR, JPY/IDR | Penutupan sebelumnya, terakhir, DtD %, YtD %, tanggal observasi; nilai aktual bergantung ketersediaan feed |
-| Harga emas | Gold Spot USD/troy oz, COMEX Gold Futures, dan emas Antam Rp/gram | Harga sebelumnya, terakhir, DtD %, YtD %, tanggal observasi; spot dibedakan dari futures |
+| Harga emas | Gold Spot USD/troy oz (referensi OTC/CFD Trading Economics), COMEX Gold Futures, dan emas Antam Rp/gram | Harga sebelumnya, terakhir, DtD %, YtD %, tanggal observasi; spot dibedakan dari futures dan bukan benchmark resmi |
 | Arus modal | Saham dan obligasi, USD juta | 1D, 1W, MtD, QtD, YtD; arus bersih bertanda positif/negatif; adapter belum terhubung |
 | Yield obligasi | UST 5Y/10Y, SBN 5Y/10Y, SBSN seri benchmark | Yield sebelumnya/terakhir dalam %, perubahan DtD dan YtD dalam bp; YtD tersedia bila histori cukup |
 | Indikator makro | Fed Funds Rate, BI Rate, inflasi Indonesia, M2, kredit/pembiayaan, DPK | Tiga observasi bulanan; BI Rate memakai tanggal publikasi yang tersedia, seri lain menunggu adapter |
@@ -221,11 +221,11 @@ Desain ditujukan untuk membaca laporan pasar secara profesional, dengan hierarki
 
 ### Kondisi tampilan dan hasil review
 
-Review struktur pada 7 Oktober 2026 dilakukan terhadap komponen dashboard dan CSS. Implementasi penataan awal kemudian diterapkan dan diperiksa melalui lint, pemeriksaan tipe TypeScript, serta respons server lokal untuk halaman `/` dan `/monitor`. Pemeriksaan visual langsung pada ukuran layar yang ditetapkan dan uji penerimaan pengguna belum dilakukan.
+Review struktur dan visual pada 7 Oktober 2026 mencakup komponen dashboard, CSS, serta browser Chromium pada lebar 1440, 1280, 1024, 768, dan 390 px. Lint dan pemeriksaan tipe TypeScript berhasil; halaman `/` dan `/monitor` merespons normal. Tidak ditemukan overflow horizontal pada halaman, dan navigasi kategori melalui sidebar serta tombol Home/End pada tab berfungsi. Bagian tren riwayat kini memakai satu grafik interaktif, ringkasan perubahan periode, dan rentang yang mengikuti cakupan data tiap instrumen. Uji penerimaan oleh pengguna masih terbuka.
 
-Alur **Laporan Harian** saat ini adalah header dan pilihan tampilan → tiga KPI utama dan dua KPI pendukung → insight dan implikasi praktis → indikator acuan → tiga grafik berukuran seimbang → pemilih delapan kategori dan tabel terpilih → unduh PDF → footer. Tampilan **Monitor Pasar** tersedia pada `/monitor`. Tiga sorotan awal tampil terbuka; sorotan tambahan dan implikasi praktis tersedia melalui bagian yang dapat dibuka.
+Alur **Laporan Harian** saat ini adalah header dan pilihan tampilan → tiga KPI utama dan dua KPI pendukung → insight dan implikasi praktis → indikator acuan → satu grafik penuh dengan pilihan USD/IDR, IHSG, dan SBN 10Y → pemilih delapan kategori dan tabel terpilih → unduh PDF → footer. Tampilan **Monitor Pasar** tersedia pada `/monitor`. Tiga sorotan awal tampil terbuka; sorotan tambahan dan implikasi praktis tersedia melalui bagian yang dapat dibuka.
 
-Dasar tampilan sudah sesuai untuk laporan harian. Penataan KPI, kategori, navigasi, grafik, dan pemisahan halaman live telah diterapkan pada frontend. Penerimaan visual responsif, operasi keyboard di seluruh navigasi, serta peninjauan oleh pengguna masih perlu diselesaikan.
+Dasar tampilan sudah sesuai untuk laporan harian. Penataan KPI, kategori, navigasi, grafik, dan pemisahan halaman live telah diterapkan pada frontend. Pemeriksaan browser memastikan halaman tidak meluber pada kelima ukuran; grafik riwayat memakai satu panel penuh, dengan tinggi yang menyesuaikan layar. Tab instrumen dan rentang data berfungsi, termasuk menonaktifkan rentang yang belum tercakup histori. Tab kategori dan tabel yang lebih lebar memakai scroll lokal pada ponsel. Status data live berhasil dimuat pada `/monitor`. Peninjauan dan penerimaan akhir oleh pengguna masih perlu dilakukan.
 
 ### Struktur yang diterapkan dan sasaran lanjutan
 
@@ -235,7 +235,7 @@ Urutan area **Laporan Harian**:
 2. KPI utama: USD/IDR, IHSG, dan SBN 10Y. UST 10Y dan emas Antam tersedia sebagai indikator pendukung dengan bobot visual lebih rendah.
 3. Ringkasan pasar dan tiga insight utama; sorotan tambahan serta implikasi praktis dapat dibuka sesuai kebutuhan.
 4. Indikator acuan ringkas: BI Rate, INDONIA, dan spread SBN–UST, tanpa mengulang uraian lengkap tabel makro.
-5. Grafik historis USD/IDR, IHSG, dan SBN 10Y.
+5. Satu grafik historis penuh dengan pilihan USD/IDR, IHSG, dan SBN 10Y. Nilai terakhir, perubahan pada rentang terpilih, tanggal observasi terakhir, dan jumlah titik ditampilkan bersama grafik.
 6. Tab kategori dan satu tabel detail terpilih dari delapan kategori pasar. Sidebar mengelompokkan ringkasan, analisis, data pasar, dan ekspor; submenu kategori menyediakan tautan langsung.
 7. Area unduh PDF di bawah laporan.
 8. Footer ringkas.
@@ -248,7 +248,7 @@ Pedoman pengembangan:
 
 - Hapus section, tautan navigasi, dan kolom Sumber/Glosarium dari dashboard. Simpan metadata sumber di backend untuk penelusuran dan pengendalian kualitas; bila artikel dijadikan dasar insight, tautan kontekstual dapat melekat pada insight tersebut.
 - Dashboard menampilkan tiga sorotan awal dan dampak praktis. Label periode (DtD, WtD, MtD, QtD, YtD, MoM, YoY) serta satuan dijelaskan langsung pada judul kolom atau tooltip singkat.
-- Tiga grafik memakai ukuran setara: tiga kolom pada layar lebar, dua kolom pada tablet, dan satu kolom pada ponsel. Validasi visual pada semua ukuran tersebut masih menunggu pemeriksaan browser.
+- Satu grafik riwayat memakai area penuh agar garis dan label mudah dibaca. Pilihan rentang awal satu bulan; pilihan tiga bulan, enam bulan, dan semua data dinonaktifkan bila cakupan seri aktif belum cukup. Perubahan historis diberi label periode tersendiri dan tidak disamakan dengan DtD pada KPI.
 - Tab kategori membuat satu tabel aktif dalam satu waktu. Semua kategori dapat diakses dari pemilih dan submenu navigasi; tautan langsung membuka kategori terkait. Tabel lebar memakai scroll horizontal dengan kolom instrumen tetap terlihat.
 - Navigasi dikelompokkan menjadi **Ringkasan**, **Analisis & Grafik**, **Data Pasar**, dan **Unduh PDF**. Kategori berada pada submenu Data Pasar. Login serta refresh operator tetap diakses melalui tombol **Pengelolaan** di header.
 - Tiga KPI utama dan dua indikator pendukung mempertahankan kelima instrumen tanpa menambah KPI demi mengisi grid. Pada tablet kartu ketiga memenuhi baris; pada ponsel susunan berubah mengikuti lebar layar.
@@ -270,10 +270,10 @@ Pada frontend baru, komponen ringkasan, kartu indikator, tabel, grafik, status d
 | Tahap | Fokus | Status |
 |---|---|---|
 | 1 | Hierarki KPI, pemilih kategori, dan kelompok navigasi | Diterapkan; lint dan pemeriksaan TypeScript berhasil |
-| 2 | Pemisahan Laporan Harian dan Monitor Pasar, indikator acuan ringkas, serta grafik seimbang | Diterapkan; kedua route merespons pada server lokal |
-| 3 | Keterbacaan tabel, label periode/tanggal, dan konsistensi tema | Label dan aturan responsif diterapkan; penerimaan visual desktop/ponsel dan pengujian keyboard masih tertunda |
+| 2 | Pemisahan Laporan Harian dan Monitor Pasar, indikator acuan ringkas, serta grafik riwayat interaktif | Diterapkan; kedua route merespons pada server lokal |
+| 3 | Keterbacaan tabel, label periode/tanggal, dan konsistensi tema | Lint, pemeriksaan tipe, browser lima ukuran, deep link kategori, serta tombol Home/End lulus; penerimaan akhir pengguna masih terbuka |
 
-Penerimaan visual akhir mencakup pemeriksaan browser pada lebar 1440, 1280, 1024, 768, dan 390 px. Halaman tidak meluber horizontal; scroll horizontal terbatas pada tabel dan navigasi kategori di layar kecil. Grafik, nama instrumen, angka KPI, dan kontrol kategori tidak terpotong. Pemilih tab mendukung tombol panah, Home, dan End; kedua tampilan serta menu kategori dapat dijangkau dengan keyboard.
+Pemeriksaan browser dilakukan pada lebar 1440, 1280, 1024, 768, dan 390 px. Halaman tidak meluber horizontal; scroll horizontal terbatas pada tabel dan navigasi kategori di layar kecil. Grafik, nama instrumen, angka KPI, dan kontrol kategori terlihat pada seluruh ukuran yang diperiksa. Deep link sidebar memilih kategori yang benar; pemilih tab mendukung tombol panah, Home, dan End. Route `/monitor` juga memuat harga live. Penerimaan akhir oleh pengguna tetap menjadi langkah tersendiri.
 
 ## 10. Arsitektur dan struktur proyek
 
@@ -406,7 +406,7 @@ Urutan ini melengkapi roadmap migrasi di atas. Perluasan kategori dilakukan sete
 | E. Agenda dan insight | Ambil agenda ekonomi dan berita yang relevan, lalu tautkan ke instrumen serta periode | Belum diimplementasikan; insight saat ini belum ditopang adapter berita/kalender baru |
 | F. Dashboard | Hilangkan panel Sumber/Glosarium; tampilkan delapan kategori, label periode, tooltip, dan status data kosong | Diterapkan; beberapa kategori masih dominan kosong sampai adapter tersedia |
 | G. Konsistensi kanal | Selaraskan KPI, grafik, PDF satu halaman, API, dan validasi penerbitan | Kontrak API/dashboard diperluas dan PDF lama tetap memakai field kompatibel; tabel kategori baru belum seluruhnya masuk PDF |
-| H. Penataan dashboard | Terapkan hierarki KPI, pemilih kategori, kelompok navigasi, pemisahan monitor live, dan keterbacaan tabel/grafik | Penataan awal diterapkan pada frontend; penerimaan visual lintas ukuran layar dan peninjauan pengguna masih perlu dilakukan |
+| H. Penataan dashboard | Terapkan hierarki KPI, pemilih kategori, kelompok navigasi, pemisahan monitor live, dan keterbacaan tabel/grafik | Diterapkan; lintas lima ukuran layar dan navigasi keyboard diperiksa di browser. Peninjauan akhir oleh pengguna masih terbuka |
 
 Nilai harga dan indeks dibulatkan pada tampilan sesuai preferensi produk; yield dan persentase mempertahankan desimal yang bermakna. Angka mentah tidak dibulatkan sebelum perhitungan. Sumber aktual dan waktu observasi dapat berbeda per instrumen, sehingga satu tanggal global tidak menggantikan tanggal per baris.
 

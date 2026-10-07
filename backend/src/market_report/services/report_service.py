@@ -114,6 +114,106 @@ def _index_sector_history(snapshot: dict) -> dict[str, list[dict]]:
     }
 
 
+def _gold_spot_history(snapshot: dict) -> list[dict]:
+    """Carry dated Gold Spot reference closes across report versions for YtD."""
+    from market_report.services.history_service import MAX_HISTORY_POINTS, source_date_iso
+
+    observations: dict[str, float] = {}
+
+    def add(raw_date, value):
+        if not _valid_price(value):
+            return
+        day = source_date_iso(raw_date)
+        if day:
+            observations[day] = float(value)
+
+    reports = list_report_versions(limit=MAX_HISTORY_POINTS)
+    active = load_report()
+    active_id = active.get("report_id") if isinstance(active, dict) else None
+    if isinstance(active, dict) and not any(item.get("report_id") == active_id for item in reports):
+        reports.append(active)
+
+    for report in reports:
+        source_snapshot = report.get("_source_snapshot")
+        source_snapshot = source_snapshot if isinstance(source_snapshot, dict) else {}
+        for history in (report.get("_gold_spot_history"), source_snapshot.get("_gold_spot_history")):
+            for point in history if isinstance(history, list) else []:
+                if isinstance(point, dict):
+                    add(point.get("date") or point.get("dates"), point.get("close"))
+
+        source_market = source_snapshot.get("yfinance")
+        source_market = source_market if isinstance(source_market, dict) else {}
+        source_reading = source_market.get("GOLD_SPOT")
+        if isinstance(source_reading, dict):
+            add(source_reading.get("date"), source_reading.get("last"))
+
+        report_gold = report.get("gold")
+        report_gold = report_gold if isinstance(report_gold, dict) else {}
+        reading = report_gold.get("Gold Spot (USD/troy oz)")
+        if isinstance(reading, dict):
+            add(reading.get("date"), reading.get("today"))
+
+    market = snapshot.get("yfinance")
+    market = market if isinstance(market, dict) else {}
+    current = market.get("GOLD_SPOT")
+    if isinstance(current, dict):
+        add(current.get("date"), current.get("last"))
+
+    return [
+        {"date": day, "close": close}
+        for day, close in sorted(observations.items())[-MAX_HISTORY_POINTS:]
+    ]
+
+
+def _latest_saved_gold_spot_observation() -> dict | None:
+    """Find the most recent valid Gold Spot observation for feed-outage fallback."""
+    from market_report.services.history_service import source_date_iso
+
+    reports = list_report_versions(limit=420)
+    active = load_report()
+    if isinstance(active, dict) and not any(
+        item.get("report_id") == active.get("report_id") for item in reports
+    ):
+        reports.append(active)
+
+    candidates: list[tuple[str, dict]] = []
+    for report in reports:
+        source_snapshot = report.get("_source_snapshot")
+        source_snapshot = source_snapshot if isinstance(source_snapshot, dict) else {}
+        source_market = source_snapshot.get("yfinance")
+        source_market = source_market if isinstance(source_market, dict) else {}
+        source_reading = source_market.get("GOLD_SPOT")
+        if isinstance(source_reading, dict):
+            day = source_date_iso(source_reading.get("date"))
+            if day and _valid_price(source_reading.get("last")):
+                candidates.append((day, {
+                    **source_reading,
+                    "date": day,
+                    "last": float(source_reading["last"]),
+                }))
+
+        report_gold = report.get("gold")
+        report_gold = report_gold if isinstance(report_gold, dict) else {}
+        reading = report_gold.get("Gold Spot (USD/troy oz)")
+        if isinstance(reading, dict):
+            day = source_date_iso(reading.get("date"))
+            if day and _valid_price(reading.get("today")):
+                candidates.append((day, {
+                    "last": float(reading["today"]),
+                    "prev": reading.get("prev"),
+                    "dtd_pct": reading.get("dtd_pct", reading.get("change_pct")),
+                    "prev_date": reading.get("prev_date"),
+                    "date": day,
+                    "unit": reading.get("unit", "USD/troy oz"),
+                    "source": reading.get("source"),
+                    "source_name": reading.get("source_name", "Trading Economics"),
+                }))
+
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: item[0])[1]
+
+
 def _saved_antam_observation(report: dict) -> dict | None:
     """Ambil observasi Antam terakhir yang tersimpan pada versi laporan."""
     from market_report.services.history_service import source_date_iso
@@ -253,7 +353,7 @@ def validate_report(report: dict) -> None:
     if jumlah < 2:
         raise RuntimeError(
             "Data pasar terbaru tidak cukup (kurang dari 2 instrumen berhasil dibaca). "
-            "Laporan sebelumnya tetap dipakai; coba perbarui lagi nanti."
+            "Laporan sebelumnya tetap dipakai. Coba perbarui lagi nanti."
         )
 
 
@@ -269,6 +369,8 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
         report["_sbn_history"] = snapshot["_sbn_history"]
     if isinstance(snapshot.get("_antam_gold_history"), list):
         report["_antam_gold_history"] = snapshot["_antam_gold_history"]
+    if isinstance(snapshot.get("_gold_spot_history"), list):
+        report["_gold_spot_history"] = snapshot["_gold_spot_history"]
     if report_id:
         report["report_id"] = report_id
     validate_report(report)
@@ -295,6 +397,25 @@ def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -
     from market_report.calculate import build_report_data
     from market_report.domain.market_analysis import market_facts
     from market_report.services.history_service import load_sbn_history, record_sbn_history
+
+    market = snapshot.get("yfinance")
+    if not isinstance(market, dict):
+        market = {}
+        snapshot["yfinance"] = market
+    gold_spot = market.get("GOLD_SPOT")
+    if not isinstance(gold_spot, dict) or not _valid_price(gold_spot.get("last")):
+        last_gold_spot = _latest_saved_gold_spot_observation()
+        if last_gold_spot:
+            fetch_error = gold_spot.get("error") if isinstance(gold_spot, dict) else None
+            last_gold_spot["availability"] = "stale"
+            if fetch_error:
+                last_gold_spot["fetch_error"] = str(fetch_error)
+            last_gold_spot["availability_note"] = (
+                f"Feed Gold Spot belum berhasil diperbarui. Menampilkan observasi "
+                f"Trading Economics per {last_gold_spot['date']}."
+            )
+            market["GOLD_SPOT"] = last_gold_spot
+    snapshot["_gold_spot_history"] = _gold_spot_history(snapshot)
 
     antam = snapshot.get("antam_gold")
     if not isinstance(antam, dict) or not _valid_price(antam.get("price")):

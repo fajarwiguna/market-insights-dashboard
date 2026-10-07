@@ -140,7 +140,7 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "date": fx_backup.get("time_last_update_utc"),
                 "unit": "IDR/SAR",
                 "availability": "partial",
-                "availability_note": "Nilai turunan tersedia; histori pembanding belum tersedia.",
+                "availability_note": "Nilai turunan tersedia. Histori pembanding belum tersedia.",
                 "source": "Derived from open.er-api.com (USD/IDR ÷ USD/SAR)",
             }
         except Exception:
@@ -410,10 +410,50 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
         if label not in commodities:
             note = item.get("error") or "Harga belum tersedia dari feed yang terhubung."
             commodities[label] = _unavailable_reading(unit, note)
-    commodities.setdefault("Gold Spot (USD/troy oz)", _unavailable_reading("USD/troy oz", "Feed spot belum tersedia; GC=F adalah futures."))
-
+    spot = yf.get("GOLD_SPOT", {})
+    spot_reading = _unavailable_reading(
+        "USD/troy oz",
+        (spot.get("error") if isinstance(spot, dict) else None)
+        or "Harga Gold Spot belum tersedia dari Trading Economics.",
+    )
+    if isinstance(spot, dict) and isinstance(spot.get("last"), (int, float)) \
+            and not isinstance(spot.get("last"), bool) and math.isfinite(spot["last"]):
+        spot_history = snap.get("_gold_spot_history")
+        if not isinstance(spot_history, list):
+            spot_history = spot.get("history") if isinstance(spot.get("history"), list) else []
+        spot_periods = period_changes(spot_history, spot.get("date"), spot.get("last"))
+        spot_prev = spot.get("prev")
+        if not isinstance(spot_prev, (int, float)) or isinstance(spot_prev, bool) or not math.isfinite(spot_prev):
+            daily_change = spot.get("change")
+            spot_prev = spot["last"] - daily_change if isinstance(daily_change, (int, float)) else None
+        prev_date = spot.get("prev_date")
+        history_prev_date = spot_periods.get("prev_date")
+        if not prev_date and history_prev_date and isinstance(spot_prev, (int, float)):
+            history_prev = next((
+                point.get("close") for point in spot_history
+                if isinstance(point, dict)
+                and str(point.get("date") or point.get("dates") or "")[:10] == history_prev_date
+            ), None)
+            if isinstance(history_prev, (int, float)) and math.isclose(
+                float(history_prev), float(spot_prev), rel_tol=0, abs_tol=0.005,
+            ):
+                prev_date = history_prev_date
+        spot_reading = {
+            "today": spot["last"],
+            "prev": spot_prev,
+            "dtd_pct": spot.get("dtd_pct"),
+            "change_pct": spot.get("dtd_pct"),
+            "ytd_pct": spot_periods.get("ytd_pct"),
+            "prev_date": prev_date,
+            "date": spot.get("date"),
+            "unit": spot.get("unit", "USD/troy oz"),
+            "source": spot.get("source"),
+            "source_name": spot.get("source_name", "Trading Economics"),
+            "availability": spot.get("availability", "partial"),
+            "availability_note": spot.get("availability_note"),
+        }
     gold = {
-        "Gold Spot (USD/troy oz)": commodities["Gold Spot (USD/troy oz)"],
+        "Gold Spot (USD/troy oz)": spot_reading,
     }
     if "Gold (USD/oz)" in commodities:
         gold["Gold Futures COMEX (GC=F, USD/troy oz)"] = commodities["Gold (USD/oz)"]
@@ -572,6 +612,14 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
             for k, v in commodities.items()
         ],
         "primary": "Yahoo Finance Chart API — GC=F, CL=F, BZ=F",
+    })
+    sources.append({
+        "section": "Gold Spot",
+        "primary": spot.get("source_name", "Trading Economics") if isinstance(spot, dict) else "Trading Economics",
+        "url": spot.get("source") if isinstance(spot, dict) else None,
+        "as_of_date": spot.get("date") if isinstance(spot, dict) else None,
+        "availability": spot.get("availability", "unavailable") if isinstance(spot, dict) else "unavailable",
+        "note": spot.get("availability_note") or spot.get("error") if isinstance(spot, dict) else None,
     })
 
     sources.append({
