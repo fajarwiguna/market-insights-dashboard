@@ -31,8 +31,8 @@ function LineChart({ series, range }: { series: Series; range: Range }) {
 
   if (data.length < 2) return <div className="chart-empty">Riwayat belum cukup untuk menampilkan grafik.</div>;
 
-  const width = series.id === "sbn-10y" ? 900 : 520;
-  const height = 230;
+  const width = 440;
+  const height = 220;
   const left = 85;
   const right = 14;
   const top = 18;
@@ -83,7 +83,7 @@ export function HistoryCharts({ histories }: { histories: Record<string, History
           {ranges.map((item) => <button type="button" key={item.id} onClick={() => setRange(item.id)} aria-pressed={range === item.id} className={range === item.id ? "selected" : ""}>{item.label}</button>)}
         </div>
       </div>
-      <div className="history-grid">{series.map((item) => <article className={`history-card${item.id === "sbn-10y" ? " history-card-featured" : ""}`} key={item.id}>
+      <div className="history-grid">{series.map((item) => <article className="history-card" key={item.id}>
         <div className="history-card-heading"><h3>{item.title}</h3><span>{item.points.length ? `${item.points.length} observasi` : "Riwayat terbatas"}</span></div>
         <LineChart series={item} range={range} />
         <p className="chart-caption">Sumber riwayat laporan · tanggal mengikuti data yang tersedia.</p>

@@ -2,12 +2,13 @@ import type { HistoryPoint, InstrumentReading, MarketReport } from "@/lib/api/ty
 import { StatusPill } from "@/components/status-pill";
 import { AppearanceControls } from "@/components/appearance-controls";
 import { ExportReportButton } from "@/components/export-report-button";
+import { DashboardViewSwitcher } from "@/features/dashboard/dashboard-view-switcher";
 import { HistoryCharts } from "@/features/dashboard/history-charts";
-import { LiveMarketMonitor } from "@/features/dashboard/live-market-monitor";
 import { OperatorMenu } from "@/components/operator-menu";
 import { DashboardNav } from "@/features/dashboard/dashboard-nav";
 import { ReloadPageButton } from "@/components/reload-page-button";
-import { MARKET_GROUPS, MarketDataSections } from "@/features/dashboard/market-data-sections";
+import { MARKET_GROUPS } from "@/features/dashboard/market-groups";
+import { MarketDataSections } from "@/features/dashboard/market-data-sections";
 
 type MarketMetricSection = "fx" | "indices" | "yields" | "commodities";
 
@@ -53,19 +54,20 @@ function formatPublishedAt(value: unknown): string {
   }).format(date) + " WIB";
 }
 
-function MetricCard({ title, metric, section }: {
+function MetricCard({ title, metric, section, variant = "primary" }: {
   title: string;
   metric: [string, InstrumentReading] | null;
   section: MarketMetricSection;
+  variant?: "primary" | "supporting";
 }) {
   const [name, reading]: [string, InstrumentReading] = metric ?? ["Data belum tersedia", {}];
   return (
-    <article className="metric-card">
-      <div className="metric-heading"><span>{title}</span><span>DtD</span></div>
+    <article className={`metric-card metric-card-${variant}`}>
+      <div className="metric-heading"><span>{title}</span></div>
       <p className="metric-name">{name}</p>
       <p className="metric-value">{formatValue(reading.today, section)}</p>
       <p className="metric-change">{formatChange(reading)}</p>
-      <p className="metric-date">{reading.availability === "stale" ? "Terakhir tersedia · " : reading.availability === "partial" ? "Sumber alternatif · " : "Tanggal data · "}{reading.date || "tidak tersedia"}</p>
+      <p className="metric-date">Observasi {reading.date || "tidak tersedia"}</p>
     </article>
   );
 }
@@ -129,22 +131,26 @@ function ReportInsights({ report }: { report: MarketReport }) {
 }
 
 export function Dashboard({ report, histories = {} }: { report: MarketReport; histories?: Record<string, HistoryPoint[]> }) {
-  const featured = [
+  const primaryMetrics = [
     { title: "Rupiah", section: "fx" as const, fragments: ["USD/IDR"] },
     { title: "IHSG", section: "indices" as const, fragments: ["IHSG"] },
     { title: "SBN 10Y", section: "yields" as const, fragments: ["ID SBN 10 Tahun", "ID SBN 10Y"] },
+  ];
+  const supportingMetrics = [
     { title: "UST 10Y", section: "yields" as const, fragments: ["US Treasury 10 Tahun", "US Treasury 10Y"] },
     { title: "Emas Antam", section: "commodities" as const, fragments: ["Emas Antam"] },
   ];
   const published = report.published_at || report.generated_at;
   const navigation = [
-    { id: "overview", label: "Ringkasan", icon: "◫" },
-    { id: "references", label: "Indikator acuan", icon: "⌁" },
-    { id: "insights", label: "Insight", icon: "✳" },
-    { id: "impacts", label: "Dampak", icon: "⌁" },
-    ...(!report.is_demo ? [{ id: "history", label: "Grafik historis", icon: "⌁" }] : []),
-    ...MARKET_GROUPS.map((group) => ({ id: group.id, label: group.title, icon: "◦" })),
-    ...(!report.is_demo ? [{ id: "live", label: "Monitor live", icon: "◉" }] : []),
+    { label: "RINGKASAN", items: [{ id: "overview", label: "Ringkasan" }] },
+    { label: "ANALISIS & GRAFIK", items: [
+        { id: "insights", label: "Insight" },
+        { id: "impacts", label: "Implikasi praktis" },
+        { id: "references", label: "Indikator acuan" },
+      ...(!report.is_demo ? [{ id: "history", label: "Grafik historis" }] : []),
+      ] },
+    { label: "DATA PASAR", items: [{ id: "market-data", label: "Semua data" }], categories: MARKET_GROUPS.map((group) => ({ id: group.id, label: group.title, categoryId: group.id })) },
+    { label: "UNDUH PDF", items: [{ id: "export", label: "Unduh PDF" }] },
   ];
 
   return (
@@ -154,14 +160,14 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
           <span className="brand-mark">M</span><span>market<span className="brand-light">today</span></span>
         </a>
         <p className="sidebar-label">JELAJAHI PASAR</p>
-        <DashboardNav items={navigation} />
+        <DashboardNav groups={navigation} />
         <div className="sidebar-bottom"><span className="sidebar-orb" />
           <p>Daily Market Report</p><small>Informasi pasar harian</small>
         </div>
       </aside>
 
       <main className="main-content" id="overview">
-        <header className="topbar"><span>DAILY MARKET INTELLIGENCE</span><div className="topbar-actions"><StatusPill demo={report.is_demo} /><AppearanceControls />{!report.is_demo && <OperatorMenu />}</div></header>
+        <header className="topbar"><span>DAILY MARKET INTELLIGENCE</span><div className="topbar-actions"><DashboardViewSwitcher active="daily" /><StatusPill demo={report.is_demo} /><AppearanceControls />{!report.is_demo && <OperatorMenu />}</div></header>
         <section className="page-intro">
           <div><p className="eyebrow">PASAR KEUANGAN · INDONESIA & GLOBAL</p>
             <h1>Market <span>Today</span></h1>
@@ -171,17 +177,21 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
             <small>Dipublikasikan {formatPublishedAt(published)}</small></div>
         </section>
 
-        <section className="metrics-grid" aria-label="Angka utama">
-          {featured.map((item) => <MetricCard key={item.title} title={item.title} section={item.section} metric={findMetric(report, item.section, item.fragments)} />)}
+        <section className="metrics-area" aria-label="Indikator utama dan pendukung">
+          <div className="primary-metrics" aria-label="Indikator utama">
+            {primaryMetrics.map((item) => <MetricCard key={item.title} title={item.title} section={item.section} metric={findMetric(report, item.section, item.fragments)} />)}
+          </div>
+          <div className="supporting-metrics" aria-label="Indikator pendukung">
+            {supportingMetrics.map((item) => <MetricCard key={item.title} title={item.title} variant="supporting" section={item.section} metric={findMetric(report, item.section, item.fragments)} />)}
+          </div>
         </section>
 
-        <MarketReferences report={report} />
         <ReportInsights report={report} />
+        <MarketReferences report={report} />
         {!report.is_demo && <HistoryCharts histories={histories} />}
         <MarketDataSections report={report} />
-        {!report.is_demo && <LiveMarketMonitor report={report} />}
 
-        <section className="bottom-export" aria-label="Unduh laporan">
+        <section className="bottom-export" id="export" aria-label="Unduh laporan">
           <div className="bottom-export-copy">
             <p className="eyebrow">EKSPOR LAPORAN</p>
             <h2>Unduh laporan PDF</h2>

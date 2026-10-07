@@ -1,19 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { KeyboardEvent } from "react";
 import type { InstrumentReading, MarketReport } from "@/lib/api/types";
-
-type CategoryId = "fx" | "gold" | "capital-flow" | "yields" | "macro" | "monetary-operations" | "indices" | "commodities";
+import { MARKET_GROUPS, type CategoryId, type MarketGroup } from "@/features/dashboard/market-groups";
 type Column = { key: string; label: string; kind: "value" | "percent" | "basis-points" | "date" | "unit" | "month"; title?: string };
-type MarketGroup = { id: CategoryId; label: string; title: string; description: string; kind: "close" | "gold" | "flow" | "yield" | "macro" | "operation" | "index" | "commodity" };
-
-export const MARKET_GROUPS: MarketGroup[] = [
-  { id: "fx", label: "01 / VALUTA", title: "Kurs", description: "Nilai penutupan tiap instrumen; tanggal pembanding mengikuti kalender sumber.", kind: "close" },
-  { id: "gold", label: "02 / EMAS", title: "Harga Emas", description: "Gold Spot, futures sebagai seri terpisah, dan harga dasar Antam 1 gram.", kind: "gold" },
-  { id: "capital-flow", label: "03 / ARUS MODAL", title: "Capital Flow", description: "Arus bersih saham dan obligasi dalam USD juta.", kind: "flow" },
-  { id: "yields", label: "04 / FIXED INCOME", title: "Bond Yield", description: "Perubahan yield ditampilkan dalam basis point; 1 bp = 0,01 poin persentase.", kind: "yield" },
-  { id: "macro", label: "05 / MAKRO", title: "Indicators", description: "Nilai indikator berdasarkan bulan publikasi, bukan perubahan bulanan.", kind: "macro" },
-  { id: "monetary-operations", label: "06 / LIKUIDITAS", title: "Operasi Moneter", description: "Posisi akhir periode dari SEKI BI; frekuensi bulanan dan tanggal mengikuti observasi terbaru.", kind: "operation" },
-  { id: "indices", label: "07 / EQUITIES", title: "Index", description: "IHSG, indeks global, dan sektor IDX-IC.", kind: "index" },
-  { id: "commodities", label: "08 / KOMODITAS", title: "Commodity", description: "Harga, unit kontrak, dan perubahan lintas periode.", kind: "commodity" },
-];
 
 const SECTORS = [
   "Energi", "Bahan Baku", "Industri", "Konsumen Siklikal", "Konsumen Non-Siklikal",
@@ -159,14 +150,14 @@ function columnsFor(group: MarketGroup, months: { key: string; label: string }[]
     { key: "today", label: "Terakhir (%)", kind: "value" },
     { key: "dtd_bp", label: "DtD (bp)", kind: "basis-points", title: "Perubahan yield dari observasi sebelumnya; 1 bp = 0,01 poin persentase." },
     { key: "ytd_bp", label: "YtD (bp)", kind: "basis-points", title: "Perubahan yield sejak akhir tahun sebelumnya." },
-    { key: "date", label: "Tanggal data", kind: "date" },
+    { key: "date", label: "Tanggal (pembanding → terakhir)", kind: "date" },
   ];
   if (group.kind === "macro") return months.map((month): Column => ({ key: month.key, label: month.label, kind: "month", title: `Observasi bulan ${month.label}.` }));
   if (group.kind === "operation") return [
     { key: "today", label: "Terakhir (Rp T)", kind: "value" },
-    { key: "mtd_pct", label: "MtD (%)", kind: "percent", title: "Perubahan dari penutupan/posisi terakhir sebelum bulan berjalan." },
+    { key: "mtd_pct", label: "MoM (%)", kind: "percent", title: "Perubahan posisi akhir bulan terbaru dibandingkan posisi akhir bulan sebelumnya." },
     { key: "ytd_pct", label: "YtD (%)", kind: "percent", title: "Perubahan dari penutupan/posisi terakhir sebelum tahun berjalan." },
-    { key: "date", label: "Tanggal data", kind: "date" },
+    { key: "date", label: "Tanggal (pembanding → terakhir)", kind: "date" },
   ];
   if (group.kind === "commodity") return [
     { key: "unit", label: "Unit", kind: "unit" },
@@ -175,14 +166,14 @@ function columnsFor(group: MarketGroup, months: { key: string; label: string }[]
     { key: "wtd_pct", label: "WtD (%)", kind: "percent", title: "Perubahan dibanding penutupan terakhir sebelum minggu berjalan." },
     { key: "mtd_pct", label: "MtD (%)", kind: "percent", title: "Perubahan dibanding penutupan terakhir sebelum bulan berjalan." },
     { key: "ytd_pct", label: "YtD (%)", kind: "percent", title: "Perubahan dibanding penutupan terakhir sebelum tahun berjalan." },
-    { key: "date", label: "Tanggal data", kind: "date" },
+    { key: "date", label: "Tanggal (pembanding → terakhir)", kind: "date" },
   ];
   return [
     { key: "prev", label: "Sebelumnya", kind: "value" },
     { key: "today", label: "Terakhir", kind: "value" },
     { key: "dtd_pct", label: "DtD (%)", kind: "percent", title: "Perubahan dibanding penutupan sesi sebelumnya." },
     { key: "ytd_pct", label: "YtD (%)", kind: "percent", title: "Perubahan dibanding penutupan terakhir sebelum tahun berjalan." },
-    { key: "date", label: "Tanggal data", kind: "date" },
+    { key: "date", label: "Tanggal (pembanding → terakhir)", kind: "date" },
   ];
 }
 
@@ -223,35 +214,92 @@ function rowHasData(reading: InstrumentReading): boolean {
 
 export function MarketDataSections({ report }: { report: MarketReport }) {
   const months = recentMonths(report);
-  return <div className="market-sections">
-    {MARKET_GROUPS.map((group) => {
-      const rows = sectionRows(group, report);
-      const columns = columnsFor(group, months);
-      const withoutData = rows.filter(([, reading]) => !rowHasData(reading)).length;
-      const noticeRows = rows.filter(([, reading]) => reading.availability === "stale" || reading.availability === "partial");
-      return <section className="market-section" id={group.id} aria-labelledby={`${group.id}-heading`} key={group.id}>
-        <div className="section-heading">
-          <div><p className="eyebrow">{group.label}</p><h2 id={`${group.id}-heading`}>{group.title}</h2></div>
-          <p>{group.description}</p>
-        </div>
-        {noticeRows.map(([name, reading]) => <p className="data-availability-note" key={`${name}-source-note`} role="status">
-          {name}: {reading.availability_note || `Menampilkan observasi terakhir per ${reading.date || "tanggal tidak tersedia"}.`}
-        </p>)}
-        {withoutData > 0 && <p className="data-availability-note">
-          {withoutData === rows.length
-            ? "Seri belum tersedia dari sumber yang terhubung. Nilai tidak diisi dengan angka perkiraan."
-            : `${withoutData} seri belum memiliki data yang tervalidasi.`}
-        </p>}
-        <div className="table-scroll">
-          <table className={`market-table market-table-${group.kind}`}>
-            <thead><tr><th scope="col">Instrumen</th>{columns.map((column) => <th scope="col" key={column.key} title={column.title}>{column.label}</th>)}</tr></thead>
-            <tbody>{rows.map(([name, reading]) => <tr key={name}>
-              <th scope="row" className="sticky-instrument" title={reading.availability_note || undefined}>{name}</th>
-              {columns.map((column) => <td className={`${column.key === "today" ? "table-value " : ""}${column.kind !== "date" && column.kind !== "unit" ? "numeric-cell" : ""}`} key={column.key}>{cellValue(reading, column, group)}</td>)}
-            </tr>)}</tbody>
-          </table>
-        </div>
-      </section>;
-    })}
-  </div>;
+  const [selectedId, setSelectedId] = useState<CategoryId>("fx");
+  const selectedGroup = MARKET_GROUPS.find((group) => group.id === selectedId) ?? MARKET_GROUPS[0];
+
+  useEffect(() => {
+    const selectFromHash = () => {
+      const id = window.location.hash.slice(1) as CategoryId;
+      if (MARKET_GROUPS.some((group) => group.id === id)) {
+        setSelectedId(id);
+        window.requestAnimationFrame(() => document.getElementById("market-data")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
+    };
+    const selectFromNavigation = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail as CategoryId;
+      if (!MARKET_GROUPS.some((group) => group.id === id)) return;
+      setSelectedId(id);
+      window.requestAnimationFrame(() => document.getElementById("market-data")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    };
+    window.addEventListener("hashchange", selectFromHash);
+    window.addEventListener("market-category-change", selectFromNavigation);
+    selectFromHash();
+    return () => {
+      window.removeEventListener("hashchange", selectFromHash);
+      window.removeEventListener("market-category-change", selectFromNavigation);
+    };
+  }, []);
+
+  const selectCategory = (id: CategoryId) => {
+    setSelectedId(id);
+    window.history.replaceState(null, "", `#${id}`);
+    window.dispatchEvent(new CustomEvent("market-category-selected", { detail: id }));
+  };
+
+  const handleTabKeys = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const current = MARKET_GROUPS.findIndex((group) => group.id === selectedId);
+    let next = current;
+    if (event.key === "ArrowRight") next = (current + 1) % MARKET_GROUPS.length;
+    else if (event.key === "ArrowLeft") next = (current - 1 + MARKET_GROUPS.length) % MARKET_GROUPS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = MARKET_GROUPS.length - 1;
+    else return;
+    event.preventDefault();
+    const group = MARKET_GROUPS[next];
+    selectCategory(group.id);
+    document.getElementById(`market-tab-${group.id}`)?.focus();
+  };
+
+  const rows = sectionRows(selectedGroup, report);
+  const columns = columnsFor(selectedGroup, months);
+  const withoutData = rows.filter(([, reading]) => !rowHasData(reading)).length;
+  const noticeRows = rows.filter(([, reading]) => reading.availability === "stale" || reading.availability === "partial");
+
+  return <section className="market-data-area" id="market-data" aria-labelledby="market-data-heading">
+    <div className="market-data-intro section-heading">
+      <div><p className="eyebrow">DATA TERPERINCI</p><h2 id="market-data-heading">Data Pasar</h2></div>
+      <p>Pilih kategori untuk melihat nilai, perubahan periode, dan tanggal observasinya.</p>
+    </div>
+    <div className="market-category-picker" role="tablist" aria-label="Kategori data pasar">
+      {MARKET_GROUPS.map((group) => <button id={`market-tab-${group.id}`} type="button" role="tab" key={group.id}
+        aria-selected={selectedId === group.id} aria-controls={group.id} tabIndex={selectedId === group.id ? 0 : -1}
+        className={selectedId === group.id ? "market-category-active" : ""}
+        onClick={() => selectCategory(group.id)} onKeyDown={handleTabKeys}>
+        <span>{group.label}</span><strong>{group.title}</strong>
+      </button>)}
+    </div>
+    <section className="market-section" id={selectedGroup.id} role="tabpanel" aria-labelledby={`market-tab-${selectedGroup.id}`} tabIndex={0}>
+      <div className="section-heading">
+        <div><p className="eyebrow">{selectedGroup.label}</p><h3>{selectedGroup.title}</h3></div>
+        <p>{selectedGroup.description}</p>
+      </div>
+      {noticeRows.map(([name, reading]) => <p className="data-availability-note" key={`${name}-source-note`} role="status">
+        {name}: {reading.availability_note || `Menampilkan observasi terakhir per ${reading.date || "tanggal tidak tersedia"}.`}
+      </p>)}
+      {withoutData > 0 && <p className="data-availability-note">
+        {withoutData === rows.length
+          ? "Seri belum tersedia dari sumber yang terhubung. Nilai tidak diisi dengan angka perkiraan."
+          : `${withoutData} seri belum memiliki data yang tervalidasi.`}
+      </p>}
+      <div className="table-scroll">
+        <table className={`market-table market-table-${selectedGroup.kind}`}>
+          <thead><tr><th scope="col">Instrumen</th>{columns.map((column) => <th className={column.kind !== "date" && column.kind !== "unit" ? "numeric-header" : ""} scope="col" key={column.key} title={column.title}>{column.label}</th>)}</tr></thead>
+          <tbody>{rows.map(([name, reading]) => <tr key={name}>
+            <th scope="row" className="sticky-instrument" title={reading.availability_note || undefined}>{name}</th>
+            {columns.map((column) => <td className={`${column.key === "today" ? "table-value " : ""}${column.kind !== "date" && column.kind !== "unit" ? "numeric-cell" : ""}`} key={column.key}>{cellValue(reading, column, selectedGroup)}</td>)}
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </section>
+  </section>;
 }
