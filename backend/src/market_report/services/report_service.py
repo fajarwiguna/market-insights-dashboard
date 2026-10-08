@@ -426,6 +426,13 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     # Repository menyimpan versi immutable, lalu mengganti laporan aktif atomik.
     report = _repository(report_path).publish(report)
 
+    if report_path is None and (report.get("equity_snapshot") or {}).get("status") == "partial":
+        from market_report.services.equity_snapshot_service import persist_equity_snapshot
+        try:
+            persist_equity_snapshot(report["equity_snapshot"])
+        except OSError:
+            _logger.exception("Gagal menyimpan salinan equity snapshot")
+
     # Snapshot terpisah hanya menjadi salinan diagnostik; UI membaca salinan
     # yang tertanam pada laporan aktif agar kedua tampilan memakai versi sama.
     try:

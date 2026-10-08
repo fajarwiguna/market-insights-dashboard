@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { DashboardViewSwitcher } from "@/features/dashboard/dashboard-view-switcher";
+import { formatDate, formatValue, isEquitySnapshot, mentionedTickers, stockRow, type EquitySnapshot } from "@/lib/equity-snapshot";
 import styles from "./snapshot.module.css";
 import "./tailwind.css";
 import "@fontsource/roboto/400.css";
@@ -13,72 +14,8 @@ import "@fontsource/roboto-condensed/700.css";
 import "@fontsource/roboto-condensed/400-italic.css";
 import "@fontsource/roboto-condensed/700-italic.css";
 
-// Defaults deliberately stay outside React state. Edits live only in the DOM and
-// disappear on refresh. Memoization keeps export/status renders from touching them.
-const indices = [
-  ["Dow Jones (US)", "53,686", "+1.18%"],
-  ["S&P 500 (US)", "7,748", "+1.06%"],
-  ["Nasdaq (US)", "26,584", "+1.40%"],
-  ["Nikkei 225 (Japan)", "65,021", "+1.26%"],
-  ["HSI (Hong Kong)", "25,651", "+1.74%"],
-  ["KLCI (Malaysia)", "1,708", "−0.41%"],
-  ["STI (Singapore)", "5,802", "+0.94%"],
-  ["JCI (Indonesia)", "6,636", "−0.47%"],
-  ["IDXFIN", "1,413", "−0.40%"],
-  ["IDXHEALTH", "1,518", "−0.70%"],
-  ["IDXBASIC", "1,817", "−0.41%"],
-  ["IDXENERGY", "3,372", "+0.22%"],
-  ["IDXINDUS", "1,678", "+0.18%"],
-  ["IDXNON-CYC", "722", "−1.07%"],
-  ["IDXCYCLIC", "986", "+0.19%"],
-  ["IDXPROPERT", "842", "−0.01%"],
-  ["IDXTECH", "7,125", "−0.76%"],
-  ["IDXINFRA", "1,912", "−0.30%"],
-  ["IDXTRANS", "1,825", "−1.09%"],
-];
-
-const leaders = [
-  ["NATO", "Olympus Strategic\nIndonesia Tbk PT", "1,265", "24.63", "3.03", "2.30 Mn"],
-  ["IMPC", "Impack Pratama\nIndustri Tbk PT", "1,500", "6.76", "2.88", "62.35 Mn"],
-  ["TINS", "Timah Tbk PT", "1,420", "8.07", "1.99", "101.72 Mn"],
-  ["EMAS", "Merdeka Gold\nResources Tbk PT", "8,675", "2.06", "1.64", "14.00 Mn"],
-  ["BUMI", "Bumi Resources Tbk PT", "210", "1.94", "1.48", "1,637.67 Mn"],
-  ["CUAN", "Petrindo Jaya Kreasi\nTbk PT", "940", "3.30", "1.45", "1,013.49 Mn"],
-  ["PTRO", "Petrosea Tbk PT", "5,375", "2.87", "0.97", "51.11 Mn"],
-  ["TLKM", "Telkom Indonesia\nPersero Tbk PT", "2,610", "0.38", "0.93", "84.92 Mn"],
-  ["FILM", "MD Entertainment\nTbk PT", "940", "14.63", "0.64", "102.83 Mn"],
-  ["MSIN", "MNC Digital\nEntertainment Tbk PT", "316", "3.95", "0.48", "154.31 Mn"],
-];
-
-const laggards = [
-  ["BBCA", "Bank Central Asia Tbk\nPT", "6,700", "−1.11", "−6.66", "93.84 Mn"],
-  ["ASII", "Astra International\nTbk PT", "4,900", "−2.97", "−6.14", "50.56 Mn"],
-  ["BMRI", "Bank Mandiri Persero\nTbk PT", "4,420", "−0.90", "−3.28", "95.08 Mn"],
-  ["VKTR", "Vktr Teknologi Mobilitas\nTbk PT", "865", "−5.46", "−3.09", "125.05 Mn"],
-  ["BBRI", "Bank Rakyat Indonesia\nPersero Tbk PT", "3,390", "−0.59", "−2.94", "151.92 Mn"],
-  ["BRMS", "Bumi Resources\nMinerals Tbk PT", "315", "−2.05", "−2.24", "185.82 Mn"],
-  ["AMMN", "Amman Mineral\nInternational PT", "4,390", "−0.90", "−1.69", "33.40 Mn"],
-  ["UNTR", "United Tractors Tbk PT", "26,975", "−0.23", "−1.04", "6.10 Mn"],
-  ["CPIN", "Charoen Pokphand\nIndonesia Tbk PT", "7,920", "−0.17", "−0.90", "246.70 Mn"],
-  ["CMRY", "Cisarua Mountain\nDairy Tbk PT", "4,570", "−3.38", "−0.89", "4.13 Mn"],
-];
-
-const flows = [
-  ["China", "30 Jun 2026", "", "", "13,045.10", "148,180.20", "166,057.90", "259,178.20"],
-  ["Indonesia", "03 Sep 2026", "60.70", "132.20", "156.70", "313.40", "−3,934.90", "−1,773.70"],
-  ["Japan", "28 Aug 2026", "", "223.60", "−3,243.30", "4,037.30", "57,046.40", "75,808.00"],
-  ["Malaysia", "03 Sep 2026", "−18.50", "−153.40", "−153.40", "−564.90", "−1,264.60", "−2,526.30"],
-  ["United States", "30 Jun 2026", "", "", "181,426.00", "425,622.00", "448,898.00", "919,452.00"],
-];
-
-const narratives = [
-  ["Pergerakan IHSG dan sikap investor", "IHSG turun 0,47% ke level 6.636. Aksi profit taking terjadi setelah penguatan 1,09% pada perdagangan sebelumnya. Investor bersikap wait and see menjelang rilis cadangan devisa Agustus, indeks kepercayaan konsumen, dan penjualan ritel Juli."],
-  ["Inflasi dan penyesuaian indeks", "Inflasi Agustus naik menjadi 3,19% YoY dari 2,88% pada Juli 2026. Potensi gangguan pasokan pangan akibat El Nino turut menjadi perhatian karena dapat mendorong harga komoditas pangan. Setelah MSCI berlaku efektif 1 September 2026, investor mencermati dampak rebalancing FTSE Russell pada 18–21 September 2026."],
-  ["Arus dana asing", "Pasar saham mencatat net foreign outflow IDR 317,01 Bn, berbalik dari net inflow IDR 1,11 Tn pada perdagangan sebelumnya."],
-  ["Pergerakan sektoral", "Hampir seluruh sektor melemah, kecuali energi, industrial, dan consumer cyclicals. Kenaikan batubara 3,70% MTD mendukung energi. BUMI (+1,98%), CUAN (+3,30%), dan PTRO (+2,87%) menjadi movers IHSG. Keuangan melemah setelah menguat enam hari berturut-turut. BBCA (−1,11%), BMRI (−0,90%), dan BBRI (−0,59%) menjadi laggards, dipengaruhi profit taking setelah penguatan signifikan sebelumnya."],
-];
-
 function tone(value: string) {
+  if (!/\d/.test(value)) return "";
   return /^[−-]/.test(value.trim()) ? styles.negative : styles.positive;
 }
 
@@ -118,7 +55,8 @@ function Editable({ children, className = "", numeric = false }: {
     onInput={numeric ? (event) => {
       const element = event.currentTarget;
       element.classList.remove(styles.positive, styles.negative);
-      if (element.textContent?.trim()) element.classList.add(tone(element.textContent));
+      const color = tone(element.textContent || "");
+      if (color) element.classList.add(color);
     } : undefined}
   >{children}</span>;
 }
@@ -160,14 +98,14 @@ function HeaderArt() {
   </svg>;
 }
 
-function MoversTable({ rows, negative = false }: { rows: string[][]; negative?: boolean }) {
+function MoversTable({ rows, discussed, negative = false }: { rows: string[][]; discussed: Set<string>; negative?: boolean }) {
   return <div>
     <h3 className={`${styles.moverTitle} ${negative ? styles.negative : styles.positive}`}><Editable>{negative ? "Market Laggards" : "Market Leaders"}</Editable></h3>
     <div className={styles.tableScroll}>
     <table className={`${styles.table} ${styles.moversTable}`} aria-label={negative ? "Market Laggards" : "Market Leaders"}>
       <colgroup>{[12.5, 34, 12, 11.5, 12, 18].map((width, i) => <col key={i} style={{ width: `${width}%` }} />)}</colgroup>
       <thead><tr>{["Ticker", "Company", "Price", "% Chg", "Points", "Volume"].map((label) => <th key={label}><Editable>{label}</Editable></th>)}</tr></thead>
-      <tbody>{rows.map((row) => <tr key={row[0]} className={["BUMI", "CUAN", "PTRO", "BBCA", "BMRI", "BBRI"].includes(row[0]) ? styles.highlight : ""}>
+      <tbody>{rows.map((row) => <tr key={row[0]} data-stock-ticker={row[0]} className={discussed.has(row[0]) ? styles.highlight : ""}>
         {row.map((value, i) => <td key={i}><Editable numeric={i === 3 || i === 4} className={i === 3 || i === 4 ? tone(value) : ""}>{value}</Editable></td>)}
       </tr>)}</tbody>
     </table>
@@ -175,20 +113,34 @@ function MoversTable({ rows, negative = false }: { rows: string[][]; negative?: 
   </div>;
 }
 
-const ReportContent = memo(function ReportContent() {
+const ReportContent = memo(function ReportContent({ snapshot }: { snapshot: EquitySnapshot }) {
+  const indices = snapshot.market_performance.map(row => [row.label, formatValue(row.level, 0), `${formatValue(row.change_pct, 2, true)}${row.change_pct == null ? "" : "%"}`]);
+  const leaders = snapshot.market_leaders.map(stockRow);
+  const laggards = snapshot.market_laggards.map(stockRow);
+  const narratives = snapshot.narratives.map(row => [row.title, row.text]);
+  const discussed = mentionedTickers(snapshot.narratives.map(row => row.text).join(" "), snapshot.stocks.map(row => row.ticker));
+  const flows = ["China", "Indonesia", "Japan", "Malaysia", "United States"].map(country => {
+    const row = snapshot.foreign_flow_rows.find(item => item.country === country);
+    return [country, formatDate(row?.date), ...[row?.daily, row?.wtd, row?.mtd, row?.qtd, row?.ytd, row?.["12m"]].map(value => formatValue(value))];
+  });
+  const foreignValue = snapshot.foreign_flow.net_idr != null
+    ? `IDR ${formatValue(Math.abs(snapshot.foreign_flow.net_idr) / 1e9, 2, false, "id-ID")} Bn`
+    : snapshot.foreign_flow.net_usd_mn != null ? `USD ${formatValue(Math.abs(snapshot.foreign_flow.net_usd_mn))} Mn` : "—";
+  const foreignSign = snapshot.foreign_flow.net_idr ?? snapshot.foreign_flow.net_usd_mn;
+  const foreignLabel = foreignSign == null ? "Net foreign flow" : foreignSign < 0 ? "Net foreign outflow" : "Net foreign inflow";
   return <>
     <header className={styles.header}>
       <HeaderArt />
       <p className={styles.eyebrow}><Editable>EQUITY RESEARCH</Editable></p>
       <h1><Editable>Equity Market Daily Snapshot</Editable></h1>
-      <p className={styles.date}><Editable>04 September 2026</Editable></p>
+      <p className={styles.date}><Editable>{formatDate(snapshot.report_date)}</Editable></p>
     </header>
     <div className={styles.reportBody}>
-      <p className={styles.headline}><Editable>IHSG terkoreksi, sektor energi tetap menguat</Editable></p>
+      <p className={styles.headline}><Editable>{snapshot.headline}</Editable></p>
       <section className={styles.metrics} aria-label="Ringkasan pasar">
-        <div className={styles.metric}><MarketIcon kind="index" /><div><p><Editable>IHSG</Editable></p><div className={styles.indexNumbers}><strong><Editable>6.636</Editable></strong><b><Editable numeric className={styles.negative}>−0,47%</Editable></b></div></div></div>
-        <div className={styles.metric}><MarketIcon kind="coins" /><div><p><Editable>Net foreign outflow</Editable></p><strong><Editable className={styles.negative}>IDR 317,01 Bn</Editable></strong></div></div>
-        <div className={styles.metric}><MarketIcon kind="coal" /><div><p><Editable>Batubara</Editable></p><strong><Editable numeric className={styles.positive}>+3,70% MTD</Editable></strong></div></div>
+        <div className={styles.metric}><MarketIcon kind="index" /><div><p><Editable>IHSG</Editable></p><div className={styles.indexNumbers}><strong><Editable>{formatValue(snapshot.ihsg.last, 0, false, "id-ID")}</Editable></strong><b><Editable numeric className={tone(formatValue(snapshot.ihsg.change_pct))}>{formatValue(snapshot.ihsg.change_pct, 2, true, "id-ID")}%</Editable></b></div></div></div>
+        <div className={styles.metric}><MarketIcon kind="coins" /><div><p><Editable>{foreignLabel}</Editable></p><strong><Editable className={foreignSign == null ? "" : foreignSign < 0 ? styles.negative : styles.positive}>{foreignValue}</Editable></strong></div></div>
+        <div className={styles.metric}><MarketIcon kind="coal" /><div><p><Editable>Batubara</Editable></p><strong><Editable numeric className={snapshot.coal.mtd_pct == null ? "" : tone(formatValue(snapshot.coal.mtd_pct))}>{snapshot.coal.mtd_pct == null ? "—" : `${formatValue(snapshot.coal.mtd_pct, 2, true, "id-ID")}% MTD`}</Editable></strong></div></div>
       </section>
       <SectionTitle>Daily Equity Market Performance</SectionTitle>
       <section className={styles.middle} aria-label="Performa dan narasi pasar">
@@ -196,13 +148,13 @@ const ReportContent = memo(function ReportContent() {
         <table className={`${styles.table} ${styles.indexTable}`} aria-label="Daily Equity Market Performance">
           <colgroup><col style={{ width: "48%" }} /><col style={{ width: "26%" }} /><col style={{ width: "26%" }} /></colgroup>
           <thead><tr>{["Index", "Level", "DTD %"].map((label) => <th key={label}><Editable>{label}</Editable></th>)}</tr></thead>
-          <tbody>{indices.map((row) => <tr key={row[0]}>{row.map((value, i) => <td key={i}><Editable numeric={i === 2} className={i === 2 ? tone(value) : ""}>{value}</Editable></td>)}</tr>)}</tbody>
+          <tbody>{indices.map((row, index) => <tr key={row[0]} title={`Tanggal data: ${formatDate(snapshot.market_performance[index].date)}`}>{row.map((value, i) => <td key={i}><Editable numeric={i === 2} className={i === 2 ? tone(value) : ""}>{value}</Editable></td>)}</tr>)}</tbody>
         </table>
         </div>
-        <div className={styles.narratives}>{narratives.map(([title, copy]) => <section key={title}><h3><Editable>{title}</Editable></h3><p><Editable>{copy}</Editable></p></section>)}</div>
+        <div className={styles.narratives}>{narratives.map(([title, copy]) => <section key={title} data-narrative><h3><Editable>{title}</Editable></h3><p><Editable>{copy}</Editable></p></section>)}</div>
       </section>
       <SectionTitle>JCI Market Movers</SectionTitle>
-      <section className={styles.movers} aria-label="JCI Market Movers"><MoversTable rows={leaders} /><MoversTable rows={laggards} negative /></section>
+      <section className={styles.movers} aria-label="JCI Market Movers"><MoversTable rows={leaders} discussed={discussed} /><MoversTable rows={laggards} discussed={discussed} negative /></section>
       <div className={styles.flowSection}>
         <SectionTitle>Equity Market Foreign Flow (USD Mn)</SectionTitle>
         <div className={styles.tableScroll}>
@@ -213,7 +165,7 @@ const ReportContent = memo(function ReportContent() {
         </table>
         </div>
       </div>
-      <footer className={styles.footer}><Editable>Source: Bloomberg</Editable><Editable>Investor Relation and Business Intelligence Group</Editable><Editable>PT Bank Syariah Indonesia (Persero) Tbk</Editable></footer>
+      <footer className={styles.footer}><Editable>Source: Yahoo Finance • Points: estimasi</Editable><Editable>Investor Relation and Business Intelligence Group</Editable><Editable>PT Bank Syariah Indonesia (Persero) Tbk</Editable></footer>
     </div>
   </>;
 });
@@ -221,9 +173,56 @@ const ReportContent = memo(function ReportContent() {
 export default function EquitySnapshotPage() {
   const documentRef = useRef<HTMLElement>(null);
   const exportingRef = useRef(false);
+  const [snapshot, setSnapshot] = useState<EquitySnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch("/api/equity/snapshot", { cache: "no-store", signal: controller.signal });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || "Data equity belum tersedia.");
+        if (!isEquitySnapshot(payload)) throw new Error("Format data equity tidak valid.");
+        setSnapshot(payload);
+      } catch (error) {
+        if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "Data equity gagal dimuat.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, []);
+
+  function updateHighlights() {
+    if (!snapshot || !documentRef.current) return;
+    const copy = Array.from(documentRef.current.querySelectorAll("[data-narrative] p"))
+      .map(element => element.textContent || "").join(" ");
+    const discussed = mentionedTickers(copy, snapshot.stocks.map(row => row.ticker));
+    documentRef.current.querySelectorAll<HTMLTableRowElement>("[data-stock-ticker]").forEach(row => {
+      const ticker = row.cells[0]?.textContent?.trim().toUpperCase() || "";
+      row.classList.toggle(styles.highlight, discussed.has(ticker));
+    });
+  }
+
+  function discussStock(ticker: string) {
+    if (!isEditing || !snapshot || busy) return;
+    const stock = snapshot.stocks.find(row => row.ticker === ticker);
+    const element = documentRef.current?.querySelector<HTMLElement>("[data-narrative]:last-child p [data-editable]");
+    if (!stock || !element) return;
+    const existing = mentionedTickers(element.textContent || "", [ticker]);
+    if (!existing.has(ticker)) {
+      element.appendChild(document.createTextNode(` ${ticker} (${formatValue(stock.change_pct, 2, true, "id-ID")}%; estimasi ${formatValue(stock.contribution_points, 2, true, "id-ID")} poin).`));
+      updateHighlights();
+    }
+    element.focus();
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   function toggleEditing() {
     if (!documentRef.current || exportingRef.current) return;
@@ -261,6 +260,7 @@ export default function EquitySnapshotPage() {
       await document.fonts.ready;
 
       const { default: html2pdf } = await import("html2pdf.js");
+      updateHighlights();
       const clone = documentRef.current.cloneNode(true) as HTMLElement;
       clone.removeAttribute("id");
       clone.classList.add(styles.exporting);
@@ -317,10 +317,18 @@ export default function EquitySnapshotPage() {
 
   return <main className={styles.workspace}>
     <div className={styles.navigation}><DashboardViewSwitcher active="equity" /></div>
-    <div className={styles.documentViewport}><article ref={documentRef} id="equity-snapshot-document" className={styles.document} aria-label="Dokumen Equity Market Daily Snapshot"><ReportContent /></article></div>
+    {snapshot ? <div className={styles.documentViewport}><article ref={documentRef} onInput={updateHighlights} id="equity-snapshot-document" className={styles.document} aria-label="Dokumen Equity Market Daily Snapshot"><ReportContent snapshot={snapshot} /></article></div>
+      : <div className={styles.dataMessage} role="status">{loading ? "Memuat data equity harian…" : loadError}</div>}
+    {isEditing && snapshot && <div className={styles.suggestions}>
+      <details><summary>Usulan saham untuk narasi</summary>
+        <p>Klik saham untuk menambahkan pembahasan. Anda juga dapat mengetik atau menghapus kode saham langsung di narasi.</p>
+        <div>{snapshot.narrative_suggestions.map(item => <button type="button" key={item.ticker} disabled={busy} onClick={() => discussStock(item.ticker)} title={`${item.company} — ${item.reason}`}>{item.ticker} · {item.reason}</button>)}</div>
+      </details>
+    </div>}
     <div className={`${styles.actions} eq-flex eq-flex-wrap eq-items-center eq-justify-end eq-gap-2`}>
-      <button type="button" onClick={toggleEditing} disabled={busy} aria-controls="equity-snapshot-document" aria-pressed={isEditing} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">{isEditing ? "Simpan" : "Edit"}</button>
-      <button type="button" onClick={downloadPdf} disabled={busy} className="eq-rounded-md eq-border-0 eq-bg-[#00535a] eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-white hover:eq-bg-[#00777c] disabled:eq-cursor-wait disabled:eq-opacity-60">{busy ? "Membuat PDF…" : "Download PDF"}</button>
+      <button type="button" onClick={toggleEditing} disabled={busy || !snapshot} aria-controls="equity-snapshot-document" aria-pressed={isEditing} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">{isEditing ? "Simpan" : "Edit"}</button>
+      <button type="button" onClick={downloadPdf} disabled={busy || !snapshot} className="eq-rounded-md eq-border-0 eq-bg-[#00535a] eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-white hover:eq-bg-[#00777c] disabled:eq-cursor-wait disabled:eq-opacity-60">{busy ? "Membuat PDF…" : "Download PDF"}</button>
+      {snapshot && <span className={styles.dataNote}>Data {formatDate(snapshot.report_date)} · {snapshot.coverage.valid_count}/{snapshot.coverage.universe_count} saham Yahoo JKT terhitung · Points estimasi; bobot dan keanggotaan IHSG resmi belum diverifikasi. Sektor memakai klasifikasi Yahoo Finance.</span>}
       <span className={styles.status} role="status" aria-live="polite">{message}</span>
     </div>
   </main>;

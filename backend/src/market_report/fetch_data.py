@@ -859,6 +859,13 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     print("Fetching official equity and bond capital-flow sources...")
     capital_flow = fetch_capital_flow(market)
 
+    from market_report.services.equity_snapshot_service import fetch_equity_source
+    try:
+        print("Fetching yfinance equity contributions...")
+        equity = fetch_equity_source()
+    except Exception as error:
+        equity = {"error": str(error), "stocks": [], "indices": {}}
+
     print("Fetching ANTAM buy price feed...")
     antam_gold = fetch_antam_gold_price()
 
@@ -889,6 +896,7 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
         "macro_indicators": macro_indicators,
         "monetary_operations": monetary_operations,
         "capital_flow": capital_flow,
+        "equity": equity,
     }
     if persist:
         _save("snapshot", snapshot)

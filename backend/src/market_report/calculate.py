@@ -691,6 +691,9 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
         "source_snapshot": snap.get("generated_at"),
         "is_demo": False,
     }
+    if isinstance(snap.get("equity"), dict):
+        from market_report.domain.equity_snapshot import build_equity_snapshot
+        report["equity_snapshot"] = build_equity_snapshot(snap["equity"], report)
     return report
 
 

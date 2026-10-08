@@ -67,7 +67,7 @@ class ReportPipelineTests(unittest.TestCase):
             previous_snapshot = snapshot_path.read_bytes()
             empty_snapshot = {"generated_at": "2026-10-02T10:00:00+00:00", "yfinance": {}}
 
-            with self.assertRaisesRegex(RuntimeError, "Laporan sebelumnya tetap dipakai"):
+            with self.assertRaisesRegex(RuntimeError, "Laporan (aktif )?sebelumnya tetap dipakai"):
                 report_service.publish_snapshot(
                     empty_snapshot, report_path=report_path, snapshot_path=snapshot_path
                 )
