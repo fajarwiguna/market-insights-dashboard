@@ -121,13 +121,18 @@ const ReportContent = memo(function ReportContent({ snapshot }: { snapshot: Equi
   const discussed = mentionedTickers(snapshot.narratives.map(row => row.text).join(" "), snapshot.stocks.map(row => row.ticker));
   const flows = ["China", "Indonesia", "Japan", "Malaysia", "United States"].map(country => {
     const row = snapshot.foreign_flow_rows.find(item => item.country === country);
-    return [country, formatDate(row?.date), ...[row?.daily, row?.wtd, row?.mtd, row?.qtd, row?.ytd, row?.["12m"]].map(value => formatValue(value))];
+    return [country, row?.date ? formatDate(row.date) : "-",
+      ...[row?.daily, row?.wtd, row?.mtd, row?.qtd, row?.ytd, row?.["12m"]]
+        .map(value => value == null || !Number.isFinite(value) ? "-" : formatValue(value))];
   });
   const foreignValue = snapshot.foreign_flow.net_idr != null
     ? `IDR ${formatValue(Math.abs(snapshot.foreign_flow.net_idr) / 1e9, 2, false, "id-ID")} Bn`
     : snapshot.foreign_flow.net_usd_mn != null ? `USD ${formatValue(Math.abs(snapshot.foreign_flow.net_usd_mn))} Mn` : "—";
   const foreignSign = snapshot.foreign_flow.net_idr ?? snapshot.foreign_flow.net_usd_mn;
-  const foreignLabel = foreignSign == null ? "Net foreign flow" : foreignSign < 0 ? "Net foreign outflow" : "Net foreign inflow";
+  const foreignHeading = foreignSign == null ? "Net foreign flow" : foreignSign < 0 ? "Net foreign outflow" : "Net foreign inflow";
+  const foreignLabel = snapshot.foreign_flow.stale ? `${foreignHeading} (${formatDate(snapshot.foreign_flow.date)})` : foreignHeading;
+  const flowSources = [...new Set(snapshot.foreign_flow_rows.map(row => row.source).filter(Boolean))];
+  const sources = ["Yahoo Finance", ...(snapshot.foreign_flow.source ? ["BEI"] : []), ...(snapshot.coal.source ? [snapshot.coal.source_name || "Newcastle"] : []), ...flowSources.filter(source => source !== "BEI")].join(" / ");
   return <>
     <header className={styles.header}>
       <HeaderArt />
@@ -165,7 +170,7 @@ const ReportContent = memo(function ReportContent({ snapshot }: { snapshot: Equi
         </table>
         </div>
       </div>
-      <footer className={styles.footer}><Editable>Source: Yahoo Finance • Points: estimasi</Editable><Editable>Investor Relation and Business Intelligence Group</Editable><Editable>PT Bank Syariah Indonesia (Persero) Tbk</Editable></footer>
+      <footer className={styles.footer}><Editable>{`Source: ${sources}`}</Editable><Editable>Investor Relation and Business Intelligence Group</Editable><Editable>PT Bank Syariah Indonesia (Persero) Tbk</Editable></footer>
     </div>
   </>;
 });
@@ -217,7 +222,7 @@ export default function EquitySnapshotPage() {
     if (!stock || !element) return;
     const existing = mentionedTickers(element.textContent || "", [ticker]);
     if (!existing.has(ticker)) {
-      element.appendChild(document.createTextNode(` ${ticker} (${formatValue(stock.change_pct, 2, true, "id-ID")}%; estimasi ${formatValue(stock.contribution_points, 2, true, "id-ID")} poin).`));
+      element.appendChild(document.createTextNode(` ${ticker} (${formatValue(stock.change_pct, 2, true, "id-ID")}%).`));
       updateHighlights();
     }
     element.focus();
@@ -328,7 +333,7 @@ export default function EquitySnapshotPage() {
     <div className={`${styles.actions} eq-flex eq-flex-wrap eq-items-center eq-justify-end eq-gap-2`}>
       <button type="button" onClick={toggleEditing} disabled={busy || !snapshot} aria-controls="equity-snapshot-document" aria-pressed={isEditing} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">{isEditing ? "Simpan" : "Edit"}</button>
       <button type="button" onClick={downloadPdf} disabled={busy || !snapshot} className="eq-rounded-md eq-border-0 eq-bg-[#00535a] eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-white hover:eq-bg-[#00777c] disabled:eq-cursor-wait disabled:eq-opacity-60">{busy ? "Membuat PDF…" : "Download PDF"}</button>
-      {snapshot && <span className={styles.dataNote}>Data {formatDate(snapshot.report_date)} · {snapshot.coverage.valid_count}/{snapshot.coverage.universe_count} saham Yahoo JKT terhitung · Points estimasi; bobot dan keanggotaan IHSG resmi belum diverifikasi. Sektor memakai klasifikasi Yahoo Finance.</span>}
+      {snapshot && <span className={styles.dataNote}>Data {formatDate(snapshot.report_date)} · {snapshot.coverage.valid_count}/{snapshot.coverage.universe_count} saham Yahoo JKT terhitung.</span>}
       <span className={styles.status} role="status" aria-live="polite">{message}</span>
     </div>
   </main>;

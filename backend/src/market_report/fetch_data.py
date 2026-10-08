@@ -859,6 +859,9 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     print("Fetching official equity and bond capital-flow sources...")
     capital_flow = fetch_capital_flow(market)
 
+    from market_report.services.international_equity_flow_service import fetch_international_equity_flows
+    international_equity_flows = fetch_international_equity_flows()
+
     from market_report.services.equity_snapshot_service import fetch_equity_source
     try:
         print("Fetching yfinance equity contributions...")
@@ -896,6 +899,7 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
         "macro_indicators": macro_indicators,
         "monetary_operations": monetary_operations,
         "capital_flow": capital_flow,
+        "international_equity_flows": international_equity_flows,
         "equity": equity,
     }
     if persist:

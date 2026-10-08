@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+import calendar
 import math
 from typing import Any
 
@@ -103,3 +104,19 @@ def yield_ytd_bp(history: Any, as_of: Any, latest: Any = None) -> float | None:
     if current is None:
         return None
     return round((float(current) - base[1]) * 100, 1)
+
+
+def rolling_month_change(history: Any, as_of: Any, latest: Any) -> float | None:
+    """Compare with the last close on/before the same date one month earlier."""
+    day = _date(as_of)
+    if day is None or isinstance(latest, bool) or not isinstance(latest, (int, float)) or not math.isfinite(latest):
+        return None
+    month = day.month - 1 or 12
+    year = day.year - (day.month == 1)
+    target = date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+    points = [point for point in _points(history) if point[0] <= target]
+    base = points[-1] if points else None
+    # A short history must not turn an old, unrelated observation into 1M.
+    if base is None or (target - base[0]).days > 7 or base[1] <= 0:
+        return None
+    return round((latest / base[1] - 1) * 100, 4)

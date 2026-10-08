@@ -410,6 +410,8 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
     """Bangun dan validasi laporan dari payload snapshot yang diberikan, lalu terbitkan."""
     from market_report.calculate import build_report_data, persist_json_data
 
+    from market_report.services.commodity_history_service import enrich_commodity_history
+    enrich_commodity_history(snapshot, list_report_versions(limit=420) if report_path is None else [])
     report = build_report_data(snapshot)
     report["schema_version"] = 2
     report["_source_snapshot"] = snapshot

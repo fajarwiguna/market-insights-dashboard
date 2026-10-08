@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from market_report.config import market_data_directory
-from market_report.domain.market_periods import period_changes, yield_ytd_bp
+from market_report.domain.market_periods import period_changes, yield_ytd_bp, rolling_month_change
 from market_report.domain.index_sectors import IDX_IC_SECTOR_INDEXES, IDX_SECTOR_HISTORY_SOURCE
 
 DATA_DIR = market_data_directory()
@@ -351,6 +351,7 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "date": item.get("date"),
                 "source": item.get("source"),
                 "unit": "USD/troy oz (COMEX futures)" if key == "GOLD" else "USD/barrel",
+                "rolling_1m_pct": rolling_month_change(item.get("history"), item.get("date"), item.get("last")),
                 **_period_data(item),
             }
     for key, label, unit in (
@@ -361,13 +362,11 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
         if isinstance(item.get("last"), (int, float)) and math.isfinite(item["last"]):
             commodities[label] = {
                 "today": item["last"],
-                "prev": None,
+                "prev": item.get("prev") if item.get("history") else None,
                 "dtd_pct": item.get("dtd_pct"),
                 "change_pct": item.get("dtd_pct"),
-                "wtd_pct": None,
-                "mtd_pct": None,
                 "rolling_1m_pct": item.get("rolling_1m_pct"),
-                "ytd_pct": None,
+                **_period_data(item),
                 "date": item.get("date"),
                 "source": item.get("source"),
                 "source_name": item.get("source_name"),
@@ -693,7 +692,9 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
     }
     if isinstance(snap.get("equity"), dict):
         from market_report.domain.equity_snapshot import build_equity_snapshot
-        report["equity_snapshot"] = build_equity_snapshot(snap["equity"], report)
+        report["international_equity_flows"] = snap.get("international_equity_flows") or {}
+        report["equity_snapshot"] = build_equity_snapshot(snap["equity"], {**report, "_source_snapshot": snap})
+        report.pop("international_equity_flows", None)
     return report
 
 

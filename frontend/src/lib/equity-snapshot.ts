@@ -11,9 +11,9 @@ export type EquitySnapshot = {
   narrative_suggestions: { ticker: string; company: string; sector: string; reason: string; contribution_points: number }[];
   narratives: { id: string; title: string; text: string }[];
   headline: string; ihsg: { last: number; change_pct: number };
-  foreign_flow: { net_idr: number | null; net_usd_mn: number | null; date: string | null };
-  coal: { mtd_pct: number | null; date: string | null };
-  foreign_flow_rows: { country: string; date: string | null; daily: number | null; wtd?: number | null; mtd?: number | null; qtd?: number | null; ytd?: number | null; "12m"?: number | null }[];
+  foreign_flow: { net_idr: number | null; net_usd_mn: number | null; date: string | null; source?: string; stale?: boolean };
+  coal: { mtd_pct: number | null; date: string | null; source?: string; source_name?: string; stale?: boolean };
+  foreign_flow_rows: { country: string; date: string | null; daily: number | null; wtd?: number | null; mtd?: number | null; qtd?: number | null; ytd?: number | null; "12m"?: number | null; latest?: number | null; frequency?: string; source?: string; source_url?: string; methodology?: string; period_start?: string }[];
 };
 
 export function formatValue(value: number | null | undefined, decimals = 2, signed = false, locale = "en-US") {
@@ -27,8 +27,26 @@ export function formatDate(value: string | null | undefined) {
   return new Date(`${value}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
+// Display aliases follow the analyst's Bloomberg naming convention. Yahoo
+// remains the source of prices and the original company name in the payload.
+const COMPANY_DISPLAY_NAMES: Readonly<Record<string, string>> = {
+  BBCA: "Bank Central Asia Tbk PT",
+  TLKM: "Telkom Indonesia Persero Tbk PT",
+};
+
+export function formatCompanyName(ticker: string, company: string): string {
+  const alias = COMPANY_DISPLAY_NAMES[ticker.toUpperCase().replace(/\.JK$/, "")];
+  if (alias) return alias;
+  let name = company.trim().replace(/\s+/g, " ");
+  const hasPt = /^(?:PT\.?\s+)|(?:\s+PT\.?)$/i.test(name);
+  name = name.replace(/^PT\.?\s+/i, "").replace(/\s+PT\.?$/i, "")
+    .replace(/\(\s*Persero\s*\)/gi, "Persero")
+    .replace(/\bTbk\.?$/i, "Tbk").trim();
+  return name && (hasPt || /\bTbk$/i.test(name)) ? `${name} PT` : name;
+}
+
 export function stockRow(stock: StockContribution): string[] {
-  return [stock.ticker, stock.company, formatValue(stock.close, 0),
+  return [stock.ticker, formatCompanyName(stock.ticker, stock.company), formatValue(stock.close, 0),
     formatValue(stock.change_pct), formatValue(stock.contribution_points),
     stock.volume_shares == null ? "—" : `${formatValue(stock.volume_shares / 1e6)} Mn`];
 }
