@@ -5,8 +5,12 @@ import styles from "./snapshot.module.css";
 import "./tailwind.css";
 import "@fontsource/roboto/400.css";
 import "@fontsource/roboto/700.css";
+import "@fontsource/roboto/400-italic.css";
+import "@fontsource/roboto/700-italic.css";
 import "@fontsource/roboto-condensed/400.css";
 import "@fontsource/roboto-condensed/700.css";
+import "@fontsource/roboto-condensed/400-italic.css";
+import "@fontsource/roboto-condensed/700-italic.css";
 
 // Defaults deliberately stay outside React state. Edits live only in the DOM and
 // disappear on refresh. Memoization keeps export/status renders from touching them.
@@ -77,16 +81,39 @@ function tone(value: string) {
   return /^[−-]/.test(value.trim()) ? styles.negative : styles.positive;
 }
 
+const formattingCommands: Readonly<Record<string, string>> = {
+  b: "bold", i: "italic", u: "underline",
+};
+
 function Editable({ children, className = "", numeric = false }: {
   children?: ReactNode; className?: string; numeric?: boolean;
 }) {
   return <span
-    contentEditable="plaintext-only"
+    contentEditable={false}
+    data-editable
     suppressContentEditableWarning
     spellCheck={false}
     role="textbox"
+    aria-readonly="true"
     aria-label={`Edit ${typeof children === "string" && children ? children.replaceAll("\n", " ") : "nilai"}`}
     className={`${styles.editable} ${className}`}
+    onKeyDown={(event) => {
+      if (!event.currentTarget.isContentEditable) return;
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const command = formattingCommands[event.key.toLowerCase()];
+      if (!command) return;
+      event.preventDefault();
+      // Use the browser editing engine so selection, toggling and Ctrl+Z
+      // retain their normal behavior, including partially formatted selections.
+      document.execCommand(command);
+    }}
+    onPaste={(event) => {
+      if (!event.currentTarget.isContentEditable) return;
+      // Keep pasted fonts/layout from changing the A4 document. Users can apply
+      // inline formatting with shortcuts after pasting, with native undo intact.
+      event.preventDefault();
+      document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
+    }}
     onInput={numeric ? (event) => {
       const element = event.currentTarget;
       element.classList.remove(styles.positive, styles.negative);
@@ -188,7 +215,24 @@ export default function EquitySnapshotPage() {
   const documentRef = useRef<HTMLElement>(null);
   const exportingRef = useRef(false);
   const [busy, setBusy] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState("");
+
+  function toggleEditing() {
+    if (!documentRef.current || exportingRef.current) return;
+    const nextEditing = !isEditing;
+    if (document.activeElement instanceof HTMLElement && documentRef.current.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+    // Only change editability attributes. Keep the browser-owned text, inline
+    // formatting and numeric colors intact when locking or reopening the editor.
+    documentRef.current.querySelectorAll<HTMLElement>("[data-editable]").forEach((element) => {
+      element.contentEditable = String(nextEditing);
+      element.setAttribute("aria-readonly", String(!nextEditing));
+    });
+    setIsEditing(nextEditing);
+    setMessage(nextEditing ? "" : "Perubahan disimpan di halaman ini. Refresh mengembalikan data awal.");
+  }
 
   // Helper untuk mendapatkan tanggal dengan format DDMMYYYY
   function getFormattedDate() {
@@ -203,7 +247,7 @@ export default function EquitySnapshotPage() {
     if (!documentRef.current || exportingRef.current) return;
     exportingRef.current = true;
     setBusy(true);
-    setMessage("Menyiapkan PDF dari hasil edit…");
+    setMessage("Menyiapkan PDF…");
     let staging: HTMLDivElement | undefined;
     try {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -253,7 +297,7 @@ export default function EquitySnapshotPage() {
       const imageWidth = canvas.width * scale;
       pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", (width - imageWidth) / 2, 0, imageWidth, canvas.height * scale);
       await worker.save();
-      setMessage("PDF hasil edit berhasil diunduh.");
+      setMessage("PDF berhasil diunduh.");
     } catch (error) {
       console.error("Snapshot PDF export failed", error);
       setMessage("PDF gagal dibuat. Silakan coba lagi.");
@@ -265,11 +309,14 @@ export default function EquitySnapshotPage() {
   }
 
   return <main className={styles.workspace}>
-    <div className={`${styles.toolbar} eq-flex eq-flex-wrap eq-items-center eq-justify-between eq-gap-3`}>
-      <div><strong>Equity Market Daily Snapshot</strong><p>Klik teks atau sel tabel untuk mengedit. Refresh untuk kembali ke data awal.</p></div>
-      <button type="button" onClick={downloadPdf} disabled={busy} className="eq-rounded-lg eq-border-0 eq-bg-[#00535a] eq-px-5 eq-py-3 eq-text-sm eq-font-bold eq-text-white hover:eq-bg-[#00777c] disabled:eq-cursor-wait disabled:eq-opacity-60">{busy ? "Membuat PDF…" : "Download PDF (Hasil Edit)"}</button>
-      <span className={styles.status} role="status" aria-live="polite">{message}</span>
+    <div className={styles.toolbar}>
+      <div><strong>Equity Market Daily Snapshot</strong><p>{isEditing ? "Klik teks atau sel tabel untuk mengedit. PDF mengikuti perubahan terbaru." : "Klik Edit untuk mengubah dokumen. Refresh untuk kembali ke data awal."}</p></div>
     </div>
     <div className={styles.documentViewport}><article ref={documentRef} id="equity-snapshot-document" className={styles.document} aria-label="Dokumen Equity Market Daily Snapshot"><ReportContent /></article></div>
+    <div className={`${styles.actions} eq-flex eq-flex-wrap eq-items-center eq-justify-end eq-gap-2`}>
+      <button type="button" onClick={toggleEditing} disabled={busy} aria-controls="equity-snapshot-document" aria-pressed={isEditing} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">{isEditing ? "Simpan" : "Edit"}</button>
+      <button type="button" onClick={downloadPdf} disabled={busy} className="eq-rounded-md eq-border-0 eq-bg-[#00535a] eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-white hover:eq-bg-[#00777c] disabled:eq-cursor-wait disabled:eq-opacity-60">{busy ? "Membuat PDF…" : "Download PDF"}</button>
+      <span className={styles.status} role="status" aria-live="polite">{message}</span>
+    </div>
   </main>;
 }

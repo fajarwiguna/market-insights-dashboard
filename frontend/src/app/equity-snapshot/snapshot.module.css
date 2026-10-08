@@ -7,7 +7,9 @@
 .toolbar { max-width: 210mm; margin: 0 auto 18px; font-family: Arial, sans-serif; }
 .toolbar strong { font-size: 16px; }
 .toolbar p { margin: 6px 0 0; color: #536b75; font-size: 12px; line-height: 1.5; }
-.toolbar button { cursor: pointer; }
+.actions { max-width: 210mm; margin: 0 auto; font-family: Arial, sans-serif; }
+.actions button { cursor: pointer; }
+.actions .status { text-align: right; }
 .status { width: 100%; min-height: 16px; color: #496672; font-size: 12px; }
 .documentViewport { overflow-x: auto; padding: 2px 2px 20px; }
 .document {
@@ -35,9 +37,9 @@
   border-radius: 1px;
   transition: outline-color .15s, background-color .15s;
 }
-.editable[contenteditable]:hover { outline-color: #739b9e80; }
-.editable[contenteditable]:focus { outline-color: #048c99; background-color: #0796a310; }
-.header .editable[contenteditable]:hover, .header .editable[contenteditable]:focus, .table th .editable[contenteditable]:hover, .table th .editable[contenteditable]:focus { outline-color: #ffffff9e; background-color: #ffffff12; }
+.editable[contenteditable="true"]:hover { outline-color: #739b9e80; }
+.editable[contenteditable="true"]:focus { outline-color: #048c99; background-color: #0796a310; }
+.header .editable[contenteditable="true"]:hover, .header .editable[contenteditable="true"]:focus, .table th .editable[contenteditable="true"]:hover, .table th .editable[contenteditable="true"]:focus { outline-color: #ffffff9e; background-color: #ffffff12; }
 .header {
   position: relative;
   display: grid;
@@ -85,15 +87,16 @@
 .narratives section { padding: 0 0 14px; margin-bottom: 12px; border-bottom: 1px solid #b7c1ca; }
 .narratives section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 .narratives h3 { margin-bottom: 6px; color: #008e9a; font-size: 15px; line-height: 1.15; font-weight: 700; }
-.narratives p { font-family: "Roboto Condensed", Arial, sans-serif; font-size: 13px; line-height: 1.17; }
+.narratives p { font-family: "Roboto Condensed", Arial, sans-serif; font-size: 13px; line-height: 1.17; text-align: justify; text-align-last: left; }
 .movers { display: grid; grid-template-columns: 1fr 1fr; gap: 19px; }
 .moverTitle { min-height: 20px; font-size: 17px; line-height: 1.1; font-weight: 700; }
-.moversTable { font-size: 11.5px; font-family: "Roboto Condensed", Arial, sans-serif; }
-.moversTable th { height: 23px; padding: 3px 5px; }
+.moversTable { font-size: 10.5px; font-family: Arial, sans-serif; }
+.moversTable th { height: 23px; padding: 3px 4px; }
+.moversTable th .editable { white-space: nowrap; overflow-wrap: normal; }
 .moversTable td { height: 26.4px; padding: 1px 5px; line-height: 1.02; }
 .moversTable th:nth-child(2), .moversTable td:nth-child(2) { text-align: left; }
 .moversTable td:nth-child(n+3) .editable { white-space: pre; overflow-wrap: normal; }
-.flowTable { font-family: "Roboto Condensed", Arial, sans-serif; }
+.flowTable { font-family: Arial, sans-serif; font-size: 11.5px; }
 .table tbody tr.highlight { background: #fff3d5; }
 .moversTable .highlight td:first-child { color: #b56100; font-weight: 700; }
 .flowSection { margin-top: 10px; }
@@ -112,7 +115,7 @@
 }
 @media print {
   .workspace { padding: 0; background: #fff; }
-  .toolbar { display: none; }
+  .toolbar, .actions { display: none; }
   .documentViewport { padding: 0; overflow: visible; }
   .document { margin: 0; box-shadow: none; }
   .editable { outline: none !important; }
