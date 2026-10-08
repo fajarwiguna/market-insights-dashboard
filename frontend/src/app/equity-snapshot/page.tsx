@@ -162,6 +162,7 @@ function HeaderArt() {
 function MoversTable({ rows, negative = false }: { rows: string[][]; negative?: boolean }) {
   return <div>
     <h3 className={`${styles.moverTitle} ${negative ? styles.negative : styles.positive}`}><Editable>{negative ? "Market Laggards" : "Market Leaders"}</Editable></h3>
+    <div className={styles.tableScroll}>
     <table className={`${styles.table} ${styles.moversTable}`} aria-label={negative ? "Market Laggards" : "Market Leaders"}>
       <colgroup>{[12.5, 34, 12, 11.5, 12, 18].map((width, i) => <col key={i} style={{ width: `${width}%` }} />)}</colgroup>
       <thead><tr>{["Ticker", "Company", "Price", "% Chg", "Points", "Volume"].map((label) => <th key={label}><Editable>{label}</Editable></th>)}</tr></thead>
@@ -169,6 +170,7 @@ function MoversTable({ rows, negative = false }: { rows: string[][]; negative?: 
         {row.map((value, i) => <td key={i}><Editable numeric={i === 3 || i === 4} className={i === 3 || i === 4 ? tone(value) : ""}>{value}</Editable></td>)}
       </tr>)}</tbody>
     </table>
+    </div>
   </div>;
 }
 
@@ -178,7 +180,7 @@ const ReportContent = memo(function ReportContent() {
       <HeaderArt />
       <p className={styles.eyebrow}><Editable>EQUITY RESEARCH</Editable></p>
       <h1><Editable>Equity Market Daily Snapshot</Editable></h1>
-      <p className={styles.date}><Editable>04 Sep 2026</Editable></p>
+      <p className={styles.date}><Editable>04 September 2026</Editable></p>
     </header>
     <div className={styles.reportBody}>
       <p className={styles.headline}><Editable>IHSG terkoreksi, sektor energi tetap menguat</Editable></p>
@@ -189,22 +191,26 @@ const ReportContent = memo(function ReportContent() {
       </section>
       <SectionTitle>Daily Equity Market Performance</SectionTitle>
       <section className={styles.middle} aria-label="Performa dan narasi pasar">
+        <div className={styles.tableScroll}>
         <table className={`${styles.table} ${styles.indexTable}`} aria-label="Daily Equity Market Performance">
           <colgroup><col style={{ width: "48%" }} /><col style={{ width: "26%" }} /><col style={{ width: "26%" }} /></colgroup>
           <thead><tr>{["Index", "Level", "DTD %"].map((label) => <th key={label}><Editable>{label}</Editable></th>)}</tr></thead>
           <tbody>{indices.map((row) => <tr key={row[0]}>{row.map((value, i) => <td key={i}><Editable numeric={i === 2} className={i === 2 ? tone(value) : ""}>{value}</Editable></td>)}</tr>)}</tbody>
         </table>
+        </div>
         <div className={styles.narratives}>{narratives.map(([title, copy]) => <section key={title}><h3><Editable>{title}</Editable></h3><p><Editable>{copy}</Editable></p></section>)}</div>
       </section>
       <SectionTitle>JCI Market Movers</SectionTitle>
       <section className={styles.movers} aria-label="JCI Market Movers"><MoversTable rows={leaders} /><MoversTable rows={laggards} negative /></section>
       <div className={styles.flowSection}>
         <SectionTitle>Equity Market Foreign Flow (USD Mn)</SectionTitle>
+        <div className={styles.tableScroll}>
         <table className={`${styles.table} ${styles.flowTable}`} aria-label="Equity Market Foreign Flow (USD Mn)">
           <colgroup>{[16.3, 12.2, 10.3, 10.3, 11.7, 13.3, 13.3, 12.6].map((width, i) => <col key={i} style={{ width: `${width}%` }} />)}</colgroup>
           <thead><tr>{["Country", "Date", "Daily", "WTD", "MTD", "QTD", "YTD", "12M"].map((label) => <th key={label}><Editable>{label}</Editable></th>)}</tr></thead>
           <tbody>{flows.map((row) => <tr key={row[0]} className={row[0] === "Indonesia" ? `${styles.highlight} ${styles.indonesia}` : ""}>{row.map((value, i) => <td key={i}><Editable numeric={i > 1} className={i > 1 && value ? tone(value) : ""}>{value}</Editable></td>)}</tr>)}</tbody>
         </table>
+        </div>
       </div>
       <footer className={styles.footer}><Editable>Source: Bloomberg</Editable><Editable>Investor Relation and Business Intelligence Group</Editable><Editable>PT Bank Syariah Indonesia (Persero) Tbk</Editable></footer>
     </div>
@@ -309,9 +315,6 @@ export default function EquitySnapshotPage() {
   }
 
   return <main className={styles.workspace}>
-    <div className={styles.toolbar}>
-      <div><strong>Equity Market Daily Snapshot</strong><p>{isEditing ? "Klik teks atau sel tabel untuk mengedit. PDF mengikuti perubahan terbaru." : "Klik Edit untuk mengubah dokumen. Refresh untuk kembali ke data awal."}</p></div>
-    </div>
     <div className={styles.documentViewport}><article ref={documentRef} id="equity-snapshot-document" className={styles.document} aria-label="Dokumen Equity Market Daily Snapshot"><ReportContent /></article></div>
     <div className={`${styles.actions} eq-flex eq-flex-wrap eq-items-center eq-justify-end eq-gap-2`}>
       <button type="button" onClick={toggleEditing} disabled={busy} aria-controls="equity-snapshot-document" aria-pressed={isEditing} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">{isEditing ? "Simpan" : "Edit"}</button>

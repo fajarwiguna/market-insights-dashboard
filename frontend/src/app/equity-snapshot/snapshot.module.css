@@ -1,12 +1,9 @@
 .workspace {
   min-height: 100vh;
-  padding: 24px 16px 40px;
+  padding: 0;
   background: #e8eeef;
   color: #123645;
 }
-.toolbar { max-width: 210mm; margin: 0 auto 18px; font-family: Arial, sans-serif; }
-.toolbar strong { font-size: 16px; }
-.toolbar p { margin: 6px 0 0; color: #536b75; font-size: 12px; line-height: 1.5; }
 .actions { max-width: 210mm; margin: 0 auto; font-family: Arial, sans-serif; }
 .actions button { cursor: pointer; }
 .actions .status { text-align: right; }
@@ -108,14 +105,61 @@
 .footer { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; min-height: 18px; align-items: center; font-size: 9.5px; color: #587083; }
 .exporting { margin: 0; box-shadow: none; }
 .exporting .editable { outline: none !important; background: transparent !important; }
+.tableScroll { min-width: 0; }
+/* Screen layout is deliberately excluded from the A4 export clone. The base
+   document styles above continue to define the PDF and print layout. */
+@media screen {
+  .actions { max-width: none; padding: 16px clamp(16px, 2.5vw, 40px); }
+  .documentViewport { overflow: visible; padding: 0; }
+  .document:not(.exporting) { width: 100%; min-height: 0; margin: 0; box-shadow: none; }
+  .document:not(.exporting) .header { min-height: 140px; padding: 24px clamp(16px, 2.5vw, 40px); }
+  .document:not(.exporting) .header h1 { max-width: none; font-size: clamp(28px, 3.6vw, 54px); }
+  .document:not(.exporting) .reportBody { padding: 16px clamp(16px, 2.5vw, 40px) 8px; }
+  .document:not(.exporting) .headline { padding-top: 0; margin-bottom: 16px !important; font-size: clamp(20px, 2vw, 28px); line-height: 1.3; }
+  .document:not(.exporting) .metrics { margin: 0 0 20px; min-height: 108px; padding: 18px 12px; }
+  .document:not(.exporting) .metric { gap: 16px; }
+  .document:not(.exporting) .metric p { font-size: 14px; }
+  .document:not(.exporting) .metric strong { font-size: clamp(23px, 2.2vw, 34px); }
+  .document:not(.exporting) .indexNumbers { gap: 20px; }
+  .document:not(.exporting) .indexNumbers b { font-size: clamp(22px, 2vw, 30px); }
+  .document:not(.exporting) .sectionTitle { margin-bottom: 12px; min-height: 32px; font-size: clamp(20px, 1.6vw, 24px); line-height: 1.3; }
+  .document:not(.exporting) .middle { grid-template-columns: minmax(0, 38fr) minmax(0, 62fr); gap: 24px; min-height: 0; margin-bottom: 24px; }
+  .document:not(.exporting) .tableScroll { overflow-x: auto; }
+  .document:not(.exporting) .table { font-size: 14px; }
+  .document:not(.exporting) .table th, .document:not(.exporting) .table td { height: auto; padding: 7px 8px; line-height: 1.3; }
+  .document:not(.exporting) .indexTable { min-width: 340px; }
+  .document:not(.exporting) .narratives section { padding-bottom: 18px; margin-bottom: 18px; }
+  .document:not(.exporting) .narratives section:last-child { padding-bottom: 0; margin-bottom: 0; }
+  .document:not(.exporting) .narratives h3 { margin-bottom: 8px; font-size: 17px; }
+  .document:not(.exporting) .narratives p { font-size: 16px; line-height: 1.5; }
+  .document:not(.exporting) .movers { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .document:not(.exporting) .moverTitle { margin-bottom: 10px; font-size: 19px; }
+  .document:not(.exporting) .moversTable { min-width: 510px; font-size: 12px; }
+  .document:not(.exporting) .flowSection { margin-top: 24px; }
+  .document:not(.exporting) .flowTable { min-width: 720px; font-size: 13px; }
+  .document:not(.exporting) .footer { grid-template-columns: 1fr auto auto; padding: 18px 0 8px; font-size: 11px; line-height: 1.5; }
+}
+@media screen and (max-width: 1000px) {
+  .document:not(.exporting) .middle, .document:not(.exporting) .movers { grid-template-columns: minmax(0, 1fr); }
+  .document:not(.exporting) .metric { gap: 10px; padding: 0 6px; }
+  .document:not(.exporting) .indexNumbers { gap: 10px; }
+  .document:not(.exporting) .footer { grid-template-columns: 1fr; gap: 4px; }
+}
+@media screen and (max-width: 640px) {
+  .document:not(.exporting) .header { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .document:not(.exporting) .header h1 { margin-top: 0; }
+  .document:not(.exporting) .header .date { justify-self: end; font-size: 15px; }
+  .document:not(.exporting) .metrics { grid-template-columns: minmax(0, 1fr); padding: 4px 16px; }
+  .document:not(.exporting) .metric { justify-content: flex-start; gap: 16px; padding: 16px 0; }
+  .document:not(.exporting) .metric + .metric { border-left: 0; border-top: 1px solid #b9c6cf; }
+  .document:not(.exporting) .sectionTitle { font-size: 19px; }
+}
 @media (max-width: 840px) {
-  .workspace { padding: 16px 8px; }
-  .toolbar { padding: 0 8px; }
   .document { margin-left: 0; margin-right: 0; }
 }
 @media print {
   .workspace { padding: 0; background: #fff; }
-  .toolbar, .actions { display: none; }
+  .actions { display: none; }
   .documentViewport { padding: 0; overflow: visible; }
   .document { margin: 0; box-shadow: none; }
   .editable { outline: none !important; }
