@@ -29,6 +29,7 @@ function isMarketReport(value: unknown): value is MarketReport {
       for (const key of [
         "today", "prev", "change_pct", "change_bp", "dtd_pct", "dtd_bp",
         "wtd_pct", "mtd_pct", "qtd_pct", "ytd_pct", "ytd_bp",
+        "rolling_1m_pct",
       ]) {
         const number = reading[key];
         if (number !== undefined && number !== null && (typeof number !== "number" || !Number.isFinite(number))) return false;

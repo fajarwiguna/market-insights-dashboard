@@ -1,0 +1,120 @@
+.workspace {
+  min-height: 100vh;
+  padding: 24px 16px 40px;
+  background: #e8eeef;
+  color: #123645;
+}
+.toolbar { max-width: 210mm; margin: 0 auto 18px; font-family: Arial, sans-serif; }
+.toolbar strong { font-size: 16px; }
+.toolbar p { margin: 6px 0 0; color: #536b75; font-size: 12px; line-height: 1.5; }
+.toolbar button { cursor: pointer; }
+.status { width: 100%; min-height: 16px; color: #496672; font-size: 12px; }
+.documentViewport { overflow-x: auto; padding: 2px 2px 20px; }
+.document {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  background: #fff;
+  color: #244459;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.16;
+  box-shadow: 0 8px 30px #23445126;
+  isolation: isolate;
+}
+.document * { box-sizing: border-box; }
+.document p, .document h1, .document h2, .document h3 { margin: 0; }
+.editable {
+  display: block;
+  min-width: 0;
+  min-height: 1em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: 1px dashed transparent;
+  outline-offset: 1px;
+  border-radius: 1px;
+  transition: outline-color .15s, background-color .15s;
+}
+.editable[contenteditable]:hover { outline-color: #739b9e80; }
+.editable[contenteditable]:focus { outline-color: #048c99; background-color: #0796a310; }
+.header .editable[contenteditable]:hover, .header .editable[contenteditable]:focus, .table th .editable[contenteditable]:hover, .table th .editable[contenteditable]:focus { outline-color: #ffffff9e; background-color: #ffffff12; }
+.header {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  min-height: 93px;
+  padding: 16px 28px 6px;
+  background: linear-gradient(110deg, #00373e, #005c60 54%, #003b43);
+  border-bottom: 4px solid #d6ad62;
+  color: #fff;
+  overflow: hidden;
+}
+.headerArt { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.header p, .header h1 { position: relative; }
+.eyebrow { grid-column: 1 / -1; font-size: 15px; font-weight: 700; color: #e6ba69; }
+.header h1 { font-size: 40px; line-height: 1.15; font-weight: 700; letter-spacing: -.8px; text-shadow: 0 2px 3px #002e35; margin-top: 4px; max-width: 680px; }
+.header .date { align-self: end; margin-bottom: 2px; font-size: 18px; font-weight: 700; }
+.reportBody { padding: 0 28px; }
+.headline { padding-top: 5px; margin-bottom: 8px !important; min-height: 31px; font-size: 24px; line-height: 1.12; font-weight: 700; letter-spacing: -.4px; color: #092f3d; }
+.metrics { display: grid; grid-template-columns: 1.1fr 1.13fr 1fr; min-height: 72px; margin: 0 -17px 8px; padding: 11px 16px; border-radius: 3px; background: linear-gradient(100deg, #f7f9f9, #f3f7f8, #f7f9f9); }
+.metric { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 0 8px; }
+.metric + .metric { border-left: 1px solid #b9c6cf; }
+.metric p { margin-bottom: 3px; color: #486171; font-size: 13px; font-weight: 700; }
+.metric strong { font-size: 26px; line-height: 1.1; color: #063c49; letter-spacing: -.5px; }
+.metricIcon { flex: 0 0 34px; width: 34px; height: 36px; }
+.indexNumbers { display: flex; align-items: baseline; gap: 29px; }
+.indexNumbers b { font-size: 24px; }
+.positive { color: #008a69 !important; }
+.negative { color: #e71b2b !important; }
+.sectionTitle { display: flex; align-items: center; gap: 11px; min-height: 28px; color: #093441; font-size: 18px; line-height: 1.15; font-weight: 700; letter-spacing: -.3px; }
+.sectionTitle > .editable { max-width: 90%; }
+.sectionTitle i { height: 1px; flex: 1; background: #d6a44d; align-self: center; margin-top: 6px; }
+.middle { display: grid; grid-template-columns: 38% 1fr; gap: 17px; min-height: 384px; align-items: start; }
+.table { width: 100%; border-collapse: collapse; table-layout: fixed; color: #244459; font-size: 12px; }
+.table th, .table td { border: 1px solid #b8c1c9; text-align: right; vertical-align: middle; padding: 1px 5px; font-size: inherit; color: inherit; font-weight: inherit; white-space: normal; }
+.table tbody tr:last-child td { border-bottom: 1px solid #b8c1c9; }
+.table th { background: linear-gradient(110deg, #03434a, #07535a); color: #fff; font-weight: 700; }
+.table tbody tr:nth-child(even) { background: #f2f4f4; }
+.table th:first-child, .table td:first-child { text-align: left; }
+.indexTable th { height: 19px; }
+.indexTable td { height: 16.5px; }
+.indexTable th:not(:first-child) { text-align: center; }
+.indexTable td:nth-child(2) { padding-right: 11px; }
+.indexTable td:nth-child(3) { text-align: center; }
+.narratives section { padding: 0 0 14px; margin-bottom: 12px; border-bottom: 1px solid #b7c1ca; }
+.narratives section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+.narratives h3 { margin-bottom: 6px; color: #008e9a; font-size: 15px; line-height: 1.15; font-weight: 700; }
+.narratives p { font-family: "Roboto Condensed", Arial, sans-serif; font-size: 13px; line-height: 1.17; }
+.movers { display: grid; grid-template-columns: 1fr 1fr; gap: 19px; }
+.moverTitle { min-height: 20px; font-size: 17px; line-height: 1.1; font-weight: 700; }
+.moversTable { font-size: 11.5px; font-family: "Roboto Condensed", Arial, sans-serif; }
+.moversTable th { height: 23px; padding: 3px 5px; }
+.moversTable td { height: 26.4px; padding: 1px 5px; line-height: 1.02; }
+.moversTable th:nth-child(2), .moversTable td:nth-child(2) { text-align: left; }
+.moversTable td:nth-child(n+3) .editable { white-space: pre; overflow-wrap: normal; }
+.flowTable { font-family: "Roboto Condensed", Arial, sans-serif; }
+.table tbody tr.highlight { background: #fff3d5; }
+.moversTable .highlight td:first-child { color: #b56100; font-weight: 700; }
+.flowSection { margin-top: 10px; }
+.flowSection .sectionTitle { min-height: 26px; }
+.flowTable th { height: 19px; }
+.flowTable td { height: 17px; padding: 1px 5px; }
+.indonesia { font-weight: 700; }
+.indonesia td:nth-child(2) { font-weight: 400; }
+.footer { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; min-height: 18px; align-items: center; font-size: 9.5px; color: #587083; }
+.exporting { margin: 0; box-shadow: none; }
+.exporting .editable { outline: none !important; background: transparent !important; }
+@media (max-width: 840px) {
+  .workspace { padding: 16px 8px; }
+  .toolbar { padding: 0 8px; }
+  .document { margin-left: 0; margin-right: 0; }
+}
+@media print {
+  .workspace { padding: 0; background: #fff; }
+  .toolbar { display: none; }
+  .documentViewport { padding: 0; overflow: visible; }
+  .document { margin: 0; box-shadow: none; }
+  .editable { outline: none !important; }
+}
+@page { size: A4 portrait; margin: 0; }

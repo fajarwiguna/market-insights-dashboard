@@ -365,7 +365,8 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
                 "dtd_pct": item.get("dtd_pct"),
                 "change_pct": item.get("dtd_pct"),
                 "wtd_pct": None,
-                "mtd_pct": item.get("mtd_pct"),
+                "mtd_pct": None,
+                "rolling_1m_pct": item.get("rolling_1m_pct"),
                 "ytd_pct": None,
                 "date": item.get("date"),
                 "source": item.get("source"),
@@ -506,10 +507,35 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
         "reference": "Indonesia Stock Exchange (IDX-IC sector indices)",
         "url": IDX_SECTOR_HISTORY_SOURCE,
     })
-    capital_flow = {
-        "Saham": {"unit": "USD juta", "periods": {key: None for key in ("1D", "1W", "MtD", "QtD", "YtD")}, "availability": "unavailable"},
-        "Obligasi": {"unit": "USD juta", "periods": {key: None for key in ("1D", "1W", "MtD", "QtD", "YtD")}, "availability": "unavailable"},
-    }
+    capital_flow = {}
+    fetched_capital_flow = snap.get("capital_flow", {})
+    for label in ("Saham", "Obligasi"):
+        raw = fetched_capital_flow.get(label, {}) if isinstance(fetched_capital_flow, dict) else {}
+        raw = raw if isinstance(raw, dict) else {}
+        raw_periods = raw.get("periods", {})
+        periods = {}
+        for key in ("1D", "1W", "MtD", "QtD", "YtD"):
+            value = raw_periods.get(key) if isinstance(raw_periods, dict) else None
+            periods[key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else None
+        history = raw.get("history", [])
+        capital_flow[label] = {
+            "unit": "USD juta",
+            "periods": periods,
+            "date": raw.get("date"),
+            "availability": raw.get("availability", "unavailable") if any(value is not None for value in periods.values()) else "unavailable",
+            "availability_note": raw.get("availability_note"),
+            "source": raw.get("source"),
+            "source_url": raw.get("source_url"),
+            "history": history if isinstance(history, list) else [],
+        }
+        sources.append({
+            "section": f"Capital Flow — {label}",
+            "primary": raw.get("source"),
+            "url": raw.get("source_url"),
+            "as_of_date": raw.get("date"),
+            "availability": capital_flow[label]["availability"],
+            "note": raw.get("availability_note"),
+        })
     macro_indicators = {
         "FED Fund Rate (%)": {"unit": "%", "observations": {}, "availability": "unavailable"},
         "BI Rate (%)": {"unit": "%", "observations": {}, "availability": "unavailable"},

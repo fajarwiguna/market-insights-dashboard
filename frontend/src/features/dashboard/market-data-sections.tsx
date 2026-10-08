@@ -144,6 +144,7 @@ function columnsFor(group: MarketGroup, months: { key: string; label: string }[]
     { key: "MtD", label: "MtD", kind: "value", title: "Akumulasi sejak sesi terakhir sebelum bulan berjalan." },
     { key: "QtD", label: "QtD", kind: "value", title: "Akumulasi sejak sesi terakhir sebelum kuartal berjalan." },
     { key: "YtD", label: "YtD", kind: "value", title: "Akumulasi sejak sesi terakhir sebelum tahun berjalan." },
+    { key: "date", label: "Tanggal data", kind: "date", title: "Tanggal observasi terakhir dari sumber terkait." },
   ];
   if (group.kind === "yield") return [
     { key: "prev", label: "Sebelumnya (%)", kind: "value" },
@@ -165,6 +166,7 @@ function columnsFor(group: MarketGroup, months: { key: string; label: string }[]
     { key: "dtd_pct", label: "DtD (%)", kind: "percent", title: "Perubahan dibanding penutupan sesi sebelumnya." },
     { key: "wtd_pct", label: "WtD (%)", kind: "percent", title: "Perubahan dibanding penutupan terakhir sebelum minggu berjalan." },
     { key: "mtd_pct", label: "MtD (%)", kind: "percent", title: "Perubahan dibanding penutupan terakhir sebelum bulan berjalan." },
+    { key: "rolling_1m_pct", label: "1M bergulir (%)", kind: "percent", title: "Perubahan selama satu bulan terakhir menurut feed. Periodenya bergulir dan berbeda dari MtD kalender." },
     { key: "ytd_pct", label: "YtD (%)", kind: "percent", title: "Perubahan dibanding penutupan terakhir sebelum tahun berjalan." },
     { key: "date", label: "Tanggal (pembanding → terakhir)", kind: "date" },
   ];
@@ -206,7 +208,7 @@ function cellValue(reading: InstrumentReading, column: Column, group: MarketGrou
 
 function rowHasData(reading: InstrumentReading): boolean {
   const direct = [reading.today, reading.prev, reading.change_pct, reading.change_bp, reading.dtd_pct, reading.dtd_bp,
-    reading.wtd_pct, reading.mtd_pct, reading.qtd_pct, reading.ytd_pct, reading.ytd_bp];
+    reading.wtd_pct, reading.mtd_pct, reading.rolling_1m_pct, reading.qtd_pct, reading.ytd_pct, reading.ytd_bp];
   const periods = Object.values(reading.periods ?? {});
   const months = Object.values(reading.observations ?? {});
   return [...direct, ...periods, ...months].some((value) => typeof value === "number" && Number.isFinite(value));

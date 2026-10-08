@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import socket
 import sys
 import time
 from datetime import datetime, time as clock_time, timedelta, timezone as fixed_timezone
@@ -85,9 +86,12 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     repository = PostgresJobRepository.from_environment()
+    instance_id = os.environ.get("RUNTIME_SERVICE_INSTANCE_ID", "").strip() or \
+        f"{socket.gethostname()}:{os.getpid()}"
     _logger.info("Scheduler aktif pada zona %s, waktu %s", str(timezone), raw_times)
     while True:
         try:
+            repository.heartbeat_service("scheduler", instance_id)
             dispatch_due_slots(repository, schedule_name, datetime.now(timezone), refresh_times, catchup_minutes)
         except Exception:
             _logger.exception("Gagal memeriksa jadwal refresh")

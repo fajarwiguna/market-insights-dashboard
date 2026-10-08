@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 
 from market_report.api.dependencies import require_read_access
-from market_report.api.schemas import JobResponse, ReportResponse
+from market_report.api.schemas import ExportReadyResponse, JobResponse, ReportResponse
 from market_report.api.rate_limits import export_requests
-from market_report.services.artifact_service import pdf_artifact_path
+from market_report.services.artifact_service import pdf_artifact_is_current, pdf_artifact_path
 from market_report.domain.market_analysis import build_impacts, build_insights, build_summary
 from market_report.services import report_service
 from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
@@ -52,16 +52,25 @@ def read_report_version(report_id: str) -> dict:
 
 
 @router.post("/{report_id}/exports", status_code=status.HTTP_202_ACCEPTED,
-             response_model=JobResponse, summary="Antrekan pembuatan PDF terbaru")
+             response_model=JobResponse | ExportReadyResponse,
+             summary="Antrekan pembuatan PDF bila belum tersedia")
 def request_report_export(report_id: str) -> dict:
     try:
         if report_service.load_report_version(report_id) is None:
             raise HTTPException(status_code=404, detail="Versi laporan tidak ditemukan.")
+        repository = PostgresJobRepository.from_environment()
+        artifact = repository.get_artifact(report_id)
+        if pdf_artifact_is_current(artifact):
+            return {
+                "status": "ready",
+                "report_id": report_id,
+                "artifact_id": artifact["artifact_id"],
+            }
         retry_after = export_requests.admit()
         if retry_after:
             raise HTTPException(status_code=429, detail="Antrean ekspor sedang dibatasi. Coba lagi sebentar.",
                                 headers={"Retry-After": str(retry_after)})
-        return PostgresJobRepository.from_environment().enqueue_export(report_id)
+        return repository.enqueue_export(report_id)
     except HTTPException:
         raise
     except Exception as error:

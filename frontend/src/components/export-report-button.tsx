@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type ExportJob = { job_id?: string; status?: string; error_code?: string | null };
+type ExportJob = { job_id?: string; status?: string; error_code?: string | null; artifact_id?: string };
 
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -48,7 +48,7 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
   async function createAndDownload() {
     if (!reportId) return;
     setBusy(true);
-    setMessage("Memasukkan pembuatan PDF terbaru ke antrean…");
+      setMessage("Memeriksa PDF laporan…");
     try {
       const pdfUrl = `/api/reports/${encodeURIComponent(reportId)}/pdf`;
       const queued = await fetch(`/api/reports/${encodeURIComponent(reportId)}/exports`, { method: "POST" });
@@ -90,8 +90,8 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
 
   return <div className="export-control">
     <button type="button" className="export-button" onClick={createAndDownload} disabled={disabled}>
-      {busy ? <><span className="button-spinner" aria-hidden="true" />{message || "Menyiapkan PDF…"}</> : "Buat ulang dan unduh PDF"}
+      {busy ? <><span className="button-spinner" aria-hidden="true" />{message || "Menyiapkan PDF…"}</> : "Buat dan unduh PDF"}
     </button>
-    <span className="export-caption" aria-live="polite">{busy ? "" : message || (reportId ? "PDF dibuat ulang dari versi laporan ini dengan kode terbaru." : "ID laporan belum tersedia.")}</span>
+    <span className="export-caption" aria-live="polite">{busy ? "" : message || (reportId ? "PDF disiapkan untuk versi laporan ini dan diunduh saat tersedia." : "ID laporan belum tersedia.")}</span>
   </div>;
 }

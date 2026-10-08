@@ -3,10 +3,12 @@
 import json
 import logging
 import math
+import os
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
+from market_report.domain.market_data import find_key
 from market_report.infrastructure.repositories.report_repository import (
     JsonReportRepository,
     configured_report_repository,
@@ -335,25 +337,71 @@ def load_snapshot(path: Path | None = None) -> dict:
 
 
 def validate_report(report: dict) -> None:
-    """Tolak laporan live yang tidak berisi sedikitnya dua observasi pasar valid."""
+    """Tolak laporan yang tidak memiliki data inti yang wajar dan masih segar."""
     if not isinstance(report, dict) or report.get("is_demo"):
         raise ValueError("Hasil pipeline live harus berupa laporan pasar non-demo.")
 
-    jumlah = 0
-    for section in ("fx", "indices", "yields", "commodities"):
+    errors: list[str] = []
+    price_sections = ("fx", "indices", "commodities")
+    for section in (*price_sections, "yields"):
         values = report.get(section)
         if not isinstance(values, dict):
             continue
-        for row in values.values():
+        for name, row in values.items():
             if not isinstance(row, dict):
                 continue
             value = row.get("today")
-            if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-                jumlah += 1
-    if jumlah < 2:
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                errors.append(f"{section}/{name}: nilai terakhir tidak valid")
+            elif section in price_sections and value <= 0:
+                errors.append(f"{section}/{name}: harga atau level harus lebih besar dari nol")
+
+    required = (
+        ("fx", ("USD/IDR",), "USD/IDR"),
+        ("indices", ("IHSG",), "IHSG"),
+        ("yields", ("SBN", "10", "Tahun"), "ID SBN 10 Tahun"),
+    )
+    age_raw = os.environ.get("DAILY_MARKET_CORE_MAX_AGE_DAYS", "7").strip()
+    try:
+        max_age_days = int(age_raw)
+        if max_age_days < 1:
+            raise ValueError
+    except ValueError:
+        raise RuntimeError("DAILY_MARKET_CORE_MAX_AGE_DAYS harus berupa bilangan bulat positif.") from None
+
+    from market_report.services.history_service import source_date_iso
+
+    today = datetime.now(timezone.utc).date()
+    for section, needles, label in required:
+        values = report.get(section)
+        key = find_key(values, *needles) if isinstance(values, dict) else None
+        row = values.get(key) if key else None
+        if not isinstance(row, dict):
+            errors.append(f"{label}: instrumen wajib belum tersedia")
+            continue
+        value = row.get("today")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            errors.append(f"{label}: nilai terakhir belum tersedia atau tidak valid")
+        elif section != "yields" and value <= 0:
+            errors.append(f"{label}: nilai harus lebih besar dari nol")
+
+        observation_date = source_date_iso(row.get("date"))
+        if observation_date is None:
+            errors.append(f"{label}: tanggal observasi tidak valid")
+            continue
+        age = (today - datetime.strptime(observation_date, "%Y-%m-%d").date()).days
+        if age < 0:
+            errors.append(f"{label}: tanggal observasi berada di masa depan")
+        elif age > max_age_days:
+            errors.append(f"{label}: data berusia {age} hari, melewati batas {max_age_days} hari")
+
+    if errors:
+        details = "; ".join(errors[:8])
         raise RuntimeError(
-            "Data pasar terbaru tidak cukup (kurang dari 2 instrumen berhasil dibaca). "
-            "Laporan sebelumnya tetap dipakai. Coba perbarui lagi nanti."
+            f"Laporan ditolak karena validasi data gagal: {details}. "
+            "Laporan aktif sebelumnya tetap dipakai."
         )
 
 

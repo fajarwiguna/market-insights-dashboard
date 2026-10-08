@@ -1,9 +1,11 @@
 # Project Brief — Daily Market Report / Market Today
 
-Versi dokumen: 1.6
+Versi dokumen: 1.8
 
 Tanggal acuan: 7 Oktober 2026
 Status produk: MVP/prototype yang sedang digunakan; pengembangan menuju aplikasi production dilakukan bertahap.
+
+Hasil review kesiapan produksi pada 7 Oktober 2026: belum memenuhi kriteria rilis publik yang andal. Eksekusi perbaikan berikut telah diterapkan pada kode: pemisahan periode 1M bergulir dari MtD, validasi indikator inti sebelum publikasi, readiness database/schema/worker/scheduler, mode launcher produksi lokal, serta cache PDF berdasarkan versi template. Perubahan ini belum menjalani suite regresi atau verifikasi deployment. Temuan lanjutan dan kriteria penerimaan dicatat pada bagian 12–14.
 
 Dokumen ini menjadi acuan bersama untuk memahami produk, menetapkan prioritas, dan mengevaluasi perubahan. Kondisi implementasi dibedakan dari arah pengembangan. Target, peran pengguna, dan kebijakan operasional yang belum disepakati ditandai sebagai usulan atau keputusan terbuka.
 
@@ -89,7 +91,7 @@ tidak menjadi bagian dari clone baru. Direktori source Next.js bernama `frontend
 | Monitor pasar | Grafik dan data live dari penyedia | Tersedia; terpisah dari laporan harian |
 | Penjelasan | Definisi ringkas periode dan satuan dekat kolom data | Label dan tooltip periode tersedia; panel serta tautan Sumber/Glosarium telah dihapus dari dashboard |
 | Tampilan | Tema terang/gelap dan pengaturan tampilan | Tersedia di frontend Next.js |
-| PDF | Ringkasan eksekutif A4 satu halaman dengan angka kunci, grafik Rate Differential dan Gold Prices (Gold Futures COMEX/Antam), insight, dan indikator pendukung | Renderer tersedia; ekspor melalui worker membuat ulang PDF dari versi laporan yang dipilih |
+| PDF | Ringkasan eksekutif A4 satu halaman dengan angka kunci, grafik Rate Differential dan Gold Prices (Gold Futures COMEX/Antam), insight, dan indikator pendukung | Renderer tersedia; ekspor memakai ulang artefak yang cocok dengan versi laporan dan versi template, atau membuat PDF melalui worker bila perlu |
 | Laporan berversi | Laporan aktif, ID laporan, arsip versi | Tersedia melalui repository JSON/PostgreSQL |
 | API | Baca laporan, riwayat instrumen, data live | Implementasi tersedia; kontrak masih dalam tahap transisi |
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Dashboard Next.js meminta refresh melalui API; job diproses worker saat PostgreSQL aktif |
@@ -110,12 +112,12 @@ Perubahan mesin hitung berlaku pada laporan baru setelah backend dan worker mema
 |---|---|---|
 | Kurs | DXY, USD/IDR, CNY/IDR, SAR/IDR, EUR/IDR, JPY/IDR | Penutupan sebelumnya, terakhir, DtD %, YtD %, tanggal observasi; nilai aktual bergantung ketersediaan feed |
 | Harga emas | Gold Spot USD/troy oz (referensi OTC/CFD Trading Economics), COMEX Gold Futures, dan emas Antam Rp/gram | Harga sebelumnya, terakhir, DtD %, YtD %, tanggal observasi; spot dibedakan dari futures dan bukan benchmark resmi |
-| Arus modal | Saham dan obligasi, USD juta | 1D, 1W, MtD, QtD, YtD; arus bersih bertanda positif/negatif; adapter belum terhubung |
+| Arus modal | Saham dan SBN rupiah yang dapat diperdagangkan oleh nonresiden, USD juta | 1D, 1W, MtD, QtD, YtD; saham memakai net transaksi investor asing BEI, obligasi memakai perubahan posisi kepemilikan DJPPR sebagai proksi arus. Periode tanpa histori/pembanding yang memadai tetap kosong |
 | Yield obligasi | UST 5Y/10Y, SBN 5Y/10Y, SBSN seri benchmark | Yield sebelumnya/terakhir dalam %, perubahan DtD dan YtD dalam bp; YtD tersedia bila histori cukup |
-| Indikator makro | Fed Funds Rate, BI Rate, inflasi Indonesia, M2, kredit/pembiayaan, DPK | Tiga observasi bulanan; BI Rate memakai tanggal publikasi yang tersedia, seri lain menunggu adapter |
+| Indikator makro | Fed Funds Rate, BI Rate, inflasi Indonesia, M2, kredit/pembiayaan, DPK | Tiga observasi bulanan; adapter Trading Economics dan publikasi BI tersedia, tetapi kelengkapan angka, definisi seri, serta periode observasinya masih perlu diverifikasi melalui integrasi |
 | Operasi moneter | Total Posisi Operasi Moneter BI | Terakhir dalam Rp triliun, MoM %, YtD %, dan tanggal observasi; memakai data akhir periode bulanan dari SEKI BI Tabel III.1. Label dashboard sudah menyebut MoM dan memakai field perubahan bulanan yang sama; pemeriksaan kesesuaian historinya masih menjadi bagian validasi data |
-| Indeks saham | IHSG, DJI, serta 11 sektor IDX-IC: Energi, Bahan Baku, Industri, Konsumen Siklikal, Konsumen Non-Siklikal, Kesehatan, Keuangan, Properti, Teknologi, Infrastruktur, Transportasi dan Logistik | Penutupan sebelumnya, terakhir, DtD %, YtD %, tanggal observasi; feed sektor belum terhubung |
-| Komoditas | ICE Brent, Newcastle Coal, CPO Bursa Malaysia | Unit, terakhir, DtD %, WtD %, MtD %, YtD %; Brent tersedia, Newcastle dan CPO memiliki harga, DtD, dan MtD, sementara WtD/YtD menunggu feed histori tervalidasi |
+| Indeks saham | IHSG, DJI, serta 11 sektor IDX-IC: Energi, Bahan Baku, Industri, Konsumen Siklikal, Konsumen Non-Siklikal, Kesehatan, Keuangan, Properti, Teknologi, Infrastruktur, Transportasi dan Logistik | Penutupan sebelumnya, terakhir, DtD %, YtD %, tanggal observasi; adapter sektor Yahoo tersedia, sedangkan cakupan dan baseline historinya perlu diverifikasi |
+| Komoditas | ICE Brent, Newcastle Coal, CPO Bursa Malaysia | Unit, terakhir, DtD %, WtD %, MtD %, 1M bergulir %, YtD %; adapter Newcastle/CPO memisahkan perubahan satu bulan bergulir dari MtD kalender. Periksa hasil parser; WtD/MtD/YtD tetap kosong tanpa histori pembanding yang memadai |
 
 DJI yang sudah ada tetap ditampilkan pada subkelompok indeks global, terpisah dari IHSG dan indeks sektoral Indonesia. Delapan tabel kategori kini dipilih melalui tab; satu kategori tampil pada satu waktu. Pada layar kecil tab dapat digeser horizontal dan tabel yang lebar dapat digeser dengan nama instrumen tetap terlihat. Sebelas sektor tetap menjadi baris data di kategori Index. Lima indikator utama dan pendukung menyorot USD/IDR, IHSG, SBN 10Y, UST 10Y, dan emas Antam.
 
@@ -136,6 +138,10 @@ Label periode ditampilkan di nama kolom dan tooltip singkat, tanpa panel Glosari
 Perhitungan harga memakai histori bertanggal dan nilai sumber mentah. Pembanding memakai observasi terakhir yang tersedia sebelum awal periode; jika belum ada, nilai tetap kosong, bukan nol. Periode ini mengikuti kalender minggu/bulan/kuartal/tahun, bukan akumulasi arus modal. Untuk Capital Flow, label periode adalah penjumlahan arus bersih pada sesi dalam rentang tersebut.
 
 MtD bukan MoM, dan YtD bukan YoY. Nilai `1W` untuk arus modal didefinisikan sebagai total lima sesi perdagangan terakhir; MtD/QtD/YtD adalah akumulasi arus sejak awal periode kalender. Arus modal merupakan nominal neto, bukan persentase perubahan. Untuk harga, kurs, dan indeks, perubahan dihitung dari angka asli sebelum pembulatan: `(terakhir / pembanding - 1) x 100`. Jika pembanding tidak tersedia, hasil ditampilkan sebagai `—`, bukan nol.
+
+Adapter Capital Flow memakai net transaksi investor asing pada [tabel harian BEI](https://www.idx.id/en/market-data/statistical-reports/digital-statistic/monthly/equity-trading-by-investor/table-daily-trading-by-type-of-investor) untuk saham. Untuk obligasi, [laman data kepemilikan SBN DJPPR](https://djppr.kemenkeu.go.id/kepemilikansbndomestikyangdapatdiperdagangkan) menyediakan posisi kepemilikan SBN rupiah nonresiden; perubahan posisi antarobservasi dipakai sebagai proksi arus dan tidak disamakan dengan catatan transaksi pasar sekunder. Saham dikonversi ke USD memakai kurs USD/IDR pada tanggal transaksi; bila kurs tanggal itu tidak tersedia, adapter memakai kurs terakhir sebelumnya dengan jarak maksimal empat hari kalender. Perubahan posisi obligasi dikonversi memakai kurs pada tanggal observasi terakhir periode. Tanggal sumber ditampilkan di catatan kategori. Pada saat adapter diperiksa 7 Oktober 2026, endpoint BEI belum menerbitkan data Oktober dan observasi terakhir yang tersedia adalah 30 September; baris ditandai sebagai data terakhir/stale hingga sumber menerbitkan pembaruan. Periode yang tidak memiliki lima sesi atau baseline kepemilikan bertanggal tetap kosong.
+
+Perubahan selama satu bulan terakhir merupakan periode bergulir dan tidak boleh diberi label MtD atau MoM secara otomatis. Adapter Trading Economics menyimpan perubahan tersebut pada `rolling_1m_pct`; dashboard menampilkannya sebagai **1M bergulir (%)**. Field `mtd_pct` tetap kosong sampai tersedia baseline awal bulan kalender yang sebanding. Kode telah diperbarui pada 7 Oktober 2026; hasil parser dan tampilan belum diverifikasi dengan suite regresi.
 
 Perubahan yield ditampilkan terutama dalam basis point: 1 bp = 0,01 poin persentase; kenaikan yield dari 7,00% ke 7,05% adalah +5 bp. Perubahan indikator yang sudah berupa persentase, seperti inflasi YoY dari 3,19% ke 3,28%, adalah +0,09 poin persentase, bukan perubahan inflasi bulanan. Kolom bulan memakai periode observasi yang benar; bulan berjalan tanpa publikasi ditampilkan `—`.
 
@@ -248,6 +254,7 @@ Pedoman pengembangan:
 
 - Hapus section, tautan navigasi, dan kolom Sumber/Glosarium dari dashboard. Simpan metadata sumber di backend untuk penelusuran dan pengendalian kualitas; bila artikel dijadikan dasar insight, tautan kontekstual dapat melekat pada insight tersebut.
 - Dashboard menampilkan tiga sorotan awal dan dampak praktis. Label periode (DtD, WtD, MtD, QtD, YtD, MoM, YoY) serta satuan dijelaskan langsung pada judul kolom atau tooltip singkat.
+- Narasi memakai kalimat yang jelas dengan titik, koma, atau kata penghubung. Tanda pisah panjang (`—`) dan titik koma (`;`) telah dihapus dari narasi, deskripsi kategori, dan keterangan data dashboard. Penanda `—` tetap digunakan untuk nilai data yang belum tersedia.
 - Satu grafik riwayat memakai area penuh agar garis dan label mudah dibaca. Pilihan rentang awal satu bulan; pilihan tiga bulan, enam bulan, dan semua data dinonaktifkan bila cakupan seri aktif belum cukup. Perubahan historis diberi label periode tersendiri dan tidak disamakan dengan DtD pada KPI.
 - Tab kategori membuat satu tabel aktif dalam satu waktu. Semua kategori dapat diakses dari pemilih dan submenu navigasi; tautan langsung membuka kategori terkait. Tabel lebar memakai scroll horizontal dengan kolom instrumen tetap terlihat.
 - Navigasi dikelompokkan menjadi **Ringkasan**, **Analisis & Grafik**, **Data Pasar**, dan **Unduh PDF**. Kategori berada pada submenu Data Pasar. Login serta refresh operator tetap diakses melalui tombol **Pengelolaan** di header.
@@ -340,6 +347,7 @@ Backend memakai package `market_report` dengan susunan `src/` dan konfigurasi pa
 | Endpoint | Kegunaan | Akses |
 |---|---|---|
 | `GET /health` | Mengetahui proses API hidup | Terbuka |
+| `GET /ready` | Memeriksa koneksi database, migrasi schema, worker, dan scheduler aktif bila dijadwalkan | Terbuka |
 | `GET /docs` | Dokumentasi endpoint | Terbuka |
 | `GET /api/v1/reports/latest` | Membaca laporan aktif | Token baca |
 | `GET /api/v1/reports/{report_id}` | Membaca versi tertentu | Token baca |
@@ -353,21 +361,23 @@ Backend memakai package `market_report` dengan susunan `src/` dan konfigurasi pa
 
 Token dikirim melalui `Authorization: Bearer ...`. Token baca dan operator adalah kredensial terpisah. Mekanisme ini belum merupakan login pengguna atau otorisasi per individu. Token server harus tetap di sisi server ketika frontend browser baru dikembangkan.
 
-`/health` saat ini memeriksa proses API saja. Schema laporan masih bersifat transisi, dengan beberapa bagian mengikuti payload lama; kontrak domain yang sepenuhnya terstruktur belum selesai.
+`/health` memeriksa proses API saja. `/ready` memeriksa database, seluruh migrasi yang dibundel, serta heartbeat worker dan scheduler (bila `REFRESH_TIMES` diaktifkan). Pemeriksaan readiness belum mencakup usia antrean, kegagalan job, kesegaran laporan aktif, atau kesehatan penyimpanan artefak. Schema laporan masih bersifat transisi, dengan beberapa bagian mengikuti payload lama; kontrak domain yang sepenuhnya terstruktur belum selesai.
 
 ## 12. Operasional, keamanan, dan keandalan
 
-Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, `REFRESH_TIMES`, dan `REPORT_ARTIFACT_DIR`. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi. Instalasi package mendukung `DAILY_MARKET_PROJECT_ROOT` dan `DAILY_MARKET_RUNTIME_DIR`; SQL migrasi disertakan dalam wheel.
+Konfigurasi lokal menggunakan `.env` dengan `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DATABASE_URL`, `API_READ_TOKEN`, `API_OPERATOR_TOKEN`, `REFRESH_TIMES`, `REPORT_ARTIFACT_DIR`, dan `DAILY_MARKET_CORE_MAX_AGE_DAYS` (default 7 hari). Variabel terakhir mengatur batas umur observasi untuk USD/IDR, IHSG, dan SBN 10 tahun saat validasi publikasi. Contoh struktur tersedia di `.env.example`; nilai kredensial tidak termasuk dokumentasi atau repository. Proses perlu dimulai ulang setelah perubahan konfigurasi. Instalasi package mendukung `DAILY_MARKET_PROJECT_ROOT` dan `DAILY_MARKET_RUNTIME_DIR`; SQL migrasi disertakan dalam wheel.
 
 Login operator membatasi lima kegagalan dalam 15 menit, lalu menahan percobaan selama 15 menit. Secara bawaan pembatas dibagi semua klien dan tidak mempercayai header IP. Pembatas per IP hanya aktif dengan `WEB_TRUST_PROXY=true` di belakang proxy yang menimpa `X-Real-IP` dan menutup akses langsung. Penyimpanan dibatasi 2.000 entri. Penghitung berada di memori proses Next.js; sebelum menjalankan beberapa instance, pindahkan pembatasan ke penyimpanan bersama.
 
 Grafik riwayat frontend mengambil data dengan `report_id` yang sama dengan dashboard. Laporan lama tanpa riwayat SBN tersimpan menampilkan seri kosong dan PDF tidak memakai riwayat terbaru sebagai pengganti. Ekspor PDF menghasilkan ringkasan eksekutif satu halaman dari versi laporan terpilih, mengunci pembuatan per versi di PostgreSQL, lalu memublikasikan berkas secara atomik. Permintaan ekspor dibatasi 10 per menit per proses API, dengan respons `429` dan `Retry-After` saat batas tercapai.
 
+Endpoint ekspor langsung mengembalikan artefak siap unduh bila PDF untuk versi laporan dan versi template saat ini sudah tersedia. Worker hanya merender ulang bila artefak belum ada atau template berubah. Artefak lama tetap tersimpan dan dapat dibuat ulang memakai penanda versi template pada storage key. Refresh dan pembuatan PDF tetap berbagi antrean PostgreSQL.
+
 Operasional yang dituju mencakup:
 
 - Jadwal pembaruan sesuai kebutuhan pengguna dan kalender sumber.
 - Log serta status job yang dapat ditelusuri melalui `job_id` dan `report_id`.
-- Pemeriksaan kesiapan database/worker selain pemeriksaan proses API.
+- Pemeriksaan kesiapan database, schema, worker, dan scheduler selain pemeriksaan proses API; pemantauan antrean dan artefak masih perlu ditambahkan.
 - Backup dan pemulihan database serta artefak laporan. Worker dan API harus memakai lokasi artefak persisten yang sama melalui `REPORT_ARTIFACT_DIR`.
 - Deployment yang dapat diulang, dependensi terkunci, dan pemeriksaan otomatis sebelum rilis.
 - Pengelolaan akses pengguna, rahasia konfigurasi, serta pencatatan aktivitas bila lingkup penggunaan berkembang.
@@ -376,7 +386,27 @@ Antrean mendukung deduplikasi job aktif per jenis/versi, pengambilan job dengan 
 
 Publikasi laporan dan pencatatan keberhasilan job berada pada transaksi terpisah. Refresh worker kini menetapkan ID laporan deterministik dari job agar retry memakai versi yang sudah terbit; transaksi atomik antara publikasi dan penyelesaian job serta jeda retry tetap menjadi pekerjaan lanjutan.
 
-Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru.
+Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan schema sekaligus mengimpor data lokal. Impor dapat menjadikan laporan aktif lokal sebagai laporan aktif database; skrip ini bukan perintah refresh rutin. Migrasi yang sudah diterapkan sebaiknya dipertahankan, dengan perubahan schema berikutnya melalui migrasi baru. Migrasi `010_runtime_service_heartbeats.sql` menambahkan tabel heartbeat layanan dan harus diterapkan sebelum worker baru beroperasi.
+
+`run-app.ps1` mempertahankan mode development. `run-production.ps1` membangun frontend lalu menjalankan Next.js dan API tanpa mode reload, menyalakan worker serta scheduler yang dikonfigurasi, dan menunggu `/ready`. Launcher mengikat layanan ke loopback dan menjadi runner lokal satu mesin; proses supervisor permanen, HTTPS/reverse proxy, backup/restore, serta pengelolaan log produksi tetap menjadi tanggung jawab deployment.
+
+### Hasil review kesiapan produksi, 7 Oktober 2026
+
+Penilaian didasarkan pada kode repository dan pemeriksaan lokal. Infrastruktur deployment, sertifikat TLS, kebijakan jaringan, backup, serta kapasitas lingkungan produksi belum diverifikasi. Status implementasi fitur tidak menjadi bukti kesiapan operasional.
+
+P1 berarti temuan yang harus diselesaikan sebelum rilis publik yang andal. P2 merupakan penguatan yang harus memiliki keputusan dan bukti sesuai skala deployment. Pemilik pekerjaan dan tanggal penyelesaian belum ditetapkan.
+
+| Prioritas | Temuan dan bukti | Dampak | Status dan pekerjaan tersisa |
+|---|---|---|---|
+| P1, kode diperbarui | [Parser komoditas](../backend/src/market_report/fetch_data.py) menyimpan perubahan `past month` pada `rolling_1m_pct`; MtD kalender tetap terpisah | Label dan periode pembanding kini dibedakan, tetapi nilai yang berasal dari feed belum diperiksa regresinya | Verifikasi parser dan UI dengan respons Trading Economics representatif; MtD tetap kosong tanpa baseline kalender |
+| P1, validasi diperketat | [Validasi laporan](../backend/src/market_report/services/report_service.py) memeriksa nilai harga/indeks positif, mewajibkan USD/IDR, IHSG, dan SBN 10 tahun, serta membatasi usia tanggal observasi dengan konfigurasi | Mengurangi risiko data inti tidak wajar/lama mengganti laporan aktif; kebijakan batas 7 hari dan toleransi per kalender pasar belum disetujui pemilik data | Verifikasi kasus valid, invalid, libur pasar, dan data parsial; tetapkan batas umur berbeda bila kalender sumber membutuhkannya |
+| P1, runner lokal tersedia | [Launcher](../run-app.ps1) memiliki mode produksi; [run-production.ps1](../run-production.ps1) membangun frontend dan menyalakan layanan tanpa reload | Menyediakan cara menjalankan mode produksi di satu mesin; belum ada supervisor permanen, TLS, deployment terisolasi, maupun bukti restart/restore | Tetapkan lingkungan deployment, pengelolaan proses, HTTPS, pembatasan jaringan, volume persisten, backup/restore, dan validasi konfigurasi |
+| P1, readiness tersedia | [`/health`](../backend/src/market_report/api/main.py) tetap memeriksa proses; endpoint `/ready` memeriksa database, migrasi, serta heartbeat worker/scheduler | Mendeteksi layanan belum siap saat DB/schema/worker/scheduler bermasalah; pemantauan antrean dan artefak belum tersedia | Verifikasi lewat PostgreSQL/HTTP, tambahkan pemantauan umur antrean, kegagalan job, kesegaran laporan, dan penyimpanan artefak |
+| P2, cache PDF tersedia | [Worker](../backend/src/market_report/worker/main.py) memakai artefak yang masih cocok dengan versi template dan API melewati antrean untuk artefak tersebut | Unduhan ulang tidak merender ulang selama file tersedia; belum diverifikasi lintas job/instance | Verifikasi perubahan versi template, artefak hilang, dan konkurensi pada database terisolasi; ukur waktu tunggu antrean |
+| P2 | [Pembatas login](../frontend/src/lib/operator-session.ts) dan [pembatas ekspor](../backend/src/market_report/api/rate_limits.py) berada di memori masing-masing proses | Penghitung hilang setelah restart dan tidak konsisten antar-instance | Tetapkan batas deployment yang didukung. Gunakan proxy atau penyimpanan bersama untuk pembatasan pada deployment dengan beberapa instance, lalu verifikasi kebijakan sesi dan akses operator |
+| P2 | Dependensi Python memakai rentang versi, CI belum tersedia di repository, dan tes yang dijalankan belum mencakup PostgreSQL/HTTP nyata | Hasil instalasi dapat berbeda dan regresi integrasi tidak otomatis terdeteksi sebelum rilis | Kunci dependensi backend, gunakan lockfile frontend melalui `npm ci`, dan tambahkan pemeriksaan rilis serta tes integrasi pada database terisolasi |
+
+Empat temuan P1 telah ditangani pada kode, tetapi belum ditutup karena suite regresi, integrasi PostgreSQL/HTTP, dan deployment produksi belum diverifikasi. Implementasi cache PDF P2 juga menunggu verifikasi; dua pekerjaan P2 lain masih terbuka. Rekomendasi deployment mengacu pada [konsep deployment FastAPI](https://fastapi.tiangolo.com/deployment/concepts/) dan [panduan self-hosting Next.js](https://nextjs.org/docs/app/guides/self-hosting). Pilihan penyedia, sistem operasi, pengelola layanan, dan bentuk deployment ditetapkan sesuai lingkungan target.
 
 ## 13. Roadmap dan urutan prioritas
 
@@ -389,7 +419,7 @@ Skrip `backend/src/market_report/migrate_reports_to_postgres.py` menerapkan sche
 | 5. Frontend baru | Next.js mencapai kesetaraan fitur baca MVP | Dashboard baca, grafik riwayat, tema/teks, dan alur ekspor PDF tersedia; build serta pemeriksaan TypeScript berhasil | Integrasi API dengan data representatif, worker ekspor, responsif, serta penerimaan alur baca diverifikasi |
 | 6. Fitur operasional frontend | Monitor live dan refresh operator di Next.js | Implementasi monitor, fallback snapshot, sesi operator, refresh worker, dan batas login lokal tersedia | Alur API/worker, kontrol akses deployment, polling refresh, dan fallback sumber diverifikasi |
 | 7. Transisi penggunaan | Pengguna beralih secara terkendali | Belum dimulai | Data/fitur setara, observasi operasional memadai, rollback tersedia |
-| 8. Penguatan production | Deployment, monitoring, akses, dan pemulihan | Belum selesai | Kriteria operasional dan keamanan yang disepakati terpenuhi |
+| 8. Penguatan production | Ketepatan data, deployment, monitoring, akses, dan pemulihan | Empat perbaikan P1 sudah ada pada kode dan cache PDF P2 diterapkan; belum siap untuk rilis publik karena pemeriksaan regresi, integrasi, dan deployment belum dilakukan | Verifikasi seluruh perubahan P1/P2, tutup pekerjaan P2 yang sesuai skala deployment, dan penuhi kriteria rilis pada bagian 14 |
 
 Penguatan kualitas, keamanan, dan pengujian dilakukan sepanjang tahap; tidak seluruhnya ditunda sampai tahap terakhir.
 
@@ -401,8 +431,8 @@ Urutan ini melengkapi roadmap migrasi di atas. Perluasan kategori dilakukan sete
 |---|---|---|
 | A. Kontrak data | Menambahkan field kategori, unit, ketersediaan, periode, dan observasi bulanan pada payload laporan | Kerangka kontrak tersedia; registry sumber/kalender per instrumen masih perlu dilengkapi |
 | B. Histori dan schema | Histori satu tahun untuk instrumen Yahoo, penyimpanan histori SBN sampai 420 observasi, dan histori Antam dari laporan yang diterbitkan | Perhitungan harian yang didukung histori dapat direproduksi per versi; data bulanan/aruskas belum disimpan sebagai observasi terstruktur |
-| C. Mesin periode dan validasi | Menghitung WtD/MtD/QtD/YtD harga serta YtD bp yield dari histori; DtD tetap memakai observasi sumber sebelumnya | Diterapkan untuk seri dengan histori memadai; MoM/YoY umum dan akumulasi arus modal masih perlu diterapkan |
-| D. Adapter data | Memakai feed yang sudah ada dan menampilkan placeholder jujur untuk data tanpa feed | Yahoo, PHEI, BI, dan Antam tetap terhubung; adapter sektor IDX-IC, Newcastle, CPO spot, Capital Flow, makro lengkap, dan Operasi Moneter masih diperlukan |
+| C. Mesin periode dan validasi | Menghitung WtD/MtD/QtD/YtD harga, YtD bp yield, serta periode akumulasi Capital Flow | Diterapkan untuk seri dengan histori dan baseline memadai. Perubahan 1M bergulir Newcastle/CPO dipisahkan dari MtD kalender; validasi publikasi diperketat. MoM/YoY umum masih perlu diterapkan |
+| D. Adapter data | Memakai feed yang sudah ada dan menampilkan placeholder jujur untuk data tanpa feed | Adapter Yahoo/IDX-IC, PHEI, BI, Antam, Gold Spot, Newcastle/CPO, makro, Operasi Moneter, serta Capital Flow BEI/DJPPR tersedia dengan cakupan parsial. Kualitas, tanggal, dan histori tetap perlu diverifikasi per seri; obligasi memakai perubahan posisi kepemilikan sebagai proksi transaksi |
 | E. Agenda dan insight | Ambil agenda ekonomi dan berita yang relevan, lalu tautkan ke instrumen serta periode | Belum diimplementasikan; insight saat ini belum ditopang adapter berita/kalender baru |
 | F. Dashboard | Hilangkan panel Sumber/Glosarium; tampilkan delapan kategori, label periode, tooltip, dan status data kosong | Diterapkan; beberapa kategori masih dominan kosong sampai adapter tersedia |
 | G. Konsistensi kanal | Selaraskan KPI, grafik, PDF satu halaman, API, dan validasi penerbitan | Kontrak API/dashboard diperluas dan PDF lama tetap memakai field kompatibel; tabel kategori baru belum seluruhnya masuk PDF |
@@ -410,7 +440,17 @@ Urutan ini melengkapi roadmap migrasi di atas. Perluasan kategori dilakukan sete
 
 Nilai harga dan indeks dibulatkan pada tampilan sesuai preferensi produk; yield dan persentase mempertahankan desimal yang bermakna. Angka mentah tidak dibulatkan sebelum perhitungan. Sumber aktual dan waktu observasi dapat berbeda per instrumen, sehingga satu tanggal global tidak menggantikan tanggal per baris.
 
-**Prioritas perluasan data berikutnya:** hubungkan feed tervalidasi untuk sektor IDX-IC, Newcastle Coal, CPO, data bulanan makro lengkap, Capital Flow, dan Operasi Moneter; setelah itu lengkapi agenda/berita serta tentukan apakah kategori baru juga diringkas di PDF. Trading Economics dan sumber lain pada daftar prioritas adalah target pencarian sumber, bukan klaim bahwa adapter atau akses API sudah tersedia. Prioritas operasional yang tetap berjalan adalah verifikasi antrean, ekspor artefak, dan scheduler melalui alur lengkap, kontrol akses deployment, serta penyimpanan artefak persisten.
+**Prioritas perluasan data berikutnya:** verifikasi kestabilan akses dan kelengkapan histori adapter Capital Flow BEI/DJPPR, lanjutkan pemeriksaan periode Newcastle/CPO dan kesegaran seri yang telah terhubung, lalu lengkapi agenda/berita. Tentukan apakah kategori baru juga diringkas di PDF. Ketersediaan adapter tidak menjamin akses stabil, kelengkapan histori, atau kelayakan data untuk produksi.
+
+### Urutan tindak lanjut review kesiapan produksi
+
+| Urutan | Fokus | Hasil yang harus tersedia |
+|---|---|---|
+| 1 | Ketepatan periode dan kualitas publikasi | Perubahan bergulir dibedakan dari MtD, aturan indikator wajib serta kesegaran disepakati, dan laporan tidak valid ditolak tanpa mengganti versi aktif |
+| 2 | Operasional produksi | Konfigurasi deployment dapat diulang, layanan hidup kembali setelah kegagalan, readiness dan pemantauan worker tersedia, serta database/PDF dapat dipulihkan dari backup |
+| 3 | Pengujian dan pemeriksaan rilis | Dependensi terkunci, CI menjalankan pemeriksaan yang disepakati, serta alur HTTP/PostgreSQL, pemulihan job, akses operator, cache PDF, dan batas beban diverifikasi |
+
+Penguatan kapasitas ekspor dan pembatasan akses mengikuti skala deployment yang ditetapkan pada urutan 2, dengan pengujiannya pada urutan 3. Perluasan fitur berjalan setelah masalah ketepatan angka dan kemampuan operasi memiliki kendali yang memadai.
 
 Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditetapkan.
 
@@ -433,10 +473,25 @@ Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditet
 ### Data dan sistem
 
 - Refresh gagal tidak menggantikan laporan aktif dengan hasil tidak valid.
+- Validasi publikasi memakai indikator wajib dan aturan per instrumen. Harga negatif, observasi terlalu lama, tanggal tidak valid, atau lonjakan di luar batas kewajaran ditangani sesuai kebijakan yang disepakati; nilai negatif arus modal dan perubahan tetap sah sesuai definisinya.
+- Perhitungan MtD memakai observasi terakhir sebelum bulan kalender berjalan. Perubahan satu bulan bergulir memiliki label tersendiri, dan ketiadaan baseline tidak menghasilkan angka nol atau periode yang menyesatkan.
 - Akses API sesuai peran token dan respons tidak membocorkan metadata sumber internal atau kredensial.
 - Worker yang kehilangan kepemilikan job tidak dapat menyelesaikan atau menimpa hasil worker pengganti.
 - Riwayat dan artefak yang diperlukan untuk mereproduksi laporan memiliki hubungan versi yang jelas.
 - Backup dapat dipulihkan dan aplikasi dapat dijalankan kembali dari prosedur yang terdokumentasi.
+
+### Kriteria rilis produksi
+
+Kriteria ini menjadi target penerimaan. Empat perubahan P1 telah diterapkan pada kode, tetapi review 7 Oktober 2026 belum menyatakan perubahan tersebut maupun kriteria berikut terpenuhi karena pemeriksaan regresi dan integrasi belum dijalankan:
+
+- Empat temuan P1 pada bagian 12 ditutup dengan bukti pemeriksaan. Indikator wajib, batas kesegaran, dan kebijakan laporan parsial telah disetujui penanggung jawab kualitas data.
+- Build produksi berhasil pada konfigurasi rilis yang dikunci. Frontend berjalan dengan mode produksi, API berjalan tanpa reload pengembangan, dan web/API/worker/scheduler dikelola sesuai lingkungan target dengan startup serta restart otomatis.
+- HTTPS, konfigurasi proxy, rahasia server, dan pembatasan jaringan diverifikasi di lingkungan deployment. Database serta kredensial operator tidak dapat diakses melalui browser atau akses jaringan yang tidak diizinkan.
+- Readiness memeriksa koneksi serta schema database. Pemantauan terpisah mendeteksi worker/scheduler yang berhenti, antrean terlalu lama, kegagalan ekspor, laporan lama, dan penyimpanan artefak bermasalah. Penanggung jawab serta ambang alert ditetapkan.
+- PostgreSQL dan berkas PDF memiliki penyimpanan persisten. Restore backup diuji pada lingkungan terpisah, termasuk keterkaitan metadata artefak dengan berkasnya; retensi, target kehilangan data (RPO), dan waktu pemulihan (RTO) ditetapkan.
+- Integrasi HTTP dengan PostgreSQL terisolasi menguji refresh, publikasi versi, ekspor, unduhan, deduplikasi, retry, dan pemulihan lease setelah worker dihentikan. Browser dapat mengunduh PDF dengan angka yang sesuai versi laporan.
+- Skala deployment dan target beban ditetapkan. Cache PDF, batas permintaan, koneksi database, serta antrean diuji terhadap target tersebut. Deployment beberapa instance memiliki pembatasan akses yang dibagi bersama atau dikendalikan proxy.
+- CI memeriksa TypeScript, lint, tes backend yang relevan, dan build produksi. Prosedur migrasi schema, rilis, rollback, dan penanganan kegagalan terdokumentasi. Temuan P2 memiliki hasil verifikasi atau keputusan penerimaan risiko sesuai skala deployment.
 
 ### Ukuran yang perlu mulai dicatat
 
@@ -451,7 +506,19 @@ Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditet
 
 Baseline dan target numerik belum tersedia. Target ditetapkan setelah kebutuhan operasional dan hasil pengukuran awal diketahui.
 
-Pemeriksaan tahap terdahulu mencakup pipeline/UI/PDF serta tujuh uji terisolasi kontrak API, enqueue refresh, worker, kegagalan ekspor PDF, dan dispatch scheduler. Perbaikan 4 Oktober 2026 lolos pemeriksaan TypeScript, lint penuh frontend, build produksi Next.js, kompilasi Python, dan pembentukan schema OpenAPI. Wheel backend berhasil dibangun dengan instalasi Python lokal yang memiliki `setuptools`, lalu dipasang ke direktori pemeriksaan terpisah: sembilan migrasi SQL tersedia dan root default mengikuti direktori kerja, bukan direktori instalasi package. Pemeriksaan ini tidak menulis ke database pengguna. Integrasi melalui HTTP dan PostgreSQL, konkurensi/pemulihan, serta uji rute batas login masih perlu diverifikasi.
+Pemeriksaan terdahulu mencakup pipeline/UI/PDF serta tujuh uji terisolasi kontrak API, enqueue refresh, worker, kegagalan ekspor PDF, dan dispatch scheduler. Perbaikan 4 Oktober 2026 lolos pemeriksaan TypeScript, lint frontend, build Next.js, kompilasi Python, dan pembentukan schema OpenAPI. Wheel backend berhasil dibangun dengan instalasi Python lokal yang memiliki `setuptools`, lalu dipasang ke direktori pemeriksaan terpisah: saat itu sembilan migrasi SQL tersedia dan root default mengikuti direktori kerja, bukan direktori instalasi package. Pemeriksaan ini tidak menulis ke database pengguna. Integrasi melalui HTTP dan PostgreSQL, konkurensi/pemulihan, serta uji rute batas login masih perlu diverifikasi. Hasil tersebut tidak mencakup perubahan 7 Oktober.
+
+### Bukti pemeriksaan terdahulu sebelum eksekusi 7 Oktober 2026
+
+| Pemeriksaan | Hasil | Cakupan |
+|---|---|---|
+| `npm run lint` pada `frontend/` | Lulus | Analisis statis frontend |
+| `tsc --noEmit --incremental false` pada `frontend/` | Lulus | Pemeriksaan tipe TypeScript |
+| `python -m unittest discover -s tests -p test_api_worker.py -v` | 7 tes lulus | Kontrak token, enqueue, alur worker, kegagalan PDF, dan dispatch scheduler menggunakan mock/repository pengganti |
+| `python -m unittest discover -s tests -p test_pipeline.py -v` | 3 tes lulus | Publikasi snapshot, penolakan snapshot kosong, dan pemisahan demo menggunakan direktori sementara |
+| Pemanggilan `validate_report` dengan dua harga negatif bertanggal 2020 | Baseline sebelum perubahan: masih diterima | Menjadi alasan pengetatan validasi; pemeriksaan sintetis tersebut belum diulang setelah perbaikan |
+
+Sepuluh tes terdahulu belum menguji ketepatan periode adapter komoditas, PostgreSQL sungguhan, lease antar-worker, atau seluruh rute HTTP. Untuk perubahan 7 Oktober, kompilasi sintaks Python, pemeriksaan tipe TypeScript, parsing sintaks PowerShell, dan `git diff --check` lulus. Suite test, lint, dan build tidak dijalankan. Perubahan parser, validasi, readiness, cache PDF, dan launcher masih memerlukan pemeriksaan regresi serta integrasi. Build produksi, keamanan dependency, TLS, restore backup, dan uji beban juga belum diverifikasi untuk versi rilis. Tes PDF/live yang masih mengimpor entry point `app` lama perlu diselaraskan dengan backend dan frontend aktif agar pemeriksaan rilis tidak bergantung pada checkout legacy.
 
 ## 15. Ketergantungan dan keputusan terbuka
 
@@ -460,12 +527,12 @@ Pemeriksaan tahap terdahulu mencakup pipeline/UI/PDF serta tujuh uji terisolasi 
 | Kepemilikan produk | Penanggung jawab prioritas, penerimaan fitur, dan kualitas interpretasi |
 | Pengguna | Kelompok pembaca, jumlah pengguna, dan kebutuhan akses eksternal |
 | Jadwal laporan | Jam publikasi, frekuensi refresh, zona waktu tampilan, dan penanganan hari libur |
-| Kualitas data | Indikator wajib, batas data lama, dan kebijakan laporan parsial |
+| Kualitas data | Indikator wajib, batas kewajaran, kalender/frekuensi sumber, batas data lama, dan kebijakan laporan parsial |
 | Riwayat | Periode retensi, cakupan instrumen, serta reproduksi laporan/PDF |
-| Infrastruktur | Lingkungan deployment, domain, TLS, penyimpanan artefak, dan backup |
+| Infrastruktur | Lingkungan deployment, domain, TLS, pengelola proses, skala instance, penyimpanan artefak, dan backup |
 | Akses | Kebutuhan login/SSO, peran operator, serta audit aktivitas |
 | Desain | Identitas visual final, perangkat prioritas, dan penerimaan pengguna |
-| Operasional | Target ketersediaan, pemulihan, serta pihak yang menangani kegagalan |
+| Operasional | Target ketersediaan/beban, ambang alert, retensi, RPO/RTO, prosedur rollback, serta pihak yang menangani kegagalan |
 
 Ketergantungan utama meliputi akses database, ketersediaan penyedia data, format halaman/API penyedia, serta sumber daya pengembangan. Perubahan parser, kegagalan sumber, dan riwayat yang belum lengkap perlu dipantau sebagai keterbatasan produk saat ini.
 

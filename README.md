@@ -69,6 +69,9 @@ Terapkan schema database satu kali:
 .\.venv\Scripts\python.exe backend/src/market_report/apply_schema_migrations.py
 ```
 
+Jalankan perintah migrasi itu sebelum penggunaan pertama dan setelah aplikasi mendapat migrasi
+schema baru. Perintah hanya menerapkan migrasi yang belum tercatat.
+
 Jalankan website, API, dan worker sekaligus di Windows dari root proyek:
 
 ```powershell
@@ -78,7 +81,18 @@ Jalankan website, API, dan worker sekaligus di Windows dari root proyek:
 Script menjalankan API, worker, dan frontend; scheduler ikut dijalankan bila `REFRESH_TIMES`
 di `.env` berisi jadwal valid seperti `08:00,16:00`. Log disimpan di `runtime/logs/app/`.
 Tekan `Ctrl+C` pada terminal script untuk menghentikan seluruh proses. Migrasi schema database
-tetap dijalankan satu kali sebelum penggunaan pertama.
+tetap diterapkan sebelum startup pertama dan setelah ada migrasi baru.
+
+Untuk menjalankan build Next.js dan API dalam mode produksi lokal:
+
+```powershell
+.\run-production.ps1
+```
+
+Mode ini menjalankan `npm run build`, `next start`, dan Uvicorn tanpa `--reload`. Pemeriksaan
+`/ready` menunggu migrasi database, worker, dan scheduler bila jadwal diaktifkan. Jalankan migrasi
+schema lebih dulu. Script mengikat layanan ke `127.0.0.1`; pasang reverse proxy dengan HTTPS dan
+pengelolaan proses yang sesuai lingkungan sebelum aplikasi dibuka melalui jaringan.
 
 Jika perlu menjalankan komponen satu per satu untuk debugging, jalankan dari root proyek:
 

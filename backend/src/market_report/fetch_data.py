@@ -5,6 +5,8 @@ Sources:
 - SBN / SBSN yields                       : PHEI HPW & Imbal Hasil
 - BI Rate / INDONIA / JISDOR              : Bank Indonesia
 - Cross-check FX                          : open.er-api.com
+- Equity capital flow                    : Indonesia Stock Exchange (IDX)
+- Government bond flow proxy              : DJPPR nonresident SBN holdings
 """
 
 from __future__ import annotations
@@ -13,15 +15,17 @@ import math
 import re
 import calendar
 from urllib.parse import urljoin
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Any, List
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
 
 from market_report.config import market_data_directory
 from market_report.domain.index_sectors import IDX_IC_SECTOR_INDEXES
+from market_report.services.capital_flow_service import fetch_capital_flow
 
 DATA_DIR = market_data_directory()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -60,6 +64,12 @@ def _yahoo_chart(symbol: str, range_: str = "5d") -> Dict[str, Any]:
             return {"error": "no result", "symbol": symbol}
         res = result[0]
         meta = res.get("meta", {})
+        exchange_timezone = meta.get("exchangeTimezoneName")
+        try:
+            chart_timezone = ZoneInfo(exchange_timezone) if exchange_timezone else timezone.utc
+        except (KeyError, ValueError):
+            offset = int(meta.get("gmtoffset") or 0)
+            chart_timezone = timezone(timedelta(seconds=offset))
         timestamps = res.get("timestamp") or []
         quote = (res.get("indicators") or {}).get("quote") or [{}]
         closes = quote[0].get("close") or []
@@ -73,7 +83,7 @@ def _yahoo_chart(symbol: str, range_: str = "5d") -> Dict[str, Any]:
                 "last": last,
                 "prev": prev,
                 "change_pct": round((last - prev) / prev * 100, 4) if last and prev else None,
-                "date": datetime.now().strftime("%Y-%m-%d"),
+                "date": datetime.now(chart_timezone).strftime("%Y-%m-%d"),
                 "history": [],
                 "source": f"Yahoo Chart API ({symbol})",
             }
@@ -83,7 +93,7 @@ def _yahoo_chart(symbol: str, range_: str = "5d") -> Dict[str, Any]:
         chg = round((last - prev) / prev * 100, 4) if prev else None
         history = [
             {
-                "date": datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y-%m-%d"),
+                "date": datetime.fromtimestamp(t, tz=chart_timezone).strftime("%Y-%m-%d"),
                 "close": c,
             }
             for t, c in pairs
@@ -93,7 +103,7 @@ def _yahoo_chart(symbol: str, range_: str = "5d") -> Dict[str, Any]:
             "last": float(last),
             "prev": float(prev) if prev else None,
             "change_pct": chg,
-            "date": datetime.fromtimestamp(last_ts, tz=timezone.utc).strftime("%Y-%m-%d"),
+            "date": datetime.fromtimestamp(last_ts, tz=chart_timezone).strftime("%Y-%m-%d"),
             "history": history,
             "source": f"Yahoo Finance Chart API — {symbol}",
             "meta_price": meta.get("regularMarketPrice"),
@@ -111,7 +121,6 @@ def _trading_economics_commodity(slug: str, *, name: str, unit: str) -> Dict[str
         soup = BeautifulSoup(response.text, "lxml")
         description = soup.select_one("meta#metaDesc")
         actual = soup.select_one("#market_last")
-        daily_change_value = soup.select_one("#market_daily_chg")
         daily_pct = soup.select_one("#market_daily_Pchg")
         if not description or not actual or not daily_pct:
             raise ValueError("Halaman tidak memuat harga aktual dan perubahan harian.")
@@ -132,24 +141,18 @@ def _trading_economics_commodity(slug: str, *, name: str, unit: str) -> Dict[str
 
         price = float(actual_match.group(0).replace(",", ""))
         dtd_pct = float(daily_match.group(0)) * (1 if direction_match.group(1).lower() == "up" else -1)
-        daily_change = None
-        if daily_change_value:
-            change_match = re.search(
-                r"[-+]?\d[\d,]*(?:\.\d+)?",
-                daily_change_value.get_text(" ", strip=True),
-            )
-            if change_match:
-                daily_change = float(change_match.group(0).replace(",", ""))
-        mtd_pct = None
+        rolling_1m_pct = None
         if monthly_match:
-            mtd_pct = float(monthly_match.group(2)) * (1 if monthly_match.group(1).lower() == "risen" else -1)
+            rolling_1m_pct = float(monthly_match.group(2)) * (1 if monthly_match.group(1).lower() == "risen" else -1)
+        previous_price = price / (1 + dtd_pct / 100) if 1 + dtd_pct / 100 else None
         return {
             "last": price,
-            "prev": round(price - daily_change, 8) if daily_change is not None else None,
+            "prev": round(previous_price, 8) if previous_price is not None else None,
             "date": source_date,
             "dtd_pct": dtd_pct,
-            "change": daily_change,
-            "mtd_pct": mtd_pct,
+            "change": price - previous_price if previous_price is not None else None,
+            "mtd_pct": None,
+            "rolling_1m_pct": rolling_1m_pct,
             "unit": unit,
             "name": name,
             "source": url,
@@ -157,9 +160,11 @@ def _trading_economics_commodity(slug: str, *, name: str, unit: str) -> Dict[str
             "availability": "partial",
             "availability_note": (
                 "Harga referensi Trading Economics berbasis OTC/CFD, bukan benchmark resmi. "
-                  "DtD tersedia dari sumber. YtD menunggu baseline historis yang sebanding."
+                "DtD tersedia dari sumber. Perubahan 1 bulan adalah periode bergulir. "
+                "MtD dan YtD menunggu baseline historis yang sebanding."
                 if name == "Gold Spot (USD/troy oz)"
-                else "Harga, DtD, dan MtD tersedia. WtD serta YtD tidak disajikan pada feed ini."
+                else "Harga dan DtD tersedia. Perubahan 1 bulan adalah periode bergulir. "
+                "MtD, WtD, dan YtD menunggu histori pembanding yang sebanding."
             ),
         }
     except Exception as error:
@@ -851,6 +856,9 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     if persist:
         _save("yfinance", market)
 
+    print("Fetching official equity and bond capital-flow sources...")
+    capital_flow = fetch_capital_flow(market)
+
     print("Fetching ANTAM buy price feed...")
     antam_gold = fetch_antam_gold_price()
 
@@ -880,6 +888,7 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
         "bi": bi,
         "macro_indicators": macro_indicators,
         "monetary_operations": monetary_operations,
+        "capital_flow": capital_flow,
     }
     if persist:
         _save("snapshot", snapshot)

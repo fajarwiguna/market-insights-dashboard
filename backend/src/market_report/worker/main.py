@@ -3,6 +3,8 @@
 import argparse
 import hashlib
 import logging
+import os
+import socket
 import sys
 import threading
 import time
@@ -14,10 +16,12 @@ from market_report.infrastructure.repositories.job_repository import PostgresJob
 from market_report.services import export_service
 from market_report.services import report_service
 from market_report.config import report_artifact_directory
-from market_report.services.artifact_service import pdf_artifact_path
+from market_report.services.artifact_service import PDF_TEMPLATE_VERSION, pdf_artifact_is_current
 
 
 _logger = logging.getLogger("market_report.worker")
+_SERVICE_INSTANCE_ID = os.environ.get("RUNTIME_SERVICE_INSTANCE_ID", "").strip() or \
+    f"{socket.gethostname()}:{os.getpid()}"
 
 
 def process_one(repository: PostgresJobRepository) -> bool:
@@ -37,6 +41,7 @@ def process_one(repository: PostgresJobRepository) -> bool:
                     lease_lost.set()
                     _logger.error("Worker kehilangan lease job %s", job_id)
                     return
+                repository.heartbeat_service("worker", _SERVICE_INSTANCE_ID)
             except Exception:
                 _logger.exception("Gagal memperbarui lease job %s", job_id)
                 lease_lost.set()
@@ -71,19 +76,17 @@ def process_one(repository: PostgresJobRepository) -> bool:
             with repository.artifact_guard(report["report_id"]):
                 artifact = repository.get_artifact(report["report_id"])
                 directory = report_artifact_directory()
-                # An explicit export job means the PDF may have been built by
-                # older code. Rebuild it even when a valid artifact exists.
-                rebuild_requested = job["job_type"] == "export_pdf"
-                if rebuild_requested or pdf_artifact_path(artifact, directory) is None:
+                if not pdf_artifact_is_current(artifact, directory):
                     stable_prefix = hashlib.sha256(
                         report["report_id"].encode("utf-8")
                     ).hexdigest()[:16] + "_"
                     pdf_path, download_name = export_service.save_report_pdf(
-                        report, history, directory, storage_prefix=stable_prefix,
+                        report, history, directory,
+                        storage_prefix=f"{stable_prefix}_pdfv{PDF_TEMPLATE_VERSION}_",
                     )
                     with repository.ownership_guard(job_id, owner_token):
                         artifact = repository.get_artifact(report["report_id"])
-                        if rebuild_requested or pdf_artifact_path(artifact, directory) is None:
+                        if not pdf_artifact_is_current(artifact, directory):
                             artifact = repository.record_pdf_artifact(
                                 report["report_id"], download_name, pdf_path.name
                             )
@@ -119,6 +122,7 @@ def main() -> int:
     _logger.info("Worker dimulai; interval polling %.1f detik", args.poll_seconds)
     while True:
         try:
+            repository.heartbeat_service("worker", _SERVICE_INSTANCE_ID)
             processed = process_one(repository)
         except Exception:
             _logger.exception("Worker gagal memproses antrean")

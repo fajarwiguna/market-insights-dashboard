@@ -7,6 +7,7 @@ export type InstrumentReading = {
   dtd_bp?: number | null;
   wtd_pct?: number | null;
   mtd_pct?: number | null;
+  rolling_1m_pct?: number | null;
   qtd_pct?: number | null;
   ytd_pct?: number | null;
   ytd_bp?: number | null;

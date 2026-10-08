@@ -29,6 +29,55 @@ class PostgresJobRepository:
             raise RuntimeError("Job worker memerlukan psycopg dari requirements.txt.") from error
         return psycopg.connect(self.database_url, row_factory=dict_row)
 
+    def heartbeat_service(self, service_name: str, instance_id: str) -> None:
+        if service_name not in {"worker", "scheduler"}:
+            raise ValueError("Nama layanan runtime tidak dikenal.")
+        if not instance_id or len(instance_id) > 200:
+            raise ValueError("ID instance runtime tidak valid.")
+        with self._connect() as connection:
+            connection.execute(
+                """INSERT INTO runtime_service_heartbeats (service_name, instance_id, dates)
+                   VALUES (%s, %s, now())
+                   ON CONFLICT (service_name, instance_id) DO UPDATE SET dates = now()""",
+                (service_name, instance_id),
+            )
+
+    def readiness(self, *, scheduler_required: bool, heartbeat_seconds: int = 90) -> dict:
+        from market_report.migrate_reports_to_postgres import schema_migration_files
+
+        required_migrations = {path.name for path in schema_migration_files()}
+        with self._connect() as connection:
+            applied_migrations = {
+                row["version"]
+                for row in connection.execute("SELECT version FROM schema_migrations").fetchall()
+            }
+            missing_migrations = sorted(required_migrations - applied_migrations)
+            checks = {
+                "database": "ready",
+                "schema": "ready" if not missing_migrations else "missing_migrations",
+                "worker": "unknown",
+                "scheduler": "not_required" if not scheduler_required else "unknown",
+            }
+            if not missing_migrations:
+                checks["worker"] = "ready" if connection.execute(
+                    """SELECT 1 FROM runtime_service_heartbeats
+                       WHERE service_name = 'worker' AND dates > now() - (%s * interval '1 second')
+                       LIMIT 1""",
+                    (heartbeat_seconds,),
+                ).fetchone() else "stale"
+                if scheduler_required:
+                    checks["scheduler"] = "ready" if connection.execute(
+                        """SELECT 1 FROM runtime_service_heartbeats
+                           WHERE service_name = 'scheduler' AND dates > now() - (%s * interval '1 second')
+                           LIMIT 1""",
+                        (heartbeat_seconds,),
+                    ).fetchone() else "stale"
+        return {
+            "ready": all(value in {"ready", "not_required"} for value in checks.values()),
+            "checks": checks,
+            "missing_migrations": missing_migrations,
+        }
+
     def enqueue_refresh(self) -> dict:
         return self._enqueue("refresh")
 

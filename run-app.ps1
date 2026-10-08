@@ -2,7 +2,8 @@ param(
     [ValidateRange(1, 65535)]
     [int]$ApiPort = 8000,
     [ValidateRange(1, 65535)]
-    [int]$FrontendPort = 3000
+    [int]$FrontendPort = 3000,
+    [switch]$Production
 )
 
 $ErrorActionPreference = "Stop"
@@ -115,6 +116,19 @@ try {
     if (-not $nodeCommand) {
         throw "Node.js tidak ditemukan di PATH. Install Node.js lalu buka PowerShell baru."
     }
+    if ($Production) {
+        $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue | Select-Object -First 1
+        $frontendEnvironmentFiles = @(".env.production.local", ".env.production", ".env.local", ".env") |
+            Where-Object { Test-Path -LiteralPath (Join-Path $frontendDirectory $_) }
+        $hasApiEnvironment = $env:DAILY_MARKET_API_URL -and $env:API_READ_TOKEN -and
+            $env:API_OPERATOR_TOKEN -and $env:WEB_OPERATOR_PASSWORD -and $env:WEB_OPERATOR_SESSION_SECRET
+        if (-not $frontendEnvironmentFiles -and -not $hasApiEnvironment) {
+            throw "Konfigurasi server frontend belum ditemukan. Isi frontend/.env atau atur seluruh variabel API/operator di lingkungan proses."
+        }
+        if (-not $npmCommand) {
+            throw "npm.cmd tidak ditemukan di PATH, sehingga build produksi tidak dapat dijalankan."
+        }
+    }
     if ($ApiPort -eq $FrontendPort) {
         throw "Port API dan frontend harus berbeda."
     }
@@ -127,12 +141,25 @@ try {
 
     New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 
+    if ($Production) {
+        Write-Host "Membangun frontend untuk mode produksi..."
+        Push-Location $frontendDirectory
+        try {
+            & $npmCommand.Source run build
+            if ($LASTEXITCODE -ne 0) {
+                throw "Build frontend gagal dengan exit code $LASTEXITCODE."
+            }
+        } finally {
+            Pop-Location
+        }
+    }
+
     $backendArguments = @(
         "-u", "-m", "uvicorn", "market_report.api.main:app",
         "--app-dir", "backend/src",
-        "--host", "127.0.0.1", "--port", "$ApiPort",
-        "--reload", "--reload-dir", "backend/src"
+        "--host", "127.0.0.1", "--port", "$ApiPort"
     )
+    if (-not $Production) { $backendArguments += @("--reload", "--reload-dir", "backend/src") }
     Start-LoggedService -Name "api" -FilePath $pythonExecutable `
         -ArgumentList $backendArguments -WorkingDirectory $projectRoot
 
@@ -155,7 +182,8 @@ try {
     }
 
     $nextArgument = '"' + $nextCli + '"'
-    $frontendArguments = @($nextArgument, "dev", "--hostname", "127.0.0.1", "--port", "$FrontendPort")
+    $frontendMode = if ($Production) { "start" } else { "dev" }
+    $frontendArguments = @($nextArgument, $frontendMode, "--hostname", "127.0.0.1", "--port", "$FrontendPort")
     Start-LoggedService -Name "frontend" -FilePath $nodeCommand.Source `
         -ArgumentList $frontendArguments -WorkingDirectory $frontendDirectory
 
@@ -171,8 +199,13 @@ try {
 
         if (-not $apiReady) {
             try {
-                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$ApiPort/health" -TimeoutSec 2
-                $apiReady = $health.status -eq "ok"
+                $healthPath = if ($Production) { "ready" } else { "health" }
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$ApiPort/$healthPath" -TimeoutSec 2
+                if ($Production) {
+                    $apiReady = $health.status -eq "ready"
+                } else {
+                    $apiReady = $health.status -eq "ok"
+                }
             } catch { }
         }
         if (-not $frontendReady) {
@@ -193,6 +226,9 @@ try {
     Write-Host "  Website : http://127.0.0.1:$FrontendPort"
     Write-Host "  API     : http://127.0.0.1:$ApiPort"
     Write-Host "  Log     : $logDirectory"
+    if ($Production) {
+        Write-Host "Mode produksi lokal. Pasang reverse proxy HTTPS di depan website sebelum akses jaringan dibuka."
+    }
     Write-Host "Tekan Ctrl+C untuk menghentikan seluruh proses."
     try { Start-Process "http://127.0.0.1:$FrontendPort" } catch {
         Write-Warning "Browser tidak dapat dibuka otomatis; buka alamat website di atas secara manual."
