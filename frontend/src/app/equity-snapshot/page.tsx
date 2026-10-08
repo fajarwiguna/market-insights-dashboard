@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useRef, useState, type ReactNode } from "react";
+import { DashboardViewSwitcher } from "@/features/dashboard/dashboard-view-switcher";
 import styles from "./snapshot.module.css";
 import "./tailwind.css";
 import "@fontsource/roboto/400.css";
@@ -315,6 +316,7 @@ export default function EquitySnapshotPage() {
   }
 
   return <main className={styles.workspace}>
+    <div className={styles.navigation}><DashboardViewSwitcher active="equity" /></div>
     <div className={styles.documentViewport}><article ref={documentRef} id="equity-snapshot-document" className={styles.document} aria-label="Dokumen Equity Market Daily Snapshot"><ReportContent /></article></div>
     <div className={`${styles.actions} eq-flex eq-flex-wrap eq-items-center eq-justify-end eq-gap-2`}>
       <button type="button" onClick={toggleEditing} disabled={busy} aria-controls="equity-snapshot-document" aria-pressed={isEditing} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">{isEditing ? "Simpan" : "Edit"}</button>

@@ -1,19 +1,23 @@
 # Project Brief — Daily Market Report / Market Today
 
-Versi dokumen: 1.8
+Versi dokumen: 1.9
 
-Tanggal acuan: 7 Oktober 2026
+Tanggal acuan: 8 Oktober 2026
 Status produk: MVP/prototype yang sedang digunakan; pengembangan menuju aplikasi production dilakukan bertahap.
 
 Hasil review kesiapan produksi pada 7 Oktober 2026: belum memenuhi kriteria rilis publik yang andal. Eksekusi perbaikan berikut telah diterapkan pada kode: pemisahan periode 1M bergulir dari MtD, validasi indikator inti sebelum publikasi, readiness database/schema/worker/scheduler, mode launcher produksi lokal, serta cache PDF berdasarkan versi template. Perubahan ini belum menjalani suite regresi atau verifikasi deployment. Temuan lanjutan dan kriteria penerimaan dicatat pada bagian 12–14.
 
 Dokumen ini menjadi acuan bersama untuk memahami produk, menetapkan prioritas, dan mengevaluasi perubahan. Kondisi implementasi dibedakan dari arah pengembangan. Target, peran pengguna, dan kebijakan operasional yang belum disepakati ditandai sebagai usulan atau keputusan terbuka.
 
+Pembaruan 8 Oktober 2026 mencatat halaman Equity Snapshot, navigasi tiga tampilan, penyuntingan sementara di browser, ekspor PDF client-side, dan temuan UI yang masih terbuka. Pemeriksaan TypeScript dan lint pada berkas navigasi/snapshot berhasil; hasil tersebut belum menjadi bukti penerimaan layout, ekspor hasil edit, atau kesiapan produksi.
+
 ## 1. Ringkasan produk
 
 **Daily Market Report** adalah aplikasi informasi pasar yang menyajikan ringkasan harian, perubahan indikator utama, interpretasi kondisi pasar, grafik, dan laporan PDF. **Market Today** merupakan nama tampilan dashboard yang digunakan saat ini.
 
 Produk membantu pembaca memahami kondisi pasar melalui satu tampilan yang terstruktur dan angka rinci. Asal data serta metode dicatat sebagai metadata untuk kendali kualitas; artikel yang mendukung insight dapat ditautkan secara kontekstual. Produk juga membantu operator menyiapkan laporan yang konsisten tanpa menyusun ulang data dan grafik secara manual.
+
+Halaman **Equity Snapshot** menyediakan dokumen pasar saham dengan layout mengikuti referensi pengguna, penyuntingan teks dan tabel, serta unduhan PDF dari hasil edit. Implementasi saat ini menggunakan data contoh bawaan dari referensi. Integrasi angka dan narasi halaman ini dengan laporan aktif/API belum tersedia.
 
 Pendekatan pengembangan adalah mempertahankan fitur MVP yang sudah berguna, memperbaiki kualitas data dan pengalaman membaca, lalu memisahkan antarmuka, layanan aplikasi, penyimpanan, dan pekerjaan latar belakang secara bertahap.
 
@@ -92,12 +96,14 @@ tidak menjadi bagian dari clone baru. Direktori source Next.js bernama `frontend
 | Penjelasan | Definisi ringkas periode dan satuan dekat kolom data | Label dan tooltip periode tersedia; panel serta tautan Sumber/Glosarium telah dihapus dari dashboard |
 | Tampilan | Tema terang/gelap dan pengaturan tampilan | Tersedia di frontend Next.js |
 | PDF | Ringkasan eksekutif A4 satu halaman dengan angka kunci, grafik Rate Differential dan Gold Prices (Gold Futures COMEX/Antam), insight, dan indikator pendukung | Renderer tersedia; ekspor memakai ulang artefak yang cocok dengan versi laporan dan versi template, atau membuat PDF melalui worker bila perlu |
+| Equity Snapshot | Dokumen saham: ringkasan IHSG/arus asing/batubara, indeks dan sektor, narasi, leaders/laggards, serta foreign flow lintas negara | Route `/equity-snapshot` tersedia sebagai Client Component dengan data contoh dari referensi; angka belum dihubungkan ke API |
+| Edit dan PDF Equity Snapshot | Penyuntingan langsung teks/sel tabel dan ekspor dokumen hasil edit | Tombol Edit/Simpan mengatur `contentEditable`; perubahan hanya berada di halaman browser. `html2pdf.js` dimuat melalui dynamic import saat unduh; hasil disesuaikan ke satu halaman A4 |
 | Laporan berversi | Laporan aktif, ID laporan, arsip versi | Tersedia melalui repository JSON/PostgreSQL |
 | API | Baca laporan, riwayat instrumen, data live | Implementasi tersedia; kontrak masih dalam tahap transisi |
 | Antrean refresh | Membuat dan membaca status job; worker terpisah | Dashboard Next.js meminta refresh melalui API; job diproses worker saat PostgreSQL aktif |
 | Scheduler terpusat | Menjadwalkan refresh melalui antrean | Scheduler configurable dan pencatatan slot PostgreSQL tersedia; jadwal bisnis belum ditetapkan |
 | Ekspor latar belakang | Job PDF per versi laporan dan tautan artefak | Endpoint/job tersedia; perlu verifikasi integrasi dan berkas masih disimpan di direktori bersama lokal |
-| Frontend aktif | Next.js + TypeScript | Dashboard di `frontend/` mencakup ringkasan, delapan kategori data, grafik riwayat, pengaturan tema/teks, serta ekspor PDF per versi melalui worker. Label periode dan status data kosong ditampilkan per kategori |
+| Frontend aktif | Next.js + TypeScript | Navigasi atas mencakup Laporan Harian, Monitor Pasar, dan Equity Snapshot. Dashboard memakai API/worker; Equity Snapshot memakai editor serta ekspor PDF di browser |
 | Identitas pengguna | Akun, SSO, peran, audit aktivitas pengguna | Belum diimplementasikan |
 
 Keberadaan suatu modul belum berarti modul tersebut telah memenuhi seluruh kebutuhan operasional production.
@@ -173,6 +179,17 @@ Pengguna membuka tampilan **Monitor Pasar** dari pilihan di header atau melalui 
 
 Repository dan API sudah menyediakan akses versi laporan. Pengalaman pengguna untuk memilih arsip versi dan mengunduh artefak PDF yang terikat pada versi tertentu masih perlu dikembangkan.
 
+### E. Menyunting dan mengunduh Equity Snapshot
+
+1. Pengguna memilih **Equity Snapshot** pada navigasi atas atau membuka `/equity-snapshot`.
+2. Halaman menampilkan dokumen bawaan berdasarkan referensi, termasuk angka contoh dan tanggal dokumen 4 September 2026.
+3. Pengguna menekan **Edit**, lalu menyunting judul, tanggal, indikator, narasi, header tabel, sel tabel, dan footer langsung di browser. Garis putus-putus muncul pada elemen yang dapat diedit saat hover/focus.
+4. Tombol **Simpan** mengunci penyuntingan pada halaman yang sedang dibuka. Perubahan tetap berada di DOM browser dan tidak dikirim ke backend, database, atau penyimpanan browser. Shortcut Ctrl/Cmd+B, I, dan U tersedia untuk format teks; paste menerima teks polos.
+5. Pengguna menekan **Download PDF**. Ekspor menyalin isi dokumen saat itu, termasuk hasil edit, lalu menyesuaikan seluruh dokumen ke satu halaman A4 portrait. Teks yang diperpanjang dapat membuat ukuran cetak mengecil. Navigasi dan kontrol editor berada di luar area yang diekspor.
+6. Refresh halaman mengembalikan isi bawaan. Navigasi atas menyediakan akses kembali ke Laporan Harian dan Monitor Pasar.
+
+Nama unduhan saat ini adalah `Equity Market DDMMYYYY.pdf`, memakai tanggal saat ekspor menurut browser. Tanggal tersebut dapat berbeda dari tanggal dokumen yang diedit. Ekspor ini tidak memakai antrean worker, `report_id`, atau artefak PDF laporan harian.
+
 ## 8. Data, sumber, dan prinsip kualitas
 
 ### Cakupan sumber
@@ -212,14 +229,16 @@ Beberapa definisi instrumen perlu dipastikan sebelum publikasi. Kode `GC=F` yang
 - Data kosong tidak boleh diperlakukan sebagai nilai nol.
 - Tampilkan unit dan pembanding periode sesuai indikator; simpan asal, waktu pengambilan, dan metode sumber sebagai metadata untuk penelusuran kualitas.
 - Pisahkan data demo dari laporan aktif.
-- Dashboard dan PDF harus memakai versi laporan yang sama untuk angka laporan harian.
+- Dashboard dan PDF laporan harian harus memakai versi laporan yang sama. PDF Equity Snapshot mengikuti isi editor browser dan belum memiliki hubungan dengan `report_id`.
 - Publikasi versi baru tidak boleh merusak laporan aktif bila proses gagal.
 - Seluruh kolom tanggal/waktu fisik pada schema database menggunakan nama **`dates`**, sesuai keputusan proyek.
 - Nama metadata payload seperti `published_at` dan `report_date_iso` tetap memiliki makna tersendiri; aturan nama kolom database tidak otomatis mengganti seluruh properti JSON.
 
-Validasi publikasi saat ini menolak laporan demo dan mensyaratkan setidaknya dua nilai `today` numerik yang valid dari kelompok pasar. Ini merupakan pemeriksaan dasar; pemeriksaan kelengkapan per instrumen, kesegaran, dan kewajaran perubahan masih perlu diperkuat.
+Validasi publikasi saat ini menolak laporan demo, memeriksa nilai numerik finite serta harga/level positif, dan mewajibkan USD/IDR, IHSG, serta SBN 10 tahun dengan tanggal observasi valid. Usia observasi inti dibatasi melalui `DAILY_MARKET_CORE_MAX_AGE_DAYS`, default tujuh hari; tanggal masa depan ditolak. Validasi lonjakan, kalender per instrumen, dan kelengkapan seluruh kategori masih perlu diperkuat.
 
-Riwayat SBN dibatasi hingga 30 titik dan dikumpulkan pada pipeline penerbitan laporan. Riwayat SBN dilampirkan ke versi laporan; versi lama yang tidak menyimpan riwayat tersebut tidak memakai seri terbaru sebagai pengganti. Riwayat instrumen lain yang tersedia di API sebagian berasal dari snapshot laporan aktif. Sistem belum menjadi gudang data historis lengkap.
+Riwayat SBN dibatasi hingga 420 titik dan dikumpulkan pada pipeline penerbitan laporan. Riwayat SBN dilampirkan ke versi laporan; versi lama yang tidak menyimpan riwayat tersebut tidak memakai seri terbaru sebagai pengganti. Riwayat instrumen lain yang tersedia di API sebagian berasal dari snapshot laporan aktif. Sistem belum menjadi gudang data historis lengkap.
+
+Angka, narasi, tanggal, dan label `Source: Bloomberg` pada Equity Snapshot merupakan isi contoh dari referensi pengguna. Label itu tidak membuktikan adanya feed Bloomberg. Tanggal dokumen contoh maupun hasil edit tidak dipakai sebagai tanggal observasi laporan aktif. Penyambungan ke data nyata perlu menetapkan sumber, satuan, periode, validasi, serta aturan untuk menandai angka atau narasi yang disunting manual.
 
 ## 9. Arah desain dan pengalaman pengguna
 
@@ -229,7 +248,7 @@ Desain ditujukan untuk membaca laporan pasar secara profesional, dengan hierarki
 
 Review struktur dan visual pada 7 Oktober 2026 mencakup komponen dashboard, CSS, serta browser Chromium pada lebar 1440, 1280, 1024, 768, dan 390 px. Lint dan pemeriksaan tipe TypeScript berhasil; halaman `/` dan `/monitor` merespons normal. Tidak ditemukan overflow horizontal pada halaman, dan navigasi kategori melalui sidebar serta tombol Home/End pada tab berfungsi. Bagian tren riwayat kini memakai satu grafik interaktif, ringkasan perubahan periode, dan rentang yang mengikuti cakupan data tiap instrumen. Uji penerimaan oleh pengguna masih terbuka.
 
-Alur **Laporan Harian** saat ini adalah header dan pilihan tampilan → tiga KPI utama dan dua KPI pendukung → insight dan implikasi praktis → indikator acuan → satu grafik penuh dengan pilihan USD/IDR, IHSG, dan SBN 10Y → pemilih delapan kategori dan tabel terpilih → unduh PDF → footer. Tampilan **Monitor Pasar** tersedia pada `/monitor`. Tiga sorotan awal tampil terbuka; sorotan tambahan dan implikasi praktis tersedia melalui bagian yang dapat dibuka.
+Alur **Laporan Harian** saat ini adalah header dan pilihan tampilan → tiga KPI utama dan dua KPI pendukung → insight dan implikasi praktis → indikator acuan → satu grafik penuh dengan pilihan USD/IDR, IHSG, dan SBN 10Y → pemilih delapan kategori dan tabel terpilih → unduh PDF → footer. Tampilan **Monitor Pasar** tersedia pada `/monitor`, sedangkan **Equity Snapshot** tersedia pada `/equity-snapshot`. Tiga sorotan awal tampil terbuka; sorotan tambahan dan implikasi praktis tersedia melalui bagian yang dapat dibuka.
 
 Dasar tampilan sudah sesuai untuk laporan harian. Penataan KPI, kategori, navigasi, grafik, dan pemisahan halaman live telah diterapkan pada frontend. Pemeriksaan browser memastikan halaman tidak meluber pada kelima ukuran; grafik riwayat memakai satu panel penuh, dengan tinggi yang menyesuaikan layar. Tab instrumen dan rentang data berfungsi, termasuk menonaktifkan rentang yang belum tercakup histori. Tab kategori dan tabel yang lebih lebar memakai scroll lokal pada ponsel. Status data live berhasil dimuat pada `/monitor`. Peninjauan dan penerimaan akhir oleh pengguna masih perlu dilakukan.
 
@@ -237,7 +256,7 @@ Dasar tampilan sudah sesuai untuk laporan harian. Penataan KPI, kategori, naviga
 
 Urutan area **Laporan Harian**:
 
-1. Header, tanggal laporan, waktu publikasi, dan pilihan **Laporan Harian / Monitor Pasar**; navigasi tampilan tersedia pada kedua halaman.
+1. Header, tanggal laporan, waktu publikasi, dan pilihan **Laporan Harian / Monitor Pasar / Equity Snapshot**; navigasi tampilan tersedia pada ketiga halaman.
 2. KPI utama: USD/IDR, IHSG, dan SBN 10Y. UST 10Y dan emas Antam tersedia sebagai indikator pendukung dengan bobot visual lebih rendah.
 3. Ringkasan pasar dan tiga insight utama; sorotan tambahan serta implikasi praktis dapat dibuka sesuai kebutuhan.
 4. Indikator acuan ringkas: BI Rate, INDONIA, dan spread SBN–UST, tanpa mengulang uraian lengkap tabel makro.
@@ -247,6 +266,8 @@ Urutan area **Laporan Harian**:
 8. Footer ringkas.
 
 **Monitor Pasar** merupakan route `/monitor` yang diakses dari pilihan di bagian atas. Halaman menampilkan status, waktu pengambilan, tanggal observasi, kemungkinan penundaan harga, serta snapshot laporan sebagai cadangan. Peralihan tampilan tidak mengubah versi laporan harian atau angka PDF yang terikat pada `report_id`.
+
+**Equity Snapshot** mengikuti struktur visual referensi: header teal gelap dengan dekorasi peta/grafik, judul dan tanggal; headline; tiga ringkasan angka; tabel Daily Equity Market Performance di kiri dan empat narasi di kanan; tabel Market Leaders dan Market Laggards berdampingan; tabel Equity Market Foreign Flow; lalu footer. Pada layar kecil, ringkasan dan kolom utama ditumpuk serta tabel lebar memakai scroll lokal. Clone ekspor mempertahankan layout A4 dua kolom. Tombol Edit/Simpan dan Download PDF saat ini berada di bawah dokumen, sedangkan navigasi tampilan berada di atas dan tidak ikut PDF.
 
 Agenda ekonomi tetap menjadi pengembangan konten berikutnya; penempatan final ditentukan setelah adapter agenda tersedia dan kebutuhan pembaca ditinjau.
 
@@ -279,8 +300,24 @@ Pada frontend baru, komponen ringkasan, kartu indikator, tabel, grafik, status d
 | 1 | Hierarki KPI, pemilih kategori, dan kelompok navigasi | Diterapkan; lint dan pemeriksaan TypeScript berhasil |
 | 2 | Pemisahan Laporan Harian dan Monitor Pasar, indikator acuan ringkas, serta grafik riwayat interaktif | Diterapkan; kedua route merespons pada server lokal |
 | 3 | Keterbacaan tabel, label periode/tanggal, dan konsistensi tema | Lint, pemeriksaan tipe, browser lima ukuran, deep link kategori, serta tombol Home/End lulus; penerimaan akhir pengguna masih terbuka |
+| 4 | Equity Snapshot dan navigasi tiga tampilan | Implementasi editor, layout responsif, serta ekspor A4 tersedia. Lint berkas snapshot/navigasi dan pemeriksaan TypeScript berhasil pada 8 Oktober; penerimaan hasil edit/PDF dan navigasi pada build terbaru masih terbuka |
 
 Pemeriksaan browser dilakukan pada lebar 1440, 1280, 1024, 768, dan 390 px. Halaman tidak meluber horizontal; scroll horizontal terbatas pada tabel dan navigasi kategori di layar kecil. Grafik, nama instrumen, angka KPI, dan kontrol kategori terlihat pada seluruh ukuran yang diperiksa. Deep link sidebar memilih kategori yang benar; pemilih tab mendukung tombol panah, Home, dan End. Route `/monitor` juga memuat harga live. Penerimaan akhir oleh pengguna tetap menjadi langkah tersendiri.
+
+### Temuan review UI lanjutan yang masih terbuka
+
+Review dashboard pada 7 Oktober 2026 memeriksa ulang lebar 1440, 1024, dan 390 px, delapan kategori, tema gelap, serta mode teks besar. Tidak ditemukan error browser atau overflow halaman. Temuan berikut tetap memerlukan perbaikan; hasil pemeriksaan sebelumnya belum menjadi bukti bahwa seluruh informasi nyaman dibaca di ponsel.
+
+| Prioritas | Temuan | Arah perbaikan |
+|---|---|---|
+| Tinggi | Memilih kategori pada ponsel membuka submenu navigasi dan menaikkan tinggi sidebar dari 113 menjadi 393 px | Gunakan dropdown/drawer kategori yang tidak memperbesar area navigasi halaman |
+| Tinggi | Kolom instrumen sticky pada tabel makro memakai sekitar 309 dari 330 px ruang tabel; nama instrumen emas juga terlalu lebar | Batasi lebar kolom, bungkus nama panjang, dan beri petunjuk scroll agar angka tetap terlihat |
+| Sedang | Tiga insight awal mengikuti urutan payload; Rupiah, spread, dan BI Rate tampil sebelum insight IHSG | Prioritaskan Rupiah, IHSG, dan SBN serta ringkas uraian yang mengulang KPI |
+| Sedang | KPI menampilkan tanggal tetapi belum memberi badge untuk observasi lama/parsial | Bedakan status penerbitan laporan dari kesegaran tiap indikator |
+| Sedang | Tanggal tabel masih mencampur ISO dengan timestamp lengkap dari sumber | Seragamkan format tanggal tampilan, termasuk tanggal pembanding |
+| Sedang | Metadata kecil, catatan ketersediaan panjang, dan kontras catatan pada tema gelap kurang jelas | Perbaiki tipografi/kontras dan pindahkan metodologi panjang ke detail yang dapat dibuka |
+
+Urutan tindak lanjut UI: navigasi ponsel, tabel ponsel, status/tanggal data, prioritas insight, lalu tipografi dan penyelarasan indikator pendukung. Perubahan ini merupakan pekerjaan lanjutan, belum tercakup dalam penambahan tautan Equity Snapshot.
 
 ## 10. Arsitektur dan struktur proyek
 
@@ -306,7 +343,9 @@ Dashboard Next.js mengakses layanan Python melalui FastAPI. Worker menggunakan l
 
 | Lokasi | Tanggung jawab |
 |---|---|
-| `frontend/` | Aplikasi dashboard Next.js |
+| `frontend/` | Aplikasi Next.js: Laporan Harian, Monitor Pasar, dan Equity Snapshot |
+| `frontend/src/app/equity-snapshot/` | Client Component editor dokumen, CSS Modules untuk layout layar/A4, serta utility Tailwind |
+| `frontend/src/features/dashboard/dashboard-view-switcher.tsx` | Navigasi bersama tiga tampilan dan penanda halaman aktif |
 | `backend/src/market_report/domain/` | Logika dan analisis pasar |
 | `backend/src/market_report/services/` | Alur laporan, riwayat, live, ekspor, dan refresh |
 | `backend/src/market_report/infrastructure/repositories/` | Repository JSON dan PostgreSQL untuk laporan, riwayat, job, serta artefak |
@@ -324,6 +363,8 @@ Dashboard Next.js mengakses layanan Python melalui FastAPI. Worker menggunakan l
 Frontend Next.js + TypeScript mengakses FastAPI. Backend Python mempertahankan perhitungan dan analisis. PostgreSQL menyimpan laporan, riwayat, dan job. Worker menangani refresh serta ekspor, dengan scheduler mengirim pekerjaan melalui antrean yang sama.
 
 Backend memakai package `market_report` dengan susunan `src/` dan konfigurasi package tersendiri. Pemisahan tanggung jawab dan kontrak data tetap menjadi prioritas pengembangan.
+
+Equity Snapshot saat ini berjalan sepenuhnya di frontend. Utility Tailwind v3 dibatasi ke direktori route, memakai prefix `eq-` dan menonaktifkan preflight; CSS Modules mengatur layout agar styling dokumen tidak mengubah dashboard lain. Font Roboto/Roboto Condensed berasal dari package lokal. `html2pdf.js` dimuat saat tombol unduh ditekan, lalu merender clone dokumen dan menyesuaikan gambar hasil render ke satu halaman A4. Mekanisme ini tidak menulis ke tabel laporan/job/artefak PostgreSQL.
 
 ## 11. Penyimpanan dan kontrak integrasi
 
@@ -436,7 +477,8 @@ Urutan ini melengkapi roadmap migrasi di atas. Perluasan kategori dilakukan sete
 | E. Agenda dan insight | Ambil agenda ekonomi dan berita yang relevan, lalu tautkan ke instrumen serta periode | Belum diimplementasikan; insight saat ini belum ditopang adapter berita/kalender baru |
 | F. Dashboard | Hilangkan panel Sumber/Glosarium; tampilkan delapan kategori, label periode, tooltip, dan status data kosong | Diterapkan; beberapa kategori masih dominan kosong sampai adapter tersedia |
 | G. Konsistensi kanal | Selaraskan KPI, grafik, PDF satu halaman, API, dan validasi penerbitan | Kontrak API/dashboard diperluas dan PDF lama tetap memakai field kompatibel; tabel kategori baru belum seluruhnya masuk PDF |
-| H. Penataan dashboard | Terapkan hierarki KPI, pemilih kategori, kelompok navigasi, pemisahan monitor live, dan keterbacaan tabel/grafik | Diterapkan; lintas lima ukuran layar dan navigasi keyboard diperiksa di browser. Peninjauan akhir oleh pengguna masih terbuka |
+| H. Penataan dashboard | Terapkan hierarki KPI, pemilih kategori, kelompok navigasi, pemisahan monitor live, dan keterbacaan tabel/grafik | Struktur diterapkan; review lanjutan menemukan masalah navigasi/tabel ponsel serta kejelasan status/tanggal. Perbaikan dan penerimaan pengguna masih terbuka |
+| I. Equity Snapshot | Dokumen saham yang dapat diedit dan diekspor mengikuti referensi | Route, editor sementara, layout layar/A4, ekspor browser, serta navigasi tiga tampilan tersedia. Data masih contoh; integrasi laporan/API dan verifikasi hasil edit/PDF belum selesai |
 
 Nilai harga dan indeks dibulatkan pada tampilan sesuai preferensi produk; yield dan persentase mempertahankan desimal yang bermakna. Angka mentah tidak dibulatkan sebelum perhitungan. Sumber aktual dan waktu observasi dapat berbeda per instrumen, sehingga satu tanggal global tidak menggantikan tanggal per baris.
 
@@ -464,11 +506,14 @@ Tanggal target, kapasitas tim, anggaran, serta urutan detail backlog belum ditet
 - Delapan kategori memiliki label kolom/periode yang konsisten dan tidak menampilkan perubahan sebagai nol ketika pembanding tidak ada; cakupan feed per kategori masih bertahap.
 - Seluruh persentase dihitung dari angka mentah; yield ditampilkan dengan perubahan bp dan indikator persen dengan perubahan poin persentase.
 - Harga komoditas menyebut unit/basis instrumen, dan berita yang dipakai sebagai konteks insight memiliki penerbit serta waktu rilis tersimpan.
-- Dashboard dan PDF memiliki angka harian yang sama untuk `report_id` yang sama.
+- Dashboard dan PDF laporan harian memiliki angka yang sama untuk `report_id` yang sama; Equity Snapshot memiliki alur editor/PDF tersendiri yang belum terkait versi laporan.
 - Fitur penting MVP tetap tersedia pada dashboard Next.js yang menjadi antarmuka aktif.
 - Lima indikator tetap tersedia dengan tiga KPI utama dan dua indikator pendukung; seluruh delapan kategori dapat dijangkau tanpa menampilkan semua tabel sekaligus.
 - Laporan Harian dan Monitor Pasar memiliki konteks serta waktu data yang jelas; harga live tidak mengubah snapshot laporan atau PDF versi terpilih.
 - Unduh PDF tetap berada di bawah laporan dan dapat dijangkau melalui navigasi. Tata letak memenuhi pemeriksaan ukuran layar, tema, ukuran teks, dan keyboard pada bagian 9.
+- Navigasi atas ketiga tampilan membuka `/`, `/monitor`, dan `/equity-snapshot`, dengan penanda aktif yang sesuai serta tanpa overflow pada ukuran layar sasaran.
+- Pada Equity Snapshot, Edit/Simpan mempertahankan hasil penyuntingan dan format teks selama halaman terbuka; refresh mengembalikan isi bawaan. Ekspor memuat seluruh isi hasil edit pada satu halaman A4 tanpa navigasi, tombol, atau garis edit. Periksa juga narasi panjang dan sel tabel yang diperpanjang; ukuran cetak yang mengecil tetap perlu disetujui pengguna.
+- Data contoh Equity Snapshot dikenali sebagai template. Sebelum dipakai sebagai laporan aktual, sumber/tanggal/basis angka dan label hasil edit manual perlu ditetapkan.
 
 ### Data dan sistem
 
@@ -520,6 +565,8 @@ Pemeriksaan terdahulu mencakup pipeline/UI/PDF serta tujuh uji terisolasi kontra
 
 Sepuluh tes terdahulu belum menguji ketepatan periode adapter komoditas, PostgreSQL sungguhan, lease antar-worker, atau seluruh rute HTTP. Untuk perubahan 7 Oktober, kompilasi sintaks Python, pemeriksaan tipe TypeScript, parsing sintaks PowerShell, dan `git diff --check` lulus. Suite test, lint, dan build tidak dijalankan. Perubahan parser, validasi, readiness, cache PDF, dan launcher masih memerlukan pemeriksaan regresi serta integrasi. Build produksi, keamanan dependency, TLS, restore backup, dan uji beban juga belum diverifikasi untuk versi rilis. Tes PDF/live yang masih mengimpor entry point `app` lama perlu diselaraskan dengan backend dan frontend aktif agar pemeriksaan rilis tidak bergantung pada checkout legacy.
 
+Pemeriksaan penambahan navigasi pada 8 Oktober 2026: ESLint untuk `dashboard-view-switcher.tsx` dan `equity-snapshot/page.tsx`, serta `tsc --noEmit --incremental false` berhasil. Browser menerima HTTP 200 untuk ketiga route, tetapi server port 3000 masih menyajikan build sebelumnya saat pemeriksaan; visibilitas tautan baru dan navigasi bolak-balik perlu diperiksa setelah build/restart. Ekspor hasil edit, reset setelah refresh, format teks, serta layout A4/ponsel pada versi sekarang belum diverifikasi dalam pemeriksaan ini.
+
 ## 15. Ketergantungan dan keputusan terbuka
 
 | Topik | Hal yang perlu ditetapkan |
@@ -532,6 +579,7 @@ Sepuluh tes terdahulu belum menguji ketepatan periode adapter komoditas, Postgre
 | Infrastruktur | Lingkungan deployment, domain, TLS, pengelola proses, skala instance, penyimpanan artefak, dan backup |
 | Akses | Kebutuhan login/SSO, peran operator, serta audit aktivitas |
 | Desain | Identitas visual final, perangkat prioritas, dan penerimaan pengguna |
+| Equity Snapshot | Sumber indeks global, movers dan foreign flow lintas negara; pemetaan ke laporan aktif; aturan hasil edit manual, penyimpanan draft, tanggal nama file, serta kelayakan ukuran PDF setelah teks diperpanjang |
 | Operasional | Target ketersediaan/beban, ambang alert, retensi, RPO/RTO, prosedur rollback, serta pihak yang menangani kegagalan |
 
 Ketergantungan utama meliputi akses database, ketersediaan penyedia data, format halaman/API penyedia, serta sumber daya pengembangan. Perubahan parser, kegagalan sumber, dan riwayat yang belum lengkap perlu dipantau sebagai keterbatasan produk saat ini.
@@ -549,5 +597,6 @@ Ketergantungan utama meliputi akses database, ketersediaan penyedia data, format
 - [README.md](../README.md): instalasi, menjalankan aplikasi, konfigurasi, dan penggunaan teknis.
 - [backend/](../backend/): layanan API, domain, worker, scheduler, dan migrasi.
 - [frontend/](../frontend/): dashboard Next.js.
+- [Equity Snapshot](../frontend/src/app/equity-snapshot/page.tsx): editor dokumen dan ekspor PDF browser; [layout](../frontend/src/app/equity-snapshot/snapshot.module.css) mengatur tampilan layar dan A4.
 
 Brief ini merupakan acuan holistik produk. README menjadi panduan menjalankan proyek.

@@ -5,6 +5,7 @@
   color: #123645;
 }
 .actions { max-width: 210mm; margin: 0 auto; font-family: Arial, sans-serif; }
+.navigation { max-width: 210mm; margin: 0 auto; padding: 12px 8px; }
 .actions button { cursor: pointer; }
 .actions .status { text-align: right; }
 .status { width: 100%; min-height: 16px; color: #496672; font-size: 12px; }

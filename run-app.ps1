@@ -2,23 +2,22 @@ param(
     [ValidateRange(1, 65535)]
     [int]$ApiPort = 8000,
     [ValidateRange(1, 65535)]
-    [int]$FrontendPort = 3000,
-    [switch]$Production
+    [int]$FrontendPort = 3000,     [switch]$Production
 )
 
 $ErrorActionPreference = "Stop"
-$projectRoot = $PSScriptRoot
-$frontendDirectory = Join-Path $projectRoot "frontend"
-$pythonExecutable = Join-Path $projectRoot ".venv\Scripts\python.exe"
-$nextCli = Join-Path $frontendDirectory "node_modules\next\dist\bin\next"
-$logDirectory = Join-Path $projectRoot "runtime\logs\app"
+$projectRoot =$PSScriptRoot
+$frontendDirectory = Join-Path$projectRoot "frontend"
+$pythonExecutable = Join-Path$projectRoot ".venv\Scripts\python.exe"
+$nextCli = Join-Path$frontendDirectory "node_modules\next\dist\bin\next"
+$logDirectory = Join-Path$projectRoot "runtime\logs\app"
 $runId = Get-Date -Format "yyyyMMdd-HHmmss"
 $script:managedServices = @()
 
 function Test-PortAvailable {
     param([int]$Port)
 
-    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback,$Port)
     try {
         $listener.Start()
         return $true
@@ -37,8 +36,8 @@ function Start-LoggedService {
         [string]$WorkingDirectory
     )
 
-    $stdoutPath = Join-Path $logDirectory "$runId-$Name.stdout.log"
-    $stderrPath = Join-Path $logDirectory "$runId-$Name.stderr.log"
+    $stdoutPath = Join-Path$logDirectory "$runId-$Name.stdout.log"
+    $stderrPath = Join-Path$logDirectory "$runId-$Name.stderr.log"
     $process = Start-Process `
         -FilePath $FilePath `
         -ArgumentList $ArgumentList `
@@ -70,9 +69,8 @@ function Show-ServiceLogs {
 }
 
 function Stop-ManagedServices {
-    $taskkill = Join-Path $env:SystemRoot "System32\taskkill.exe"
-    for ($index = $script:managedServices.Count - 1; $index -ge 0; $index--) {
-        $service = $script:managedServices[$index]
+    $taskkill = Join-Path$env:SystemRoot "System32\taskkill.exe"
+    for ($index = $script:managedServices.Count - 1; $index -ge 0; $index--) {$service = $script:managedServices[$index]
         try {
             if (-not $service.Process.HasExited) {
                 & $taskkill /PID $service.Process.Id /T /F 2>$null | Out-Null
@@ -88,9 +86,9 @@ function Read-RefreshTimes {
         return $env:REFRESH_TIMES.Trim().Trim('"').Trim("'")
     }
 
-    $envFile = Join-Path $projectRoot ".env"
+    $envFile = Join-Path$projectRoot ".env"
     if (-not (Test-Path -LiteralPath $envFile)) { return "" }
-    $setting = Get-Content -LiteralPath $envFile |
+    $setting = Get-Content -LiteralPath$envFile |
         Where-Object { $_ -match '^\s*REFRESH_TIMES\s*=' } |
         Select-Object -Last 1
     if (-not $setting) { return "" }
@@ -161,7 +159,7 @@ try {
     )
     if (-not $Production) { $backendArguments += @("--reload", "--reload-dir", "backend/src") }
     Start-LoggedService -Name "api" -FilePath $pythonExecutable `
-        -ArgumentList $backendArguments -WorkingDirectory $projectRoot
+        -ArgumentList $backendArguments -WorkingDirectory$projectRoot
 
     Start-LoggedService -Name "worker" -FilePath $pythonExecutable `
         -ArgumentList @("-u", "backend/src/market_report/worker/main.py") `
@@ -169,8 +167,8 @@ try {
 
     $refreshTimes = Read-RefreshTimes
     if ($refreshTimes) {
-        $timePattern = '^(?:(?:[01]\d|2[0-3]):[0-5]\d)(?:,(?:(?:[01]\d|2[0-3]):[0-5]\d))*$'
-        if ($refreshTimes -match $timePattern) {
+        $timePattern = '^(?:(?:[01]\d\vert{}2[0-3]):[0-5]\d)(?:,(?:(?:[01]\d\vert{}2[0-3]):[0-5]\d))*$'
+        if ($refreshTimes -match$timePattern) {
             Start-LoggedService -Name "scheduler" -FilePath $pythonExecutable `
                 -ArgumentList @("-u", "backend/src/market_report/scheduler/main.py") `
                 -WorkingDirectory $projectRoot
@@ -183,7 +181,9 @@ try {
 
     $nextArgument = '"' + $nextCli + '"'
     $frontendMode = if ($Production) { "start" } else { "dev" }
-    $frontendArguments = @($nextArgument, $frontendMode, "--hostname", "127.0.0.1", "--port", "$FrontendPort")
+    
+    # UPDATE: Menggunakan localhost alih-alih 127.0.0.1
+    $frontendArguments = @($nextArgument, $frontendMode, "--hostname", "localhost", "--port", "$FrontendPort")
     Start-LoggedService -Name "frontend" -FilePath $nodeCommand.Source `
         -ArgumentList $frontendArguments -WorkingDirectory $frontendDirectory
 
@@ -210,7 +210,8 @@ try {
         }
         if (-not $frontendReady) {
             try {
-                Invoke-WebRequest -Uri "http://127.0.0.1:$FrontendPort" -TimeoutSec 2 -UseBasicParsing | Out-Null
+                # UPDATE: Cek kesehatan frontend ke localhost
+                Invoke-WebRequest -Uri "http://localhost:$FrontendPort" -TimeoutSec 2 -UseBasicParsing | Out-Null
                 $frontendReady = $true
             } catch { }
         }
@@ -223,20 +224,22 @@ try {
     }
 
     Write-Host "`nDaily Market Report berjalan:" -ForegroundColor Green
-    Write-Host "  Website : http://127.0.0.1:$FrontendPort"
+    # UPDATE: Tampilan URL Frontend ke localhost
+    Write-Host "  Website : http://localhost:$FrontendPort"
     Write-Host "  API     : http://127.0.0.1:$ApiPort"
     Write-Host "  Log     : $logDirectory"
     if ($Production) {
         Write-Host "Mode produksi lokal. Pasang reverse proxy HTTPS di depan website sebelum akses jaringan dibuka."
     }
     Write-Host "Tekan Ctrl+C untuk menghentikan seluruh proses."
-    try { Start-Process "http://127.0.0.1:$FrontendPort" } catch {
+    
+    # UPDATE: Redirect browser otomatis membuka http://localhost:<port>
+    try { Start-Process "http://localhost:$FrontendPort" } catch {
         Write-Warning "Browser tidak dapat dibuka otomatis; buka alamat website di atas secara manual."
     }
 
     while ($true) {
-        foreach ($service in $script:managedServices) {
-            $service.Process.Refresh()
+        foreach ($service in $script:managedServices) {$service.Process.Refresh()
             if ($service.Process.HasExited) {
                 throw "$($service.Name) berhenti (exit code $($service.Process.ExitCode))."
             }
@@ -254,4 +257,4 @@ try {
     }
 }
 
-if ($exitCode -ne 0) { exit $exitCode }
+if ($exitCode -ne 0) { exit$exitCode }
