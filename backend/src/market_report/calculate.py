@@ -376,7 +376,7 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
             }
     antam = snap.get("antam_gold", {})
     if isinstance(antam, dict) and antam.get("price") is not None:
-        antam_series = antam.get("series_id") or "ocebsi_antam_buy_1g"
+        antam_series = antam.get("series_id") or "logammulia_antam_sell_1g"
         saved_antam_history = snap.get("_antam_gold_history")
         antam_history = [
             point for point in saved_antam_history if isinstance(point, dict)
@@ -649,7 +649,7 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
 
     sources.append({
         "section": "Emas Antam",
-        "primary": antam.get("source_name", "OCEBSI ANTAM") if isinstance(antam, dict) else "OCEBSI ANTAM",
+        "primary": antam.get("source_name", "Logam Mulia ANTAM") if isinstance(antam, dict) else "Logam Mulia ANTAM",
         "url": antam.get("source") if isinstance(antam, dict) else None,
         "series_id": antam.get("series_id") if isinstance(antam, dict) else None,
         "availability": antam.get("availability") if isinstance(antam, dict) else None,

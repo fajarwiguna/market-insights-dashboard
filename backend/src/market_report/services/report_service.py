@@ -244,16 +244,16 @@ def _saved_antam_observation(report: dict) -> dict | None:
         price = reading.get("price") if reading.get("price") is not None else reading.get("today")
         day = source_date_iso(reading.get("date"))
         series_id = reading.get("series_id")
-        if series_id != "ocebsi_antam_buy_1g":
+        if series_id != "logammulia_antam_sell_1g":
             continue
         if _valid_price(price) and day:
             return {
                 "price": price,
                 "date": day,
-                "source": reading.get("source") or "https://ocebsi.com/macro/gold-antam/",
+                "source": reading.get("source") or "https://www.logammulia.com/id/harga-emas-hari-ini",
                 "source_name": reading.get("source_name") or "Antam price feed",
                 "series_id": series_id,
-                "basis": reading.get("basis") or "Harga beli Antam 1 gram.",
+                "basis": reading.get("basis") or "Harga jual resmi Emas Batangan 1 gram dari Logam Mulia / ANTAM.",
             }
 
     # Some report versions contain the cumulative series but not the Antam row itself.
@@ -267,7 +267,7 @@ def _saved_antam_observation(report: dict) -> dict | None:
                 continue
             day = source_date_iso(point.get("date") or point.get("dates"))
             price = point.get("close")
-            if day and _valid_price(price) and point.get("series_id") == "ocebsi_antam_buy_1g":
+            if day and _valid_price(price) and point.get("series_id") == "logammulia_antam_sell_1g":
                 points.append((day, price, point.get("series_id") or "legacy_antam"))
         if points:
             day, price, series_id = max(points, key=lambda point: point[0])
@@ -275,9 +275,9 @@ def _saved_antam_observation(report: dict) -> dict | None:
                 "price": price,
                 "date": day,
                 "series_id": series_id,
-                "source": "https://ocebsi.com/macro/gold-antam/",
-                "source_name": "OCEBSI ANTAM (histori tersimpan)",
-                "basis": "Harga beli Antam 1 gram.",
+                "source": "https://www.logammulia.com/id/harga-emas-hari-ini",
+                "source_name": "Logam Mulia ANTAM (histori tersimpan)",
+                "basis": "Harga jual resmi Emas Batangan 1 gram dari Logam Mulia / ANTAM.",
             }
     return None
 
@@ -488,14 +488,14 @@ def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -
             )
             snapshot["antam_gold"] = last_antam
 
-    # Seed published history from OCEBSI and continue carrying it across versions.
+    # Seed published history from Logam Mulia ANTAM and continue carrying it across versions.
     antam = snapshot.get("antam_gold")
     if isinstance(antam, dict) and isinstance(antam.get("price"), (int, float)) \
             and not isinstance(antam.get("price"), bool) and math.isfinite(antam["price"]):
         from market_report.services.history_service import MAX_HISTORY_POINTS, source_date_iso
 
         antam_day = source_date_iso(antam.get("date"))
-        series_id = antam.get("series_id") or "ocebsi_antam_buy_1g"
+        series_id = antam.get("series_id") or "logammulia_antam_sell_1g"
         observations: dict[tuple[str, str], float] = {}
         for point in antam.get("history", []):
             if not isinstance(point, dict):

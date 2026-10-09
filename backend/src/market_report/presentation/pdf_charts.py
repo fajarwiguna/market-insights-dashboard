@@ -309,7 +309,7 @@ class GoldPricesChart(Flowable):
             gold_points[gold_day] = gold_today
 
         antam_reading = _pick(report.get("commodities"), "emas", "antam")
-        antam_series = antam_reading.get("series_id") or "ocebsi_antam_buy_1g"
+        antam_series = antam_reading.get("series_id") or "logammulia_antam_sell_1g"
         antam_history = report.get("_antam_gold_history") or snapshot.get("_antam_gold_history")
         antam_history = [
             point for point in antam_history if isinstance(point, dict)

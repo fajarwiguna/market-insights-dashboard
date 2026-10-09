@@ -190,7 +190,7 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
           <ExportReportButton reportId={report.report_id} />
         </section>
 
-        <footer className="page-footer"><span>Market Today · Daily Market Report</span>
+        <footer className="page-footer"><span>Market Insights</span>
           <span>ID laporan: {report.report_id || "belum tersedia"}</span></footer>
       </main>
     </div>

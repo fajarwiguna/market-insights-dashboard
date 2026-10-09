@@ -123,7 +123,7 @@ const ReportContent = memo(function ReportContent({ snapshot }: { snapshot: Equi
     const row = snapshot.foreign_flow_rows.find(item => item.country === country);
     return [country, row?.date ? formatDate(row.date) : "-",
       ...[row?.daily, row?.wtd, row?.mtd, row?.qtd, row?.ytd, row?.["12m"]]
-        .map(value => value == null || !Number.isFinite(value) ? "-" : formatValue(value))];
+        .map(value => value == null || !Number.isFinite(value) ? "—" : formatValue(value))];
   });
   const foreignValue = snapshot.foreign_flow.net_idr != null
     ? `IDR ${formatValue(Math.abs(snapshot.foreign_flow.net_idr) / 1e9, 2, false, "id-ID")} Bn`
@@ -151,7 +151,7 @@ const ReportContent = memo(function ReportContent({ snapshot }: { snapshot: Equi
       <section className={styles.middle} aria-label="Performa dan narasi pasar">
         <div className={styles.tableScroll}>
         <table className={`${styles.table} ${styles.indexTable}`} aria-label="Daily Equity Market Performance">
-          <colgroup><col style={{ width: "48%" }} /><col style={{ width: "26%" }} /><col style={{ width: "26%" }} /></colgroup>
+          <colgroup><col style={{ width: "26%" }} /><col style={{ width: "26%" }} /><col style={{ width: "26%" }} /></colgroup>
           <thead><tr>{["Index", "Level", "DTD %"].map((label) => <th key={label}><Editable>{label}</Editable></th>)}</tr></thead>
           <tbody>{indices.map((row, index) => <tr key={row[0]} title={`Tanggal data: ${formatDate(snapshot.market_performance[index].date)}`}>{row.map((value, i) => <td key={i}><Editable numeric={i === 2} className={i === 2 ? tone(value) : ""}>{value}</Editable></td>)}</tr>)}</tbody>
         </table>

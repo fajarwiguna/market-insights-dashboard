@@ -7,6 +7,7 @@ Sources:
 - Cross-check FX                          : open.er-api.com
 - Equity capital flow                    : Indonesia Stock Exchange (IDX)
 - Government bond flow proxy              : DJPPR nonresident SBN holdings
+- ANTAM gold 1g (harga jual)              : Logam Mulia (logammulia.com) via logam-mulia-api
 """
 
 from __future__ import annotations
@@ -576,51 +577,132 @@ def fetch_market_snapshot() -> Dict[str, Any]:
 
 
 def fetch_antam_gold_price() -> Dict[str, Any]:
-    """Ambil harga beli Antam 1g terbaru dari seri historis OCEBSI."""
-    url = "https://ocebsi.com/macro/gold-antam/"
+    """Ambil harga jual Antam 1g (harga beli konsumen) dari Logam Mulia.
+
+    Sumber utama: API publik logam-mulia-api yang men-scrape harga resmi
+    www.logammulia.com (Emas Batangan 1 gram, harga dasar sebelum PPh 0,25%).
+    Situs logammulia.com dilindungi Cloudflare sehingga tidak bisa di-hit
+    langsung dari server scraper; proxy terbuka ini adalah jalur stabil.
+    """
+    base = "https://logam-mulia-api.iamutaki.workers.dev"
+    latest_url = f"{base}/api/prices/logammulia"
+    history_url = f"{base}/api/prices/logammulia/history"
+    official_page = "https://www.logammulia.com/id/harga-emas-hari-ini"
     try:
-        response = requests.get(url, headers=HEADERS, timeout=20)
+        # --- harga terkini ---
+        response = requests.get(latest_url, headers=HEADERS, timeout=20)
         response.raise_for_status()
         payload = response.json()
-        if isinstance(payload, dict) and isinstance(payload.get("data"), list):
-            payload = payload["data"]
-        if not isinstance(payload, list):
-            raise ValueError("Respons OCEBSI bukan daftar observasi harga emas.")
+        if not payload.get("success") or not isinstance(payload.get("data"), list):
+            raise ValueError("Respons logam-mulia-api tidak memuat daftar harga Logam Mulia.")
 
-        observations = {}
-        for item in payload:
-            if not isinstance(item, dict) or str(item.get("type", "")).strip().lower() != "beli":
+        one_gram = None
+        for item in payload["data"]:
+            if not isinstance(item, dict):
                 continue
-            date = str(item.get("date", ""))[:10]
-            price = item.get("price")
+            material = str(item.get("materialType") or "").strip().lower()
+            # Hanya Emas Batangan klasik (bukan Gift Series / tematik)
+            if material != "emas batangan":
+                continue
             try:
-                date = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
-            except ValueError:
+                weight = float(item.get("weight") or 0)
+            except (TypeError, ValueError):
                 continue
+            if abs(weight - 1.0) > 1e-9:
+                continue
+            price = item.get("sellPrice")
             if _valid_antam_price(price):
-                observations[date] = float(price)
-        if not observations:
-            raise ValueError("OCEBSI tidak menyediakan observasi harga beli Antam yang valid.")
+                one_gram = item
+                break
+        if one_gram is None:
+            raise ValueError("Harga Emas Batangan 1 gram tidak ditemukan di Logam Mulia.")
 
-        source_date = max(observations)
-        price = observations[source_date]
+        price = float(one_gram["sellPrice"])
+        # PPh 22 pembelian emas batangan 0,25% (PMK 48/2023) — harga terbit di situs
+        price_with_tax = round(price * 1.0025)
+        source_date = str(one_gram.get("recordedDate") or "")[:10]
+        try:
+            source_date = datetime.strptime(source_date, "%Y-%m-%d").date().isoformat()
+        except ValueError:
+            source_date = datetime.now(ZoneInfo("Asia/Jakarta")).date().isoformat()
+
+        # --- histori (paginasi; filter 1g Emas Batangan) ---
+        observations: Dict[str, float] = {source_date: price}
+        page = 1
+        max_pages = 8  # cukup untuk ~1–1,5 tahun bila tersedia
+        while page <= max_pages:
+            hist = requests.get(
+                history_url,
+                params={"weight": 1, "length": 200, "page": page},
+                headers=HEADERS,
+                timeout=25,
+            )
+            hist.raise_for_status()
+            hist_payload = hist.json()
+            rows = hist_payload.get("data") if isinstance(hist_payload, dict) else None
+            if not isinstance(rows, list) or not rows:
+                break
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                material = str(row.get("materialType") or "").strip().lower()
+                if material != "emas batangan":
+                    continue
+                try:
+                    weight = float(row.get("weight") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if abs(weight - 1.0) > 1e-9:
+                    continue
+                day = str(row.get("recordedDate") or "")[:10]
+                sell = row.get("sellPrice")
+                try:
+                    day = datetime.strptime(day, "%Y-%m-%d").date().isoformat()
+                except ValueError:
+                    continue
+                if _valid_antam_price(sell):
+                    observations[day] = float(sell)
+            pagination = hist_payload.get("pagination") or {}
+            total_pages = int(pagination.get("totalPages") or page)
+            if page >= total_pages:
+                break
+            page += 1
+
+        if not observations:
+            raise ValueError("Tidak ada observasi harga Antam 1g yang valid.")
+
+        latest_date = max(observations)
+        latest_price = observations[latest_date]
         return {
-            "price": price,
-            "price_with_tax": None,
+            "price": latest_price,
+            "price_with_tax": round(latest_price * 1.0025),
             "weight_grams": 1,
-            "date": source_date,
-            "series_id": "ocebsi_antam_buy_1g",
+            "date": latest_date,
+            "series_id": "logammulia_antam_sell_1g",
             "history": [
-                {"date": date, "close": value, "series_id": "ocebsi_antam_buy_1g"}
-                for date, value in sorted(observations.items())[-420:]
+                {
+                    "date": day,
+                    "close": value,
+                    "series_id": "logammulia_antam_sell_1g",
+                }
+                for day, value in sorted(observations.items())[-420:]
             ],
             "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "source": url,
-            "source_name": "OCEBSI ANTAM (harga beli 1 gram)",
-            "basis": "Harga beli Antam 1 gram dari seri historis OCEBSI.",
+            "source": official_page,
+            "source_name": "Logam Mulia ANTAM (harga jual Emas Batangan 1 gram)",
+            "source_proxy": latest_url,
+            "basis": (
+                "Harga jual resmi Emas Batangan 1 gram (harga dasar sebelum PPh 0,25%) "
+                "dari Logam Mulia / ANTAM, diambil via logam-mulia-api (scrape logammulia.com)."
+            ),
         }
     except Exception as error:
-        return {"error": str(error), "source": url, "source_name": "OCEBSI ANTAM"}
+        return {
+            "error": str(error),
+            "source": official_page,
+            "source_name": "Logam Mulia ANTAM",
+            "source_proxy": latest_url,
+        }
 
 
 def fetch_fx_backup() -> Dict[str, Any]:
