@@ -170,7 +170,7 @@ const ReportContent = memo(function ReportContent({ snapshot }: { snapshot: Equi
         </table>
         </div>
       </div>
-      <footer className={styles.footer}><Editable>{`Source: ${sources}`}</Editable><Editable>Investor Relation and Business Intelligence Group</Editable><Editable>PT Bank Syariah Indonesia (Persero) Tbk</Editable></footer>
+     <footer className={styles.footer}><Editable>{`Source: ${sources}`}</Editable><Editable>Internal</Editable><Editable>Production</Editable></footer>
     </div>
   </>;
 });
