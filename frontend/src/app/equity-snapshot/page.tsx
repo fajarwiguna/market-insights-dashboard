@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { DashboardViewSwitcher } from "@/features/dashboard/dashboard-view-switcher";
-import { formatDate, formatValue, isEquitySnapshot, mentionedTickers, stockRow, type EquitySnapshot } from "@/lib/equity-snapshot";
+import { formatDate, formatValue, isEquitySnapshot, mentionedTickers, stockRow, todayIso, type EquitySnapshot } from "@/lib/equity-snapshot";
 import styles from "./snapshot.module.css";
 import "./tailwind.css";
 import "@fontsource/roboto/400.css";
@@ -138,7 +138,7 @@ const ReportContent = memo(function ReportContent({ snapshot }: { snapshot: Equi
       <HeaderArt />
       <p className={styles.eyebrow}><Editable>EQUITY RESEARCH</Editable></p>
       <h1><Editable>Equity Market Daily Snapshot</Editable></h1>
-      <p className={styles.date}><Editable>{formatDate(snapshot.report_date)}</Editable></p>
+      <p className={styles.date}><Editable>{formatDate(todayIso())}</Editable></p>
     </header>
     <div className={styles.reportBody}>
       <p className={styles.headline}><Editable>{snapshot.headline}</Editable></p>

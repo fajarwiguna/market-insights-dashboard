@@ -26,7 +26,7 @@ env/
 
 # Mengabaikan seluruh folder arsip kode lama dan dokumentasi transisi
 /legacy/
-/project_migration.md
+/docs/project_migration.md
 
 # Streamlit secrets (jika masih tersisa)
 .streamlit/secrets.toml
@@ -73,3 +73,5 @@ Thumbs.db
 desktop.ini
 
 helper.txt
+database_integration.md
+meta_timeseries.xlsx

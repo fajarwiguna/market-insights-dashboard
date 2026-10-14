@@ -27,6 +27,12 @@ export function formatDate(value: string | null | undefined) {
   return new Date(`${value}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
+// Tanggal kalender lokal saat halaman dibuka (YYYY-MM-DD), untuk header dokumen.
+export function todayIso(now: Date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 // Display aliases follow the analyst's Bloomberg naming convention. Yahoo
 // remains the source of prices and the original company name in the payload.
 const COMPANY_DISPLAY_NAMES: Readonly<Record<string, string>> = {

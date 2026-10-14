@@ -205,6 +205,50 @@ class WorkerAndSchedulerTests(unittest.TestCase):
         self.assertEqual(len(repository.slots), 1)
         self.assertEqual(repository.slots[0][1].hour, 16)
 
+    @patch("market_report.services.refresh_service.request_refresh")
+    def test_trigger_and_wait_refresh_completed_mode(self, request_refresh):
+        from market_report.services.refresh_service import trigger_and_wait_refresh
+
+        request_refresh.return_value = {"mode": "completed", "report": {"report_id": "rep-1"}}
+        result = trigger_and_wait_refresh(timeout=1.0)
+        self.assertEqual(result["mode"], "completed")
+        self.assertEqual(result["report"]["report_id"], "rep-1")
+
+    @patch("market_report.services.refresh_service.get_refresh_job")
+    @patch("market_report.services.refresh_service.request_refresh")
+    def test_trigger_and_wait_refresh_queued_success(self, request_refresh, get_refresh_job):
+        from market_report.services.refresh_service import trigger_and_wait_refresh
+
+        request_refresh.return_value = {"mode": "queued", "job": {"job_id": "job-123", "status": "queued"}}
+        get_refresh_job.side_effect = [
+            {"job_id": "job-123", "status": "running"},
+            {"job_id": "job-123", "status": "succeeded", "report_id": "rep-123"},
+        ]
+        result = trigger_and_wait_refresh(timeout=5.0, poll_interval=0.01)
+        self.assertEqual(result["mode"], "completed")
+        self.assertEqual(result["report_id"], "rep-123")
+
+    @patch("market_report.services.refresh_service.get_refresh_job")
+    @patch("market_report.services.refresh_service.request_refresh")
+    def test_trigger_and_wait_refresh_queued_failure(self, request_refresh, get_refresh_job):
+        from market_report.services.refresh_service import trigger_and_wait_refresh
+
+        request_refresh.return_value = {"mode": "queued", "job": {"job_id": "job-123", "status": "queued"}}
+        get_refresh_job.return_value = {"job_id": "job-123", "status": "failed", "error_code": "network_down"}
+        with self.assertRaises(RuntimeError) as ctx:
+            trigger_and_wait_refresh(timeout=5.0, poll_interval=0.01)
+        self.assertIn("network_down", str(ctx.exception))
+
+    @patch("market_report.services.refresh_service.get_refresh_job")
+    @patch("market_report.services.refresh_service.request_refresh")
+    def test_trigger_and_wait_refresh_timeout(self, request_refresh, get_refresh_job):
+        from market_report.services.refresh_service import trigger_and_wait_refresh
+
+        request_refresh.return_value = {"mode": "queued", "job": {"job_id": "job-123", "status": "queued"}}
+        get_refresh_job.return_value = {"job_id": "job-123", "status": "running"}
+        with self.assertRaises(TimeoutError):
+            trigger_and_wait_refresh(timeout=0.05, poll_interval=0.01)
+
 
 if __name__ == "__main__":
     unittest.main()

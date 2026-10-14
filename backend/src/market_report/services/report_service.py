@@ -20,6 +20,7 @@ _DATA_DIR = market_data_directory()
 _REPORT_PATH = _DATA_DIR / "report_data.json"
 _SNAPSHOT_PATH = _DATA_DIR / "snapshot.json"
 _DEMO_REPORT_PATH = _DATA_DIR / "demo_report_data.json"
+_CATALOG_SYNCED: set[str] = set()
 _logger = logging.getLogger(__name__)
 
 
@@ -47,6 +48,44 @@ def list_report_versions(limit: int = 30, path: Path | None = None) -> list[dict
 def _valid_price(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) \
         and math.isfinite(value) and value > 0
+
+
+def sync_timeseries_catalog(*, force: bool = False) -> int:
+    """Daftarkan katalog series dari meta_timeseries.xlsx ke backend aktif.
+
+    Dipanggil sekali per proses agar pipeline harian tidak mengurai berkas
+    meta berulang kali. Kegagalan hanya dicatat, tidak membatalkan laporan.
+    """
+    from market_report.config import load_environment
+
+    load_environment()
+    key = os.environ.get("DATABASE_URL", "").strip() or "json"
+    if not force and key in _CATALOG_SYNCED:
+        return 0
+    _CATALOG_SYNCED.add(key)
+    try:
+        from market_report.services.timeseries_meta import sync_to_database
+
+        return sync_to_database()
+    except Exception:
+        _logger.exception("Gagal menyinkronkan katalog time-series ke database")
+        return 0
+
+
+def sync_timeseries_observations(snapshot: dict) -> int:
+    """Simpan observasi harian dari snapshot terbit ke `ts_observation`.
+
+    Ekstraksi hanya mengeluarkan series yang terdaftar di katalog pipeline,
+    sehingga urutan pemanggilan setelah `sync_timeseries_catalog()` aman.
+    Kegagalan dicatat dan tidak membatalkan penerbitan laporan.
+    """
+    try:
+        from market_report.services.timeseries_catalog import sync_observations
+
+        return sync_observations(snapshot)
+    except Exception:
+        _logger.exception("Gagal menyinkronkan observasi time-series ke database")
+        return 0
 
 
 def _index_sector_history(snapshot: dict) -> dict[str, list[dict]]:
@@ -604,6 +643,8 @@ def run_live_pipeline(*, publication_guard=None, report_id: str | None = None) -
             record_sbn_history(sbn10["today"], sbn10.get("date"))
     except Exception:
         _logger.exception("Gagal memperbarui riwayat SBN setelah laporan diterbitkan")
+    sync_timeseries_catalog()
+    sync_timeseries_observations(snapshot)
     return report
 
 
@@ -612,7 +653,10 @@ def rebuild_from_saved_snapshot() -> dict:
     snapshot = load_snapshot()
     if not snapshot:
         raise RuntimeError("Snapshot sumber belum tersedia untuk dibangun ulang.")
-    return publish_snapshot(snapshot)
+    report = publish_snapshot(snapshot)
+    sync_timeseries_catalog()
+    sync_timeseries_observations(snapshot)
+    return report
 
 
 def save_demo_report(report: dict, path: Path | None = None) -> Path:

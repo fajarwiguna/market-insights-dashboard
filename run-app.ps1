@@ -3,7 +3,9 @@ param(
     [int]$ApiPort = 8000,
     [ValidateRange(1, 65535)]
     [int]$FrontendPort = 3000,
-    [switch]$Production
+    [switch]$Production,
+    [switch]$FetchData,
+    [switch]$SkipFetch
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +16,7 @@ $nextCli = Join-Path $frontendDirectory "node_modules\next\dist\bin\next"
 $logDirectory = Join-Path $projectRoot "runtime\logs\app"
 $runId = Get-Date -Format "yyyyMMdd-HHmmss"
 $script:managedServices = @()
+$shouldFetchData = ($FetchData.IsPresent -or $Production.IsPresent) -and (-not $SkipFetch.IsPresent)
 
 function Test-PortAvailable {
     param([int]$Port)
@@ -220,6 +223,17 @@ try {
 
     if (-not $apiReady -or -not $frontendReady) {
         throw "API atau frontend belum siap dalam 60 detik. Periksa log di $logDirectory."
+    }
+
+    if ($shouldFetchData) {
+        Write-Host "`nMenarik data pasar terbaru ke database..." -ForegroundColor Cyan
+        $refreshScript = Join-Path $projectRoot "backend\src\market_report\services\refresh_service.py"
+        & $pythonExecutable -u $refreshScript --wait --timeout 180
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Penarikan data pasar awal tidak selesai dengan sukses (exit code $LASTEXITCODE). Layanan tetap berjalan dengan data sebelumnya."
+        } else {
+            Write-Host "Data pasar berhasil ditarik dan disinkronkan ke database.`n" -ForegroundColor Green
+        }
     }
 
     Write-Host "`nDaily Market Report berjalan:" -ForegroundColor Green

@@ -196,12 +196,96 @@ def fetch_equity_source() -> dict:
 def persist_equity_snapshot(snapshot: dict) -> None:
     if snapshot.get("status") == "unavailable":
         raise RuntimeError("Equity snapshot has no usable stock contributions")
+    _persist_to_json(snapshot)
+    _persist_to_postgres(snapshot)
+
+
+def _persist_to_json(snapshot: dict) -> None:
     root = market_data_directory()
     _save(snapshot, root / "equity_versions" / f"{snapshot['report_id']}.json")
     _save(snapshot, root / "equity_snapshot.json")
 
 
+def _persist_to_postgres(snapshot: dict) -> None:
+    database_url = _get_database_url()
+    if not database_url:
+        return
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+    except ImportError:
+        return
+    try:
+        with psycopg.connect(database_url, row_factory=dict_row) as conn:
+            conn.execute(
+                """INSERT INTO equity_snapshot (report_id, dates, previous_dates,
+                       fetched_at, status, schema_version, payload)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+                   ON CONFLICT (report_id) DO UPDATE SET
+                       dates = EXCLUDED.dates,
+                       fetched_at = EXCLUDED.fetched_at,
+                       status = EXCLUDED.status,
+                       payload = EXCLUDED.payload""",
+                (
+                    snapshot.get("report_id"),
+                    snapshot.get("trading_date"),
+                    snapshot.get("previous_trading_date"),
+                    snapshot.get("fetched_at"),
+                    snapshot.get("status", "partial"),
+                    snapshot.get("schema_version", 1),
+                    json.dumps(snapshot, ensure_ascii=False, default=str),
+                ),
+            )
+            conn.execute("DELETE FROM equity_stock_bar WHERE report_id = %s",
+                         (snapshot.get("report_id"),))
+            stocks = snapshot.get("stocks") or []
+            if stocks:
+                with conn.cursor() as cur:
+                    for stock in stocks:
+                        if not isinstance(stock, dict):
+                            continue
+                        cur.execute(
+                            """INSERT INTO equity_stock_bar
+                                   (report_id, symbol, dates, close,
+                                    previous_close, volume_shares)
+                               VALUES (%s, %s, %s, %s, %s, %s)""",
+                            (
+                                snapshot.get("report_id"),
+                                stock.get("symbol"),
+                                stock.get("date"),
+                                stock.get("close"),
+                                stock.get("previous_close"),
+                                stock.get("volume_shares"),
+                            ),
+                        )
+    except Exception as error:
+        logger.warning("Gagal menyimpan equity snapshot ke PostgreSQL: %s", error)
+
+
+def _get_database_url() -> str:
+    try:
+        from market_report.config import load_environment
+        load_environment()
+        return os.environ.get("DATABASE_URL", "").strip()
+    except Exception:
+        return ""
+
+
 def load_equity_snapshot() -> dict:
+    database_url = _get_database_url()
+    if database_url:
+        try:
+            import psycopg
+            from psycopg.rows import dict_row
+            with psycopg.connect(database_url, row_factory=dict_row) as conn:
+                row = conn.execute(
+                    """SELECT payload FROM equity_snapshot
+                       ORDER BY dates DESC, fetched_at DESC LIMIT 1"""
+                ).fetchone()
+            if row:
+                return row["payload"]
+        except Exception:
+            pass
     return _read(market_data_directory() / "equity_snapshot.json")
 
 

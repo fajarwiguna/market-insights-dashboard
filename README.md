@@ -13,7 +13,7 @@ berversi, PostgreSQL menyimpan antrean pembaruan, dan worker menyiapkan refresh 
 
 
 ```
-Sumber pasar (Yahoo Finance + PHEI + BI)
+Sumber pasar 
         ↓
 Backend Python (pengambilan + validasi + analisis)
         ↓
@@ -89,10 +89,7 @@ Untuk menjalankan build Next.js dan API dalam mode produksi lokal:
 .\run-production.ps1
 ```
 
-Mode ini menjalankan `npm run build`, `next start`, dan Uvicorn tanpa `--reload`. Pemeriksaan
-`/ready` menunggu migrasi database, worker, dan scheduler bila jadwal diaktifkan. Jalankan migrasi
-schema lebih dulu. Script mengikat layanan ke `127.0.0.1`; pasang reverse proxy dengan HTTPS dan
-pengelolaan proses yang sesuai lingkungan sebelum aplikasi dibuka melalui jaringan.
+Mode ini menjalankan `npm run build`, `next start`, Uvicorn tanpa `--reload`, dan secara otomatis memicu penarikan data pasar terbaru ke database saat startup (gunakan `-SkipFetch` bila ingin melewati penarikan awal). Pemeriksaan `/ready` menunggu migrasi database, worker, dan scheduler bila jadwal diaktifkan. Jalankan migrasi schema lebih dulu. Script mengikat layanan ke `127.0.0.1`; pasang reverse proxy dengan HTTPS dan pengelolaan proses yang sesuai lingkungan sebelum aplikasi dibuka melalui jaringan.
 
 Jika perlu menjalankan komponen satu per satu untuk debugging, jalankan dari root proyek:
 
@@ -559,7 +556,7 @@ SBN, jalur cadangan saat sumber tidak terjangkau, dan kedua pembuat grafik.
 | BI Rate, INDONIA, JISDOR | Bank Indonesia | BI Rate setelah RDG; INDONIA harian |
 | Gold futures / Oil | Yahoo Finance Chart (`GC=F`, `CL=F`, `BZ=F`) | `GC=F` adalah futures COMEX, bukan Gold Spot; Brent tersedia melalui `BZ=F` |
 | Harga emas Antam 1 gr | Seri harga beli harian yang dikonfigurasi pada backend | Tanggal observasi mengikuti data sumber; observasi terakhir dipertahankan saat feed tidak tersedia |
-| Newcastle Coal, CPO Bursa Malaysia | Trading Economics | Harga terakhir, DtD, dan MtD; WtD dan YtD belum disediakan feed yang digunakan |
+| Newcastle Coal, CPO Bursa Malaysia | Trading Economics | Harga referensi OTC/CFD, DtD, serta WtD/MtD/YtD dari histori chart harian satu tahun sumber yang sama. Acuan kalender adalah penutupan terakhir sebelum awal periode; 1M bergulir tetap terpisah. Histori disimpan sebagai cache; periode tanpa acuan valid tetap kosong. |
 | Arus modal, indeks sektoral, indikator makro lengkap, Operasi Moneter | Belum terhubung | Dashboard menunjukkan nilai kosong sampai adapter dan seri tervalidasi tersedia |
 
 ---
