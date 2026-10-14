@@ -157,6 +157,13 @@ try {
         }
     }
 
+    # Hentikan worker atau scheduler lama jika masih berjalan dari sesi sebelumnya
+    Get-CimInstance Win32_Process -Filter "name = 'python.exe'" -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -match 'backend/src/market_report/(worker|scheduler)/main\.py'
+    } | ForEach-Object {
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+
     $backendArguments = @(
         "-u", "-m", "uvicorn", "market_report.api.main:app",
         "--app-dir", "backend/src",
@@ -228,7 +235,7 @@ try {
     if ($shouldFetchData) {
         Write-Host "`nMenarik data pasar terbaru ke database..." -ForegroundColor Cyan
         $refreshScript = Join-Path $projectRoot "backend\src\market_report\services\refresh_service.py"
-        & $pythonExecutable -u $refreshScript --wait --timeout 180
+        & $pythonExecutable -u $refreshScript --wait --timeout 420
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Penarikan data pasar awal tidak selesai dengan sukses (exit code $LASTEXITCODE). Layanan tetap berjalan dengan data sebelumnya."
         } else {

@@ -416,3 +416,348 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* ==========================================================================
+   Monitor Pasar (image.png Pixel-Perfect Recreation)
+   ========================================================================== */
+
+.market-monitor-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #edf2f7;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  padding: 36px 40px;
+  margin-top: 24px;
+  margin-bottom: 32px;
+}
+
+.monitor-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.monitor-eyebrow {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.monitor-title {
+  margin: 0 0 4px 0;
+  font-size: 30px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.monitor-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.monitor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monitor-badge {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.monitor-refresh-btn {
+  background: #ffffff;
+  border: 1px solid #d97706;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.monitor-refresh-btn:hover:not(:disabled) {
+  background: #fffbeb;
+}
+
+.monitor-refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.monitor-refresh-btn .spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+.monitor-alert {
+  background: #fef9e7;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 20px 0 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.monitor-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.monitor-table {
+  min-width: 760px;
+  width: 100%;
+}
+
+.monitor-col-headers {
+  display: grid;
+  grid-template-columns: minmax(180px, 2.2fr) minmax(120px, 1.4fr) minmax(100px, 1.2fr) minmax(140px, 1.8fr) minmax(120px, 1.3fr);
+  padding: 8px 12px;
+  color: #8e9ca8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.monitor-group-container {
+  display: contents;
+}
+
+.monitor-group-bar {
+  background: #f4f6f9;
+  border-radius: 8px;
+  padding: 9px 14px;
+  margin: 18px 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monitor-group-accent {
+  width: 3.5px;
+  height: 14px;
+  border-radius: 999px;
+  background: #d97706;
+  flex-shrink: 0;
+}
+
+.monitor-group-title {
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.monitor-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 2.2fr) minmax(120px, 1.4fr) minmax(100px, 1.2fr) minmax(140px, 1.8fr) minmax(120px, 1.3fr);
+  padding: 15px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  align-items: center;
+}
+
+.monitor-cell-indicator {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.monitor-cell-indicator .instrument-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.monitor-cell-indicator .instrument-unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8e9ca8;
+}
+
+.monitor-cell-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.monitor-cell-change {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-cell-change.change-positive {
+  font-weight: 600;
+  color: #059669;
+}
+
+.monitor-cell-change.change-negative {
+  font-weight: 600;
+  color: #ef4444;
+}
+
+.monitor-cell-change.change-neutral {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.monitor-cell-sparkline {
+  display: flex;
+  align-items: center;
+}
+
+.monitor-sparkline {
+  display: block;
+  width: 130px;
+  height: 36px;
+  overflow: visible;
+}
+
+.monitor-cell-updated {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.monitor-cell-updated .update-date {
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.35;
+}
+
+.monitor-cell-updated .update-time {
+  font-size: 11px;
+  font-weight: 400;
+  color: #8e9ca8;
+  line-height: 1.35;
+}
+
+.monitor-footnote {
+  margin: 22px 0 0 0;
+  font-size: 11px;
+  color: #8e9ca8;
+  font-weight: 400;
+}
+
+/* Dark mode overrides for Monitor Pasar */
+[data-theme="dark"] .market-monitor-card {
+  background: #19272d;
+  border-color: #34484c;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .monitor-title {
+  color: #e2ece9;
+}
+
+[data-theme="dark"] .monitor-subtitle,
+[data-theme="dark"] .monitor-eyebrow {
+  color: #8da6aa;
+}
+
+[data-theme="dark"] .monitor-badge {
+  background: #25383d;
+  color: #adbcba;
+}
+
+[data-theme="dark"] .monitor-refresh-btn {
+  background: #19272d;
+  border-color: #d97706;
+  color: #e2ece9;
+}
+
+[data-theme="dark"] .monitor-refresh-btn:hover:not(:disabled) {
+  background: #25383d;
+}
+
+[data-theme="dark"] .monitor-alert {
+  background: #2d2616;
+  color: #f2c779;
+}
+
+[data-theme="dark"] .monitor-col-headers {
+  color: #7b9193;
+}
+
+[data-theme="dark"] .monitor-group-bar {
+  background: #203138;
+}
+
+[data-theme="dark"] .monitor-group-title {
+  color: #e2ece9;
+}
+
+[data-theme="dark"] .monitor-row {
+  border-bottom-color: #26383e;
+}
+
+[data-theme="dark"] .monitor-cell-indicator .instrument-name {
+  color: #e2ece9;
+}
+
+[data-theme="dark"] .monitor-cell-indicator .instrument-unit {
+  color: #7b9193;
+}
+
+[data-theme="dark"] .monitor-cell-value {
+  color: #e2ece9;
+}
+
+[data-theme="dark"] .monitor-cell-change.change-neutral {
+  color: #8da6aa;
+}
+
+[data-theme="dark"] .monitor-cell-updated .update-date {
+  color: #c5d4d1;
+}
+
+[data-theme="dark"] .monitor-cell-updated .update-time {
+  color: #7b9193;
+}
+
+[data-theme="dark"] .monitor-footnote {
+  color: #7b9193;
+}
+
+@media (max-width: 768px) {
+  .market-monitor-card {
+    padding: 20px 16px;
+    border-radius: 14px;
+    margin-top: 14px;
+  }
+  .monitor-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .monitor-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

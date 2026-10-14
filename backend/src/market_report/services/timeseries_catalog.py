@@ -423,7 +423,13 @@ def _points_from_history(history) -> list[tuple[str, float]]:
         if not isinstance(point, dict):
             continue
         date = str(point.get("date") or point.get("dates") or "").strip()[:10]
-        value = point.get("close", point.get("value"))
+        value = (
+            point.get("close")
+            if point.get("close") is not None
+            else point.get("value")
+            if point.get("value") is not None
+            else point.get("balance_idr_trillion")
+        )
         if date and isinstance(value, (int, float)) and not isinstance(value, bool):
             points.append((date, float(value)))
     return points

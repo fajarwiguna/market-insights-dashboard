@@ -35,7 +35,7 @@ def get_refresh_job(job_id: str) -> dict | None:
 
 
 def trigger_and_wait_refresh(
-    timeout: float = 180.0,
+    timeout: float = 420.0,
     poll_interval: float = 2.0,
     on_progress: Callable[[float], None] | None = None,
 ) -> dict:
@@ -78,7 +78,7 @@ def trigger_and_wait_refresh(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Pemicu refresh data Daily Market Report")
     parser.add_argument("--wait", action="store_true", help="Tunggu hingga proses refresh selesai")
-    parser.add_argument("--timeout", type=float, default=180.0, help="Batas waktu tunggu dalam detik")
+    parser.add_argument("--timeout", type=float, default=420.0, help="Batas waktu tunggu dalam detik")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")

@@ -43,7 +43,7 @@ def instrument_history(instrument_id: str, report_id: str | None = None) -> list
                 for point in history_service.load_sbn_history()]
 
     symbol = _SNAPSHOT_SYMBOLS.get(instrument_id)
-    if symbol is None and instrument_id != "sbn-10y":
+    if symbol is None and instrument_id not in ("sbn-10y", "antam"):
         return None
     report = report_service.load_report_version(report_id) if report_id else report_service.load_report()
     if report is None and report_id:
@@ -54,6 +54,16 @@ def instrument_history(instrument_id: str, report_id: str | None = None) -> list
         # Older versions without frozen history must not borrow today's series.
         return _clean_points(report.get("_sbn_history") or
                              (report.get("_source_snapshot") or {}).get("_sbn_history"))
+    if instrument_id == "antam":
+        reading = report.get("commodities", {}).get("Emas Antam 1 gr (Rp)") or {}
+        series_id = reading.get("series_id") or "logammulia_antam_sell_1g"
+        history = report.get("_antam_gold_history") or (report.get("_source_snapshot") or {}).get("_antam_gold_history")
+        if isinstance(history, list):
+            filtered = [p for p in history if isinstance(p, dict) and (p.get("series_id") or "legacy_antam") == series_id]
+            points = _clean_points(filtered)
+            if points:
+                return points
+        return []
     if instrument_id == "us-10y":
         points = _clean_points(report.get("history_ust10"))
         if points:
