@@ -947,7 +947,9 @@ def run_all(*, persist: bool = True) -> Dict[str, Any]:
     from market_report.services.equity_snapshot_service import fetch_equity_source
     try:
         print("Fetching yfinance equity contributions...")
-        equity = fetch_equity_source()
+        ihsg = market.get("IHSG") if isinstance(market.get("IHSG"), dict) else {}
+        # Pakai sesi yang sama dengan dashboard/laporan agar angka equity selaras.
+        equity = fetch_equity_source(session_day=ihsg.get("date"))
     except Exception as error:
         equity = {"error": str(error), "stocks": [], "indices": {}}
 

@@ -5,6 +5,7 @@ from market_report.api.dependencies import require_read_access
 from market_report.services.equity_snapshot_service import load_equity_snapshot
 from market_report.services.report_service import load_report
 from market_report.domain.equity_snapshot import enrich_equity_indicators
+from market_report.services.narration.freeze import apply_frozen_narrative
 
 router = APIRouter(prefix="/equity", tags=["equity"], dependencies=[Depends(require_read_access)])
 
@@ -23,4 +24,6 @@ def latest_equity() -> dict:
     if not candidates:
         raise HTTPException(status_code=404, detail="Data equity belum tersedia. Jalankan refresh worker atau modul equity_snapshot_service.")
     snapshot = max(candidates, key=lambda row: (row.get("report_date") or "", row.get("fetched_at") or ""))
-    return enrich_equity_indicators(snapshot, report)
+    # Narasi beku menang atas narasi deterministik supaya halaman equity versi ini
+    # tidak berubah saat narasi dibuat ulang (blueprint §15.1).
+    return apply_frozen_narrative(enrich_equity_indicators(snapshot, report), report)

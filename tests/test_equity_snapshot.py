@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend" / "src"))
 from fastapi import HTTPException
 from market_report.domain.equity_snapshot import build_equity_snapshot, rank_stocks, enrich_equity_indicators
 from market_report.api.routers import equity
-from market_report.services.equity_snapshot_service import _quote_index
+from market_report.services.equity_snapshot_service import _quote_index, session_cutoff
 from datetime import datetime, timezone
 
 
@@ -89,6 +89,74 @@ class EquityTests(unittest.TestCase):
         result = build_equity_snapshot(self.source(), report)
         self.assertEqual(result["foreign_flow"]["net_usd_mn"], 0)
         self.assertIsNone(result["foreign_flow"]["net_idr"])
+
+    def test_session_cutoff_prefers_report_session_and_falls_back_to_close(self):
+        self.assertEqual(session_cutoff(datetime(2026, 10, 16, 9, 0), "2026-10-16"), "2026-10-16")
+        self.assertEqual(session_cutoff(datetime(2026, 10, 16, 16, 30), "2026-10-15"), "2026-10-15")
+        self.assertEqual(session_cutoff(datetime(2026, 10, 16, 9, 0)), "2026-10-15")
+        self.assertEqual(session_cutoff(datetime(2026, 10, 16, 15, 55)), "2026-10-15")
+        self.assertEqual(session_cutoff(datetime(2026, 10, 16, 16, 30)), "2026-10-16")
+        self.assertEqual(session_cutoff(datetime(2026, 10, 16, 9, 0), "bukan-tanggal"), "2026-10-15")
+
+    def _symbol_frame(self, sessions):
+        import pandas as pd
+        index = pd.to_datetime(sessions)
+        size = len(sessions)
+        return pd.DataFrame({"Close": [100.0 + offset for offset in range(size)],
+                             "Volume": [1000] * size, "Stock Splits": [0] * size}, index=index)
+
+    def test_fetch_equity_source_follows_provided_session(self):
+        from market_report.services import equity_snapshot_service as service
+        sessions = ["2026-10-14", "2026-10-15", "2026-10-16"]
+        universe = {"date": "2026-10-16", "complete": True, "stocks": [
+            {"symbol": "AAAA.JK", "ticker": "AAAA", "company": "AAAA", "shares_outstanding": 100,
+             "market_cap": 0, "sector": "Energy", "quote_price": 102}]}
+        with patch.object(service, "_download", lambda yf, symbols: {s: self._symbol_frame(sessions) for s in symbols}), \
+             patch.object(service, "discover_equities", lambda yf, now: universe):
+            latest = service.fetch_equity_source(session_day="2026-10-16")
+            earlier = service.fetch_equity_source(session_day="2026-10-15")
+        self.assertEqual((latest["trading_date"], latest["previous_trading_date"]), ("2026-10-16", "2026-10-15"))
+        self.assertEqual((earlier["trading_date"], earlier["previous_trading_date"]), ("2026-10-15", "2026-10-14"))
+        self.assertEqual(latest["stocks"][0]["date"], "2026-10-16")
+        self.assertEqual(latest["indices"]["IHSG"]["date"], "2026-10-16")
+
+    def test_active_report_session_day_reads_active_report(self):
+        from market_report.services import equity_snapshot_service as service
+        import market_report.services.report_service as report_service
+        with patch.object(report_service, "load_report",
+                          lambda *a, **k: {"equity_snapshot": {"report_date": "2026-10-16"}}):
+            self.assertEqual(service._active_report_session_day(), "2026-10-16")
+        with patch.object(report_service, "load_report",
+                          lambda *a, **k: {"_source_snapshot": {"yfinance": {"IHSG": {"date": "2026-10-15"}}}}):
+            self.assertEqual(service._active_report_session_day(), "2026-10-15")
+        with patch.object(report_service, "load_report", return_value=None):
+            self.assertIsNone(service._active_report_session_day())
+
+    def test_run_all_forwards_report_session_to_equity(self):
+        from contextlib import ExitStack
+        import market_report.fetch_data as fetch_data
+        import market_report.services.equity_snapshot_service as service
+        import market_report.services.international_equity_flow_service as intl
+        captured = {}
+
+        def fake_equity(session_day=None):
+            captured["session_day"] = session_day
+            return {"session_day": session_day}
+
+        stubs = {
+            "fetch_market_snapshot": lambda: {"IHSG": {"date": "2026-10-16"}, "USDIDR": {}},
+            "fetch_capital_flow": lambda market: {},
+            "fetch_antam_gold_price": dict, "fetch_fx_backup": dict, "fetch_phei_yields": dict,
+            "fetch_bi_rates": dict, "fetch_macro_indicators": dict, "fetch_monetary_operations": dict,
+        }
+        with ExitStack() as stack:
+            for name, stub in stubs.items():
+                stack.enter_context(patch.object(fetch_data, name, stub))
+            stack.enter_context(patch.object(intl, "fetch_international_equity_flows", lambda: {}))
+            stack.enter_context(patch.object(service, "fetch_equity_source", fake_equity))
+            snapshot = fetch_data.run_all(persist=False)
+        self.assertEqual(captured["session_day"], "2026-10-16")
+        self.assertEqual(snapshot["equity"], {"session_day": "2026-10-16"})
 
     def test_sector_quote_rejects_live_or_stale_session(self):
         stamp = datetime(2026, 10, 7, 10, tzinfo=timezone.utc).timestamp()

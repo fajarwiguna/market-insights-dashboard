@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "description": "Registry sumber bukti untuk LLM Narrative Engine. Dipakai mode 'seeded' (mengambil kanal berita/halaman data) dan sebagai pemetaan domain -> tier untuk validasi sumber. Diturunkan dari daftar sumber yang ditetapkan pengguna, lihat docs/LLM_NARRATIVE_ENGINE_BLUEPRINT.md bagian 31.",
+  "tier_order": [
+    "official_primary",
+    "supranational_official",
+    "company_primary",
+    "data_portal",
+    "id_market_media",
+    "global_market_media",
+    "major_media",
+    "secondary"
+  ],
+  "tier_labels": {
+    "official_primary": "Lembaga resmi negara (BI, OJK, BPS, IDX, The Fed, US Treasury, ECB)",
+    "supranational_official": "Lembaga multilateral (IMF, World Bank)",
+    "company_primary": "Situs resmi emiten / investor relations",
+    "data_portal": "Portal data & kalender ekonomi",
+    "id_market_media": "Media pasar Indonesia",
+    "global_market_media": "Media keuangan global",
+    "major_media": "Media besar yang boleh dipakai untuk klaim kausal",
+    "secondary": "Domain di luar registry; hanya untuk klaim non-kausal"
+  },
+  "domain_tiers": {
+    "idx.co.id": "official_primary",
+    "bi.go.id": "official_primary",
+    "bps.go.id": "official_primary",
+    "ojk.go.id": "official_primary",
+    "federalreserve.gov": "official_primary",
+    "home.treasury.gov": "official_primary",
+    "ecb.europa.eu": "official_primary",
+    "imf.org": "supranational_official",
+    "worldbank.org": "supranational_official",
+    "tradingeconomics.com": "data_portal",
+    "investing.com": "data_portal",
+    "finance.yahoo.com": "global_market_media",
+    "bloombergtechnoz.com": "id_market_media",
+    "reuters.com": "global_market_media",
+    "bloomberg.com": "global_market_media",
+    "ft.com": "global_market_media",
+    "cnbc.com": "global_market_media",
+    "cnbcindonesia.com": "id_market_media",
+    "antaranews.com": "id_market_media",
+    "kontan.co.id": "id_market_media",
+    "bisnis.com": "id_market_media",
+    "katadata.co.id": "id_market_media",
+    "tempo.co": "id_market_media",
+    "investor.id": "id_market_media",
+    "idxchannel.com": "id_market_media",
+    "emitennews.com": "id_market_media",
+    "bisnisindonesia.id": "id_market_media",
+    "jakartapost.com": "id_market_media",
+    "thejakartapost.com": "id_market_media",
+    "medcom.id": "major_media",
+    "republika.co.id": "major_media",
+    "kompas.com": "major_media",
+    "liputan6.com": "major_media",
+    "detik.com": "major_media",
+    "msci.com": "official_primary",
+    "ftserussell.com": "official_primary",
+    "spglobal.com": "official_primary",
+    "fitchratings.com": "official_primary",
+    "moodys.com": "official_primary",
+    "kompas.id": "id_market_media",
+    "ajaib.co.id": "id_market_media",
+    "marketwatch.com": "global_market_media",
+    "apnews.com": "global_market_media"
+  },
+  "sources": [
+    {
+      "id": "google_news_search",
+      "name": "Google News (pencarian dinamis)",
+      "tier": "major_media",
+      "country": "GLOBAL",
+      "mode": "query",
+      "format": "rss",
+      "url_template": "https://news.google.com/rss/search?q={query}&hl=id&gl=ID&ceid=ID:id",
+      "queries_per_run": 3,
+      "topics": ["indonesian_equity", "fx", "yields", "commodities", "capital_market",
+                 "global_equity", "global_macro", "indonesia_macro", "corporate_action"],
+      "note": "Kueri dinamis berasal dari sinyal pasar sesi ini (services/narration/signals.py). Tier per item diambil dari domain penerbit (<source url=...>), bukan news.google.com."
+    },
+    {
+      "id": "idx",
+      "name": "Indonesia Stock Exchange (IDX)",
+      "tier": "official_primary",
+      "country": "ID",
+      "mode": "reference",
+      "urls": ["https://www.idx.co.id/"],
+      "topics": ["indonesian_equity", "corporate_action", "company_disclosure", "market_statistics"]
+    },
+    {
+      "id": "bi",
+      "name": "Bank Indonesia",
+      "tier": "official_primary",
+      "country": "ID",
+      "mode": "reference",
+      "urls": ["https://www.bi.go.id/"],
+      "topics": ["monetary_policy", "fx", "foreign_reserves", "indonesia_macro"]
+    },
+    {
+      "id": "bps",
+      "name": "Badan Pusat Statistik",
+      "tier": "official_primary",
+      "country": "ID",
+      "mode": "reference",
+      "urls": ["https://www.bps.go.id/"],
+      "topics": ["inflation", "gdp", "trade_balance", "export_import", "indonesia_macro"]
+    },
+    {
+      "id": "ojk",
+      "name": "Otoritas Jasa Keuangan",
+      "tier": "official_primary",
+      "country": "ID",
+      "mode": "reference",
+      "urls": ["https://www.ojk.go.id/"],
+      "topics": ["capital_market_policy", "financial_regulation"]
+    },
+    {
+      "id": "fed",
+      "name": "Federal Reserve",
+      "tier": "official_primary",
+      "country": "US",
+      "mode": "reference",
+      "urls": ["https://www.federalreserve.gov/"],
+      "topics": ["us_rates", "global_macro"]
+    },
+    {
+      "id": "ustreasury",
+      "name": "U.S. Department of the Treasury",
+      "tier": "official_primary",
+      "country": "US",
+      "mode": "reference",
+      "urls": ["https://home.treasury.gov/"],
+      "topics": ["us_yields", "us_fiscal"]
+    },
+    {
+      "id": "ecb",
+      "name": "European Central Bank",
+      "tier": "official_primary",
+      "country": "EU",
+      "mode": "reference",
+      "urls": ["https://www.ecb.europa.eu/"],
+      "topics": ["euro_rates", "global_macro"]
+    },
+    {
+      "id": "imf",
+      "name": "International Monetary Fund",
+      "tier": "supranational_official",
+      "country": "GLOBAL",
+      "mode": "reference",
+      "urls": ["https://www.imf.org/"],
+      "topics": ["global_macro"]
+    },
+    {
+      "id": "worldbank",
+      "name": "World Bank",
+      "tier": "supranational_official",
+      "country": "GLOBAL",
+      "mode": "reference",
+      "urls": ["https://www.worldbank.org/"],
+      "topics": ["global_macro"]
+    },
+    {
+      "id": "tradingeconomics",
+      "name": "TradingEconomics",
+      "tier": "data_portal",
+      "country": "GLOBAL",
+      "mode": "seed",
+      "urls": [
+        "https://tradingeconomics.com/stream",
+        "https://tradingeconomics.com/calendar",
+        "https://tradingeconomics.com/united-states/currency",
+        "https://tradingeconomics.com/commodity/gold",
+        "https://tradingeconomics.com/united-states/government-bond-yield"
+      ],
+      "topics": ["economic_calendar", "fx", "commodities", "yields"]
+    },
+    {
+      "id": "investing",
+      "name": "Investing.com",
+      "tier": "data_portal",
+      "country": "GLOBAL",
+      "mode": "seed",
+      "format": "rss",
+      "urls": [
+        "https://www.investing.com/rss/news_11.rss",
+        "https://www.investing.com/rss/news_14.rss",
+        "https://www.investing.com/rss/news_1.rss",
+        "https://www.investing.com/rss/news_25.rss"
+      ],
+      "topics": ["commodities", "economy", "fx", "global_equity"]
+    },
+    {
+      "id": "yahoo_finance",
+      "name": "Yahoo Finance",
+      "tier": "global_market_media",
+      "country": "GLOBAL",
+      "mode": "seed",
+      "urls": [
+        "https://finance.yahoo.com/economy/policy/article/",
+        "https://finance.yahoo.com/topic/stock-market-news/",
+        "https://finance.yahoo.com/topic/latest-news/",
+        "https://finance.yahoo.com/markets/live/",
+        "https://finance.yahoo.com/quote/%5EDJI/news/",
+        "https://finance.yahoo.com/quote/%5EFTSE/news/",
+        "https://finance.yahoo.com/quote/%5EFCHI/news/",
+        "https://finance.yahoo.com/quote/%5EGDAXI/news/",
+        "https://finance.yahoo.com/videos/series/market-domination-overtime/"
+      ],
+      "topics": ["global_equity", "economy_policy", "market_news"]
+    },
+    {
+      "id": "bloomberg_technoz",
+      "name": "Bloomberg Technoz",
+      "tier": "id_market_media",
+      "country": "ID",
+      "mode": "seed",
+      "urls": [
+        "https://www.bloombergtechnoz.com/kanal/market/ekonomi",
+        "https://www.bloombergtechnoz.com/kanal/market/investasi",
+        "https://www.bloombergtechnoz.com/kanal/market/pasar-modal",
+        "https://www.bloombergtechnoz.com/kanal/market/komoditi",
+        "https://www.bloombergtechnoz.com/kanal/market/valuta-asing",
+        "https://www.bloombergtechnoz.com/tag/ihsg"
+      ],
+      "topics": ["indonesia_macro", "capital_market", "commodities", "fx", "ihsg"]
+    },
+    {
+      "id": "reuters",
+      "name": "Reuters",
+      "tier": "global_market_media",
+      "country": "GLOBAL",
+      "mode": "seed",
+      "urls": ["https://www.reuters.com/"],
+      "topics": ["global_macro", "global_equity", "commodities", "fx", "geopolitics"]
+    },
+    {
+      "id": "bloomberg",
+      "name": "Bloomberg",
+      "tier": "global_market_media",
+      "country": "GLOBAL",
+      "mode": "seed",
+      "urls": ["https://www.bloomberg.com/"],
+      "topics": ["global_macro", "global_equity", "commodities", "fx"]
+    },
+    {
+      "id": "ft",
+      "name": "Financial Times",
+      "tier": "global_market_media",
+      "country": "GLOBAL",
+      "mode": "seed",
+      "urls": ["https://www.ft.com/"],
+      "topics": ["global_macro", "global_equity"]
+    },
+    {
+      "id": "cnbc",
+      "name": "CNBC",
+      "tier": "global_market_media",
+      "country": "GLOBAL",
+      "mode": "seed",
+      "urls": ["https://www.cnbc.com/"],
+      "topics": ["global_macro", "global_equity", "markets"]
+    }
+  ],
+  "topic_checklist": [
+    "global_indices",
+    "fixed_income",
+    "commodities",
+    "fx",
+    "indonesia_macro",
+    "global_macro",
+    "indonesian_equity",
+    "corporate_action",
+    "equity_fundamentals",
+    "sectors",
+    "global_risk_indicators"
+  ],
+  "unverified_urls": [
+    {
+      "url": "https://tradingeconomics.com/indu:ind",
+      "reason": "Tautan tampak terpotong dan belum bisa diverifikasi. Tidak diaktifkan sampai pengguna mengonfirmasi maksudnya (dugaan: halaman indikator Indonesia).",
+      "reported_by": "pengguna"
+    }
+  ],
+  "company_primary": {
+    "note": "Situs investor relations emiten diaktifkan per ticker setelah domainnya diverifikasi, mengikuti pola runtime/data/equity_registry.json.",
+    "registry": {}
+  },
+  "rules": {
+    "note": "Halaman kanal dipakai untuk menemukan tautan artikel; yang masuk bukti adalah artikelnya, bukan halaman indeks. Sumber dengan \"format\": \"rss\" dibaca langsung dari item feed (tanpa memuat tiap artikel), dipakai saat kanal HTML diblokir. Sumber dengan \"mode\": \"query\" diekspansi dari kueri sinyal pasar sesi ini (url_template memakai placeholder {query}); tier mengikuti domain penerbit pada <source url=...>, sehingga agregator seperti news.google.com tidak dianggap sumber. Angka dari halaman registry tidak pernah menjadi angka pasar.",
+    "max_articles_per_source": 4,
+    "fetch_timeout_seconds": 20,
+    "max_bytes_per_page": 2000000,
+    "allowed_url_schemes": ["http", "https"],
+    "deny_host_patterns": ["localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", "::1", "10.", "192.168.", "172.16."]
+  }
+}

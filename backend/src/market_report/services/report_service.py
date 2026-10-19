@@ -464,6 +464,12 @@ def publish_snapshot(snapshot: dict, *, report_path: Path | None = None,
         report["report_id"] = report_id
     validate_report(report)
 
+    # Narasi dibekukan sebelum laporan disimpan: laporan versi ini memuat narasi
+    # yang dipakai PDF dan halaman laporan lama. Hanya aktif bila fitur narasi
+    # LLM dinyalakan; kegagalannya tidak menggagalkan publikasi (lihat freeze.py).
+    from market_report.services.narration.freeze import attach_narratives
+    attach_narratives(report)
+
     # Repository menyimpan versi immutable, lalu mengganti laporan aktif atomik.
     report = _repository(report_path).publish(report)
 

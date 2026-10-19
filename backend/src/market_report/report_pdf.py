@@ -320,7 +320,17 @@ class KanvasLaporan(pdfcanvas.Canvas):
 
 
 def summary_text(report: Dict[str, Any]) -> str:
-    """Tiga sorotan ringkas untuk halaman pembuka laporan."""
+    """Tiga sorotan ringkas untuk halaman pembuka laporan.
+
+    Bila laporan memuat narasi beku (blueprint §15.1), teks itu yang dipakai
+    supaya PDF versi lama tidak berubah ketika narasi dibuat ulang.
+    """
+    from market_report.services.narration.freeze import frozen_narrative
+
+    frozen = frozen_narrative(report, "dashboard")
+    if frozen:
+        return frozen
+
     fx = report.get("fx") or {}
     usd = _cari(fx, "usd/idr")
     ihsg = _cari(report.get("indices") or {}, "ihsg")
@@ -1117,17 +1127,11 @@ def build_pdf(
         ("LINEBELOW", (0, 0), (-1, -1), 1.3, ACCENT),
     ]))
 
-    usd_change, ihsg_change = usd.get("change_pct"), ihsg.get("change_pct")
-    usd_direction = "melemah" if isinstance(usd_change, (int, float)) and usd_change > 0 else "menguat"
-    ihsg_direction = "menguat" if isinstance(ihsg_change, (int, float)) and ihsg_change > 0 else "melemah"
-    if usd.get("today") is not None and ihsg.get("today") is not None:
-        headline = f"Rupiah {usd_direction.capitalize()}, IHSG {ihsg_direction.capitalize()}"
-    elif usd.get("today") is not None:
-        headline = f"Rupiah {usd_direction.capitalize()}"
-    elif ihsg.get("today") is not None:
-        headline = f"IHSG {ihsg_direction.capitalize()}"
-    else:
-        headline = "Ringkasan Pasar Hari Ini"
+    # Judul laporan diambil dari fungsi yang sama dengan payload/UI, sehingga
+    # arah judul selalu konsisten dengan data indikator (lihat build_headline).
+    from market_report.domain.market_analysis import build_headline
+
+    headline = build_headline(report)
     headline_style = ParagraphStyle("ExecHeadline", fontName="Helvetica-Bold", fontSize=24,
                                     leading=27, textColor=INK)
     summary_style = ParagraphStyle("ExecSummary", fontName="Helvetica", fontSize=8.7,

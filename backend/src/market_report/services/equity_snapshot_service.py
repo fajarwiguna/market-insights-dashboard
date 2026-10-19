@@ -6,13 +6,34 @@ import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from market_report.config import market_data_directory
 from market_report.domain.equity_snapshot import PERFORMANCE_INDICES, SECTOR_NAMES, build_equity_snapshot, finite
 
 logger = logging.getLogger(__name__)
 JAKARTA = timezone(timedelta(hours=7))
+
+# Sesi reguler IDX tutup ~15:50 WIB dan lelang penutupan berakhir ~16:00 WIB.
+# Setelah ambang ini candle harian hari berjalan dianggap selesai sehingga
+# dokumen equity boleh memakai sesi yang sama dengan laporan/dashboard.
+SESSION_CLOSE = (16, 15)
+
+
+def session_cutoff(now: datetime, session_day: str | None = None) -> str:
+    """Tanggal sesi terakhir yang boleh dipakai untuk snapshot equity.
+
+    `session_day` (tanggal observasi IHSG pada laporan) dipakai lebih dulu agar
+    dokumen equity mengikuti sesi yang sama dengan dashboard. Tanpa petunjuk,
+    jam tutup pasar dipakai sebagai penentu bawaan.
+    """
+    if session_day:
+        try:
+            return date.fromisoformat(session_day).isoformat()
+        except (TypeError, ValueError):
+            logger.warning("Ignoring invalid equity session day: %r", session_day)
+    closed = (now.hour, now.minute) >= SESSION_CLOSE
+    return (now.date() if closed else now.date() - timedelta(days=1)).isoformat()
 
 
 def _read(path) -> dict:
@@ -125,11 +146,11 @@ def _quote_index(info: dict, day: str, previous_day: str) -> dict | None:
             "date": quote_date, "prev_date": previous_day, "price_basis": "Yahoo dated quote"}
 
 
-def fetch_equity_source() -> dict:
+def fetch_equity_source(session_day: str | None = None) -> dict:
     import yfinance as yf
     now = datetime.now(JAKARTA)
-    # Exclude today's unfinished daily candle, including during closing auctions.
-    cutoff = (now.date() if (now.hour, now.minute) >= (17, 0) else now.date() - timedelta(days=1)).isoformat()
+    # Selaraskan sesi dengan laporan/dashboard; jangan campur candle yang belum selesai.
+    cutoff = session_cutoff(now, session_day)
     index_symbols = [symbol for _, symbol, _ in PERFORMANCE_INDICES]
     index_frame = _download(yf, index_symbols)
     ihsg_bars = _bars(index_frame["^JKSE"], cutoff)
@@ -289,9 +310,24 @@ def load_equity_snapshot() -> dict:
     return _read(market_data_directory() / "equity_snapshot.json")
 
 
+def _active_report_session_day() -> str | None:
+    """Tanggal observasi IHSG dari laporan aktif, bila tersedia."""
+    try:
+        from market_report.services.report_service import load_report
+        report = load_report() or {}
+        if isinstance(report.get("equity_snapshot"), dict) and report["equity_snapshot"].get("report_date"):
+            return report["equity_snapshot"]["report_date"]
+        yfinance = (report.get("_source_snapshot") or {}).get("yfinance") or {}
+        ihsg = yfinance.get("IHSG") if isinstance(yfinance.get("IHSG"), dict) else {}
+        return ihsg.get("date")
+    except Exception:
+        logger.warning("Sesi laporan aktif tidak terbaca; memakai jam tutup pasar", exc_info=True)
+        return None
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    source = fetch_equity_source()
+    source = fetch_equity_source(session_day=_active_report_session_day())
     snapshot = build_equity_snapshot(source)
     persist_equity_snapshot(snapshot)
     print(json.dumps({"report_id": snapshot["report_id"], "date": snapshot["report_date"],

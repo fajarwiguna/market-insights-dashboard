@@ -695,6 +695,11 @@ def build_report_data(snap: Optional[Dict] = None) -> Dict[str, Any]:
         report["international_equity_flows"] = snap.get("international_equity_flows") or {}
         report["equity_snapshot"] = build_equity_snapshot(snap["equity"], {**report, "_source_snapshot": snap})
         report.pop("international_equity_flows", None)
+
+    # Judul ringkas selalu searah data (dipakai kartu insight, PDF, dan UI).
+    from market_report.domain.market_analysis import build_headline
+
+    report["headline"] = build_headline(report)
     return report
 
 

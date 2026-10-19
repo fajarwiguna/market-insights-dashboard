@@ -9,7 +9,7 @@ from market_report.api.dependencies import require_read_access
 from market_report.api.schemas import ExportReadyResponse, JobResponse, ReportResponse
 from market_report.api.rate_limits import export_requests
 from market_report.services.artifact_service import pdf_artifact_is_current, pdf_artifact_path
-from market_report.domain.market_analysis import build_impacts, build_insights, build_summary
+from market_report.domain.market_analysis import build_impacts, build_insights, build_summary, build_treasury_implications
 from market_report.services import report_service
 from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
 
@@ -30,14 +30,30 @@ def _read_report(report_id: str | None = None) -> dict:
         raise HTTPException(status_code=404, detail="Versi laporan tidak ditemukan.")
     # Snapshot provider tertanam hanya untuk menjaga konsistensi internal UI.
     public_report = {key: value for key, value in report.items() if not key.startswith("_")}
+    # Narasi beku (bila laporan diterbitkan dengan fitur narasi aktif) menang atas
+    from market_report.domain.narration_contract import NarrativePage
+    from market_report.services.narration.engine import NarrativeEngine
+    from market_report.services.narration.freeze import frozen_narrative
+
+    frozen = frozen_narrative(public_report, "dashboard")
+    if not frozen:
+        try:
+            latest_narration = NarrativeEngine().latest(NarrativePage.DASHBOARD, str(public_report.get("report_id") or ""))
+            if latest_narration and latest_narration.narrative:
+                frozen = latest_narration.narrative
+        except Exception:
+            pass
+
+    public_report["narrative_frozen"] = bool(frozen)
     # Teks analisis dibuat backend agar dashboard baru dan Streamlit memakai
     # aturan bisnis yang sama. Hilangkan penanda tebal lama; UI mengatur gaya sendiri.
-    public_report["summary"] = build_summary(public_report)
+    public_report["summary"] = frozen or build_summary(public_report)
     public_report["insights"] = [
         {**item, "text": item.get("text", "").replace("<b>", "").replace("</b>", "")}
         for item in build_insights(public_report)
     ]
     public_report["impacts"] = build_impacts(public_report)
+    public_report["treasury_implications"] = build_treasury_implications(public_report)
     return public_report
 
 

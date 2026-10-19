@@ -1,7 +1,16 @@
 """Penyusunan fakta, ringkasan, dan dampak dari data pasar."""
 
+import re
+
 from market_report.domain.market_data import pick
 from market_report.presentation.formatting import _delta_bp, fmt_mag, fmt_num, fmt_pct, spread_word, tone_of
+
+# Kata arah yang dikenali pada judul (dipakai pemeriksaan konsistensi).
+_DIRECTION_WORDS = {
+    "naik": ("naik", "menguat", "menanjak", "melonjak"),
+    "turun": ("turun", "melemah", "menyusut", "anjlok"),
+    "stabil": ("stabil", "datar", "nyaris tidak berubah", "mendatar"),
+}
 
 
 def market_facts(report: dict) -> dict:
@@ -43,6 +52,83 @@ def _arah(kata_naik: str, kata_turun: str, nilai) -> str:
     if nilai < -0.02:
         return kata_turun
     return "hampir tidak berubah"
+
+
+# Pergerakan di bawah ambang ini dianggap datar pada judul (bukan naik/turun).
+HEADLINE_FLAT_PCT = 0.05
+
+
+def _headline_direction(change) -> str:
+    """Arah judul: 'naik', 'turun', atau 'stabil' (None bila data tidak ada)."""
+    if change is None:
+        return ""
+    try:
+        value = float(change)
+    except (TypeError, ValueError):
+        return ""
+    if value > HEADLINE_FLAT_PCT:
+        return "naik"
+    if value < -HEADLINE_FLAT_PCT:
+        return "turun"
+    return "stabil"
+
+
+def build_headline(report: dict) -> str:
+    """Judul ringkas yang selalu searah data (dipakai payload, PDF, dan kartu insight).
+
+    Arah diambil dari angka yang sama dengan tabel indikator, sehingga judul
+    tidak bisa bertentangan dengan data. Rupiah memakai konvensi USD/IDR: kurs
+    naik berarti Rupiah melemah.
+    """
+    f = market_facts(report)
+    parts: list[str] = []
+
+    usd = f["usd_idr"]
+    if usd.get("today") is not None:
+        arah = _headline_direction(usd.get("change_pct"))
+        parts.append({"naik": "Rupiah melemah", "turun": "Rupiah menguat",
+                      "stabil": "Rupiah stabil"}.get(arah, "Rupiah"))
+
+    ihsg = f["ihsg"]
+    if ihsg.get("today") is not None:
+        arah = _headline_direction(ihsg.get("change_pct"))
+        parts.append({"naik": "IHSG menguat", "turun": "IHSG melemah",
+                      "stabil": "IHSG stabil"}.get(arah, "IHSG"))
+
+    return ", ".join(parts) if parts else "Ringkasan Pasar Hari Ini"
+
+
+def headline_consistency_issues(report: dict, headline: str) -> list[str]:
+    """Periksa apakah judul bertentangan dengan arah data. Kosong berarti konsisten."""
+    text = (headline or "").lower()
+    if not text:
+        return ["judul kosong"]
+    f = market_facts(report)
+    issues: list[str] = []
+
+    def segment(label: str) -> str:
+        for part in re.split(r"[,;]", text):
+            if label in part:
+                return part
+        return ""
+
+    def check(label: str, expected: str) -> None:
+        seg = segment(label)
+        if not seg:
+            return
+        same = _DIRECTION_WORDS.get(expected, ())
+        opposite = tuple(word for direction, words in _DIRECTION_WORDS.items()
+                         if direction != expected for word in words)
+        if any(word in seg for word in opposite) and not any(word in seg for word in same):
+            issues.append(f"{label}: judul '{seg.strip()}' berlawanan dengan arah data")
+
+    if f["usd_idr"].get("today") is not None:
+        arah = _headline_direction(f["usd_idr"].get("change_pct"))
+        # USD/IDR naik berarti Rupiah melemah.
+        check("rupiah", {"naik": "turun", "turun": "naik", "stabil": "stabil"}.get(arah, ""))
+    if f["ihsg"].get("today") is not None:
+        check("ihsg", _headline_direction(f["ihsg"].get("change_pct")))
+    return issues
 
 
 def build_summary(report: dict) -> str:
@@ -323,3 +409,159 @@ def market_sentiment(items: list[dict]) -> tuple[str, str]:
     if skor <= -2:
         return "cenderung negatif", "bad"
     return "campuran / netral", "flat"
+
+
+def build_treasury_implications(report: dict) -> list[dict]:
+    """Menyusun narasi implikasi pasar dan rekomendasi posisi bagi unit kerja Treasury Bank."""
+    f = market_facts(report)
+    out: list[dict] = []
+
+    # 1. Valas & Kurs (FX Risk Management)
+    usd = f["usd_idr"]
+    usd_val = usd.get("today") or usd.get("last")
+    chg = usd.get("change_pct") or usd.get("dtd_pct")
+    if usd_val is not None:
+        if chg is not None and chg > 0.15:
+            fx_analysis = (
+                f"Rupiah tertekan melemah {fmt_mag(chg)} ke level Rp{fmt_num(usd_val, 0)} per dolar AS. "
+                "Pelemahan ini meningkatkan premi risiko valuta asing dan potensi tekanan likuiditas valas "
+                "di pasar domestik akibat arus modal keluar (outflow)."
+            )
+            fx_rec = (
+                "Disarankan memperketat pemantauan Net Open Position (NOP/PDN) agar tetap aman dalam threshold internal. "
+                "Antisipasi peningkatan permintaan lindung nilai (hedging) dari nasabah importir dan optimalkan kuotasi "
+                "spread valas pada client desk untuk memitigasi volatilitas intraday."
+            )
+            fx_badge = "Pelemahan Rupiah"
+        elif chg is not None and chg < -0.15:
+            fx_analysis = (
+                f"Rupiah bergerak menguat {fmt_mag(chg)} ke level Rp{fmt_num(usd_val, 0)} per dolar AS, "
+                "didukung oleh stabilisasi arus modal masuk dan sentimen positif pasar uang domestik."
+            )
+            fx_rec = (
+                "Manfaatkan momentum penguatan untuk memenuhi kebutuhan likuiditas valas jangka pendek dan "
+                "tinjau kembali penempatan posisi valas pada instrumen berimbal hasil stabil."
+            )
+            fx_badge = "Penguatan Rupiah"
+        else:
+            fx_analysis = (
+                f"Rupiah bergerak relatif stabil di kisaran Rp{fmt_num(usd_val, 0)} per dolar AS. "
+                "Keseimbangan penawaran dan permintaan valas terjaga dengan rentang fluktuasi terbatas."
+            )
+            fx_rec = (
+                "Pertahankan posisi likuiditas valas berimbang (square position) dan pantau agenda rilis data ekonomi eksternal."
+            )
+            fx_badge = "Stabil"
+        out.append({
+            "id": "fx_risk",
+            "title": "Pasar Valas & Manajemen Risiko Nilai Tukar",
+            "badge": fx_badge,
+            "analysis": fx_analysis,
+            "recommendation": fx_rec,
+        })
+
+    # 2. Portofolio Surat Berharga (Fixed Income / SBN & SBSN)
+    sbn = f["sbn10"]
+    sbn_today = sbn.get("today")
+    sbn_chg = sbn.get("dtd_bp") or sbn.get("change_bp")
+    ust = f["ust10"]
+    ust_today = ust.get("today")
+    spread = f["spread"]
+    if sbn_today is not None:
+        spread_desc, _ = spread_word(spread) if spread is not None else ("netral", "flat")
+        spread_text = f" dengan selisih imbal hasil (spread) RI–AS sebesar {fmt_num(spread, 0)} bp ({spread_desc})" if spread is not None else ""
+        ust_text = f" dibandingkan UST 10Y di {fmt_num(ust_today, 2)}%" if ust_today is not None else ""
+
+        if sbn_chg is not None and sbn_chg > 2.0:
+            fi_analysis = (
+                f"Yield SBN 10 Tahun menanjak +{fmt_num(sbn_chg, 1)} bps menjadi {fmt_num(sbn_today, 2)}%{ust_text}{spread_text}. "
+                "Kenaikan yield mencerminkan tekanan jual pada pasar obligasi sekunder dan peningkatan tuntutan imbal hasil oleh investor."
+            )
+            fi_rec = (
+                "Portofolio Trading (FVOCI/FVTPL): Batasi durasi portofolio pada tenor pendek hingga menengah guna memitigasi risiko mark-to-market. "
+                "Portofolio Investasi (Amortised Cost/HTM): Manfaatkan momentum lonjakan yield untuk selektif mengakumulasi seri acuan (benchmark FR/PBS) "
+                "dengan imbal hasil menarik menjelang stabilisasi pasar."
+            )
+            fi_badge = "Yield Naik"
+        elif sbn_chg is not None and sbn_chg < -2.0:
+            fi_analysis = (
+                f"Yield SBN 10 Tahun melandai {fmt_num(sbn_chg, 1)} bps ke level {fmt_num(sbn_today, 2)}%{ust_text}{spread_text}. "
+                "Apresiasi harga obligasi didorong oleh minat beli investor domestik dan institusional."
+            )
+            fi_rec = (
+                "Lakukan realisasi profit parsial pada portofolio trading yang telah melampaui target imbal hasil, "
+                "dan pertahankan durasi pada batas moderat."
+            )
+            fi_badge = "Yield Melandai"
+        else:
+            fi_analysis = (
+                f"Yield SBN 10 Tahun berada di posisi {fmt_num(sbn_today, 2)}%{ust_text}{spread_text}, bergerak terbatas pada sesi observasi."
+            )
+            fi_rec = (
+                "Fokus pada pengelolaan kurva imbal hasil (yield curve positioning) dan perhatikan jadwal lelang Surat Berharga Negara selanjutnya."
+            )
+            fi_badge = "Yield Konsolidatif"
+
+        out.append({
+            "id": "fixed_income",
+            "title": "Portofolio Fixed Income (SBN & SBSN)",
+            "badge": fi_badge,
+            "analysis": fi_analysis,
+            "recommendation": fi_rec,
+        })
+
+    # 3. Pasar Uang & Pengelolaan Likuiditas (Money Market & ALM)
+    bi_rate = f["bi_rate"]
+    indonia = f["indonia"]
+    if bi_rate is not None or indonia is not None:
+        bi_text = f"{fmt_num(bi_rate, 2)}%" if bi_rate is not None else "5.75%"
+        indonia_text = f"{fmt_num(indonia, 2)}%" if indonia is not None else bi_text
+        mm_analysis = (
+            f"BI Rate bertahan di {bi_text} dengan suku bunga pasar uang antarbank (INDONIA) di kisaran {indonia_text}. "
+            "Kondisi likuiditas perbankan secara agregat menunjukkan transmisi kebijakan moneter yang terjaga, "
+            "namun dinamika valas menuntut kehati-hatian dalam pengelolaan likuiditas harian."
+        )
+        mm_rec = (
+            "Maksimalkan penempatan kelebihan dana pada instrumen moneter Bank Indonesia berimbal hasil kompetitif "
+            "(seperti SRBI, SVBI, dan Term Deposit Valas) serta instrumen PUAS. Pastikan rasio alat likuid (LCR dan AL/NCD) "
+            "tetap berada di atas batas pengawasan internal."
+        )
+        out.append({
+            "id": "money_market",
+            "title": "Pasar Uang & Likuiditas (Money Market & ALM)",
+            "badge": f"BI Rate {bi_text}",
+            "analysis": mm_analysis,
+            "recommendation": mm_rec,
+        })
+
+    # 4. Katalis Pasar & Antisipasi Respons Otoritas
+    ihsg = f["ihsg"]
+    ihsg_pct = ihsg.get("change_pct") or ihsg.get("dtd_pct")
+    if ihsg_pct is not None and abs(ihsg_pct) > 2.0:
+        cat_analysis = (
+            f"Pergerakan pasar modal mengalami volatilitas tajam (IHSG {fmt_pct(ihsg_pct)}), memicu sentimen penghindaran risiko (risk-off). "
+            "Perkembangan ini berpotensi memengaruhi persepsi risiko sovereign dan volatilitas nilai tukar dalam jangka pendek."
+        )
+        cat_rec = (
+            "Antisipasi langkah stabilisasi dari Bank Indonesia (triple intervention di pasar spot, DNDF, dan pasar sekunder obligasi). "
+            "Kaji ulang limit risiko harian dan perketat koordinasi antar-desk (FX, Fixed Income, dan Money Market) untuk mengantisipasi volatilitas."
+        )
+        cat_badge = "Volatilitas Tinggi"
+    else:
+        cat_analysis = (
+            "Sentimen pasar berada dalam fase konsolidasi dengan pelaku pasar memantau sinyal arah kebijakan moneter global dan domestik."
+        )
+        cat_rec = (
+            "Pertahankan strategi posisi defensif-fleksibel serta pantau rilis data indikator makroekonomi dan aliran modal asing berkala."
+        )
+        cat_badge = "Fase Konsolidasi"
+
+    out.append({
+        "id": "catalyst_action",
+        "title": "Sentimen Katalis & Koordinasi Kebijakan",
+        "badge": cat_badge,
+        "analysis": cat_analysis,
+        "recommendation": cat_rec,
+    })
+
+    return out

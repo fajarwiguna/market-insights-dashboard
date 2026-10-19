@@ -1,8 +1,9 @@
 "use client";
 
-import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { DashboardViewSwitcher } from "@/features/dashboard/dashboard-view-switcher";
 import { formatDate, formatValue, isEquitySnapshot, mentionedTickers, stockRow, todayIso, type EquitySnapshot } from "@/lib/equity-snapshot";
+import { useOperatorSession } from "@/components/operator-session";
 import styles from "./snapshot.module.css";
 import "./tailwind.css";
 import "@fontsource/roboto/400.css";
@@ -184,16 +185,21 @@ export default function EquitySnapshotPage() {
   const [busy, setBusy] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState("");
+  const { authenticated: operator } = useOperatorSession();
+
+  const fetchSnapshot = useCallback(async (signal?: AbortSignal) => {
+    const response = await fetch("/api/equity/snapshot", { cache: "no-store", signal });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.message || "Data equity belum tersedia.");
+    if (!isEquitySnapshot(payload)) throw new Error("Format data equity tidak valid.");
+    return payload;
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
       try {
-        const response = await fetch("/api/equity/snapshot", { cache: "no-store", signal: controller.signal });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "Data equity belum tersedia.");
-        if (!isEquitySnapshot(payload)) throw new Error("Format data equity tidak valid.");
-        setSnapshot(payload);
+        setSnapshot(await fetchSnapshot(controller.signal));
       } catch (error) {
         if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "Data equity gagal dimuat.");
       } finally {
@@ -202,7 +208,26 @@ export default function EquitySnapshotPage() {
     }
     void load();
     return () => controller.abort();
-  }, []);
+  }, [fetchSnapshot]);
+
+  async function regenerateNarrative() {
+    if (!snapshot || busy) return;
+    setBusy(true);
+    setMessage("Membuat ulang narasi equity…");
+    try {
+      const url = `/api/narratives/equity_snapshot?report_id=${encodeURIComponent(snapshot.report_id)}`;
+      const response = await fetch(url, { method: "POST", credentials: "same-origin" });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) throw new Error(payload.message || "Narasi equity belum dapat dibuat ulang.");
+      setMessage("Narasi dibuat ulang. Memuat ulang dokumen…");
+      setSnapshot(await fetchSnapshot());
+      setMessage("Narasi equity terbaru sudah dimuat.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Narasi equity gagal dibuat ulang.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function updateHighlights() {
     if (!snapshot || !documentRef.current) return;
@@ -331,6 +356,8 @@ export default function EquitySnapshotPage() {
       </details>
     </div>}
     <div className={`${styles.actions} eq-flex eq-flex-wrap eq-items-center eq-justify-end eq-gap-2`}>
+      {snapshot?.narrative_status && <span className={`narrative-chip narrative-chip-${snapshot.narrative_status === "published" ? "published" : "soft"}`} title={`Status narasi: ${snapshot.narrative_status}`}>{snapshot.narrative_status === "published" ? "Narasi otomatis" : snapshot.narrative_status === "fallback" ? "Ringkasan cadangan" : "Narasi kedaluwarsa"}</span>}
+      {snapshot && operator && <button type="button" onClick={regenerateNarrative} disabled={busy} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">Buat ulang narasi</button>}
       <button type="button" onClick={toggleEditing} disabled={busy || !snapshot} aria-controls="equity-snapshot-document" aria-pressed={isEditing} className="eq-rounded-md eq-border eq-border-solid eq-border-[#00535a] eq-bg-white eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-[#00535a] hover:eq-bg-[#e8f4f3] disabled:eq-cursor-wait disabled:eq-opacity-60">{isEditing ? "Simpan" : "Edit"}</button>
       <button type="button" onClick={downloadPdf} disabled={busy || !snapshot} className="eq-rounded-md eq-border-0 eq-bg-[#00535a] eq-px-3 eq-py-1.5 eq-text-xs eq-leading-5 eq-font-bold eq-text-white hover:eq-bg-[#00777c] disabled:eq-cursor-wait disabled:eq-opacity-60">{busy ? "Membuat PDF…" : "Download PDF"}</button>
       {snapshot && <span className={styles.dataNote}>Data {formatDate(snapshot.report_date)} · {snapshot.coverage.valid_count}/{snapshot.coverage.universe_count} saham Yahoo JKT terhitung.</span>}

@@ -3,6 +3,7 @@
 import json
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 import sys
 
@@ -12,20 +13,21 @@ from market_report.services import report_service
 
 
 def valid_source_snapshot() -> dict:
+    observation = (date.today() - timedelta(days=1)).isoformat()
     return {
-        "generated_at": "2026-10-02T09:00:00+00:00",
+        "generated_at": f"{observation}T09:00:00+00:00",
         "yfinance": {
             "USDIDR": {"last": 17800.0, "prev": 17750.0, "change_pct": 0.2817,
-                       "date": "2026-10-02", "history": []},
+                       "date": observation, "history": []},
             "IHSG": {"last": 6100.0, "prev": 6050.0, "change_pct": 0.8264,
-                     "date": "2026-10-02", "history": []},
-            "US10Y": {"last": 4.1, "prev": 4.0, "date": "2026-10-02", "history": []},
-            "US5Y": {"last": 3.8, "prev": 3.7, "date": "2026-10-02", "history": []},
+                     "date": observation, "history": []},
+            "US10Y": {"last": 4.1, "prev": 4.0, "date": observation, "history": []},
+            "US5Y": {"last": 3.8, "prev": 3.7, "date": observation, "history": []},
         },
         "fx_backup": {},
         "phei": {
-            "as_of_date": "01-Oktober-2026",
-            "as_of_label": "per 01-Oktober-2026",
+            "as_of_date": observation,
+            "as_of_label": f"per {observation}",
             "yield_curve": {
                 "5": {"today": 6.5, "yesterday": 6.4, "change_bp": 10.0},
                 "10": {"today": 7.0, "yesterday": 6.9, "change_bp": 10.0},

@@ -40,7 +40,7 @@ async function downloadReportPdf(url: string, reportId: string) {
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000);
 }
 
-export function ExportReportButton({ reportId }: { reportId?: string | null }) {
+export function ExportReportButton({ reportId, label = "Unduh PDF" }: { reportId?: string | null; label?: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const disabled = busy || !reportId;
@@ -48,7 +48,7 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
   async function createAndDownload() {
     if (!reportId) return;
     setBusy(true);
-      setMessage("Memeriksa PDF laporan…");
+    setMessage("Memeriksa PDF laporan…");
     try {
       const pdfUrl = `/api/reports/${encodeURIComponent(reportId)}/pdf`;
       const queued = await fetch(`/api/reports/${encodeURIComponent(reportId)}/exports`, { method: "POST" });
@@ -88,10 +88,26 @@ export function ExportReportButton({ reportId }: { reportId?: string | null }) {
     }
   }
 
-  return <div className="export-control">
-    <button type="button" className="export-button" onClick={createAndDownload} disabled={disabled}>
-      {busy ? <><span className="button-spinner" aria-hidden="true" />{message || "Menyiapkan PDF…"}</> : "Buat dan unduh PDF"}
-    </button>
-    <span className="export-caption" aria-live="polite">{busy ? "" : message || (reportId ? "PDF disiapkan untuk versi laporan ini dan diunduh saat tersedia." : "ID laporan belum tersedia.")}</span>
-  </div>;
+  return (
+    <div className="export-control">
+      <button type="button" className="export-button" onClick={createAndDownload} disabled={disabled}>
+        {busy ? (
+          <>
+            <span className="button-spinner" aria-hidden="true" />
+            <span>{message || "Menyiapkan PDF…"}</span>
+          </>
+        ) : (
+          <>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>{label}</span>
+          </>
+        )}
+      </button>
+      {message && <span className="export-caption" aria-live="polite">{message}</span>}
+    </div>
+  );
 }

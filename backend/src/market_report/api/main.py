@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from market_report.config import load_environment
 from market_report.infrastructure.repositories.job_repository import PostgresJobRepository
-from market_report.api.routers import artifacts, equity, instruments, jobs, market, reports
+from market_report.api.routers import artifacts, equity, instruments, jobs, market, narratives, reports
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ app.include_router(instruments.router, prefix="/api/v1")
 app.include_router(market.router, prefix="/api/v1")
 app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(artifacts.router, prefix="/api/v1")
+app.include_router(narratives.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["system"], summary="Pemeriksaan proses API")

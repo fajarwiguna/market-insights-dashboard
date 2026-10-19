@@ -8,9 +8,11 @@ type Series = {
   id: string;
   title: string;
   unit: string;
+  yAxisLabel: string;
   points: HistoryPoint[];
   color: string;
 };
+
 type Range = "1m" | "3m" | "6m" | "all";
 type RangeOption = { id: Range; label: string; summaryLabel: string; days: number | null };
 
@@ -20,10 +22,11 @@ const ranges: RangeOption[] = [
   { id: "6m", label: "6 bln", summaryLabel: "6 bulan", days: 183 },
   { id: "all", label: "Semua", summaryLabel: "seluruh riwayat", days: null },
 ];
+
 const dayMilliseconds = 24 * 60 * 60 * 1000;
 const wholeNumber = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
-const rateNumber = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
-const changeNumber = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
+const rateNumber = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const changeNumber = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 function dateValue(value: string): number {
   return new Date(`${value}T00:00:00Z`).getTime();
@@ -82,48 +85,86 @@ function LineChart({ series, data }: { series: Series; data: HistoryPoint[] }) {
   if (data.length < 2) return <div className="chart-empty">Riwayat belum cukup untuk menampilkan grafik.</div>;
 
   const width = 1000;
-  const height = 280;
-  const top = 14;
-  const bottom = 258;
+  const height = 260;
+  const top = 16;
+  const bottom = 236;
+  const leftPadding = 68;
+  const rightPadding = 24;
+  const plotWidth = width - leftPadding - rightPadding;
+
   const values = data.map((point) => point.close);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const pad = (max - min) * 0.12 || Math.max(Math.abs(max) * 0.01, 0.01);
   const low = min - pad;
   const high = max + pad;
-  const x = (index: number) => (index / (data.length - 1)) * width;
-  const y = (value: number) => top + ((high - value) / (high - low)) * (bottom - top);
-  const path = data.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.close).toFixed(1)}`).join(" ");
+  const range = high - low;
+
+  const x = (index: number) => leftPadding + (index / (data.length - 1)) * plotWidth;
+  const y = (value: number) => top + ((high - value) / range) * (bottom - top);
+
+  const path = data
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)},${y(point.close).toFixed(1)}`)
+    .join(" ");
+
   const formatAxisValue = series.id === "sbn-10y" ? rateNumber : wholeNumber;
-  const ticks = [0, 1, 2, 3].map((step) => ({
-    value: high - ((high - low) * step) / 3,
-    position: ((top + ((bottom - top) * step) / 3) / height) * 100,
-  }));
+  const tickSteps = [0, 1, 2, 3];
+  const ticks = tickSteps.map((step) => {
+    const val = high - (range * step) / 3;
+    const posY = top + ((bottom - top) * step) / 3;
+    return {
+      value: val,
+      yPos: posY,
+      percentTop: (posY / height) * 100,
+    };
+  });
+
   const labelIndices = [...new Set([0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round(ratio * (data.length - 1))))];
   const dateRange = `${formatObservationDate(data[0].dates)} hingga ${formatObservationDate(data[data.length - 1].dates)}`;
 
   return (
     <div className="chart-canvas">
+      <div className="chart-unit-caption">{series.yAxisLabel}</div>
       <div className="chart-plot">
         <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={`Grafik riwayat ${series.title}, ${dateRange}`}>
           <title>{`Pergerakan ${series.title}, ${dateRange}`}</title>
-          {ticks.map((tick, index) => {
-            const yy = top + ((bottom - top) * index) / 3;
-            return <line key={index} x1="0" x2={width} y1={yy} y2={yy} className="chart-gridline" />;
-          })}
-          <path d={path} fill="none" stroke={series.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          {data.map((point, index) => <circle key={`${point.dates}-${index}`} cx={x(index)} cy={y(point.close)} r={data.length < 45 ? 4 : 2} fill={series.color}>
-            <title>{`${point.dates}: ${formatValue(point.close, series)}`}</title>
-          </circle>)}
+          {ticks.map((tick, index) => (
+            <line key={index} x1={leftPadding} x2={width - rightPadding} y1={tick.yPos} y2={tick.yPos} className="chart-gridline" />
+          ))}
+          <path d={path} fill="none" stroke={series.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          {data.map((point, index) => (
+            <circle
+              key={`${point.dates}-${index}`}
+              cx={x(index)}
+              cy={y(point.close)}
+              r={data.length < 40 ? 3.5 : 2}
+              fill={series.color}
+            >
+              <title>{`${point.dates}: ${formatValue(point.close, series)}`}</title>
+            </circle>
+          ))}
         </svg>
         <div className="chart-y-labels" aria-hidden="true">
-          {ticks.map((tick, index) => <span key={index} className={index === 0 ? "axis-label-first" : index === ticks.length - 1 ? "axis-label-last" : ""} style={{ top: `${tick.position}%` }}>
-            {formatAxisValue.format(tick.value)}{series.unit}
-          </span>)}
+          {ticks.map((tick, index) => (
+            <span
+              key={index}
+              className={index === 0 ? "axis-label-first" : index === ticks.length - 1 ? "axis-label-last" : ""}
+              style={{ top: `${tick.percentTop}%` }}
+            >
+              {formatAxisValue.format(tick.value)}{series.unit}
+            </span>
+          ))}
         </div>
       </div>
       <div className="chart-x-labels" aria-hidden="true">
-        {labelIndices.map((index) => <span key={`${data[index].dates}-${index}`}>{formatAxisDate(data[index].dates)}</span>)}
+        {labelIndices.map((index) => {
+          const pct = ((x(index) / width) * 100).toFixed(2);
+          return (
+            <span key={`${data[index].dates}-${index}`} style={{ left: `${pct}%` }}>
+              {formatAxisDate(data[index].dates)}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -131,13 +172,16 @@ function LineChart({ series, data }: { series: Series; data: HistoryPoint[] }) {
 
 export function HistoryCharts({ histories }: { histories: Record<string, HistoryPoint[]> }) {
   const series: Series[] = [
-    { id: "usd-idr", title: "USD/IDR", unit: "", points: histories["usd-idr"] ?? [], color: "#bf9653" },
-    { id: "ihsg", title: "IHSG", unit: "", points: histories.ihsg ?? [], color: "#557da8" },
-    { id: "sbn-10y", title: "SBN 10Y", unit: "%", points: histories["sbn-10y"] ?? [], color: "#198b7b" },
+    { id: "usd-idr", title: "USD/IDR", unit: "", yAxisLabel: "Rp per US$", points: histories["usd-idr"] ?? [], color: "#C88D2B" },
+    { id: "ihsg", title: "IHSG", unit: "", yAxisLabel: "Indeks", points: histories.ihsg ?? [], color: "#64748B" },
+    { id: "sbn-10y", title: "SBN 10Y", unit: "%", yAxisLabel: "% yield", points: histories["sbn-10y"] ?? [], color: "#10B981" },
   ];
-  const initialSeries = series.find((item) => item.id === "usd-idr" && item.points.length > 1)
-    ?? series.find((item) => item.points.length > 1)
-    ?? series[0];
+
+  const initialSeries =
+    series.find((item) => item.id === "usd-idr" && item.points.length > 1) ??
+    series.find((item) => item.points.length > 1) ??
+    series[0];
+
   const [activeId, setActiveId] = useState(initialSeries.id);
   const [selectedRange, setSelectedRange] = useState<Range>("1m");
   const activeSeries = series.find((item) => item.id === activeId) ?? series[0];
@@ -153,24 +197,58 @@ export function HistoryCharts({ histories }: { histories: Record<string, History
   return (
     <section className="reader-section history-section" id="history" aria-labelledby="history-heading">
       <div className="section-heading history-heading">
-        <div><p className="eyebrow">TREN PASAR</p><h2 id="history-heading">Pergerakan Pasar</h2></div>
+        <div>
+          <p className="eyebrow">TREN PASAR</p>
+          <h2 id="history-heading">Pergerakan Pasar</h2>
+        </div>
         <div className="instrument-switcher" role="group" aria-label="Pilih instrumen grafik">
-          {series.map((item) => <button type="button" key={item.id} onClick={() => setActiveId(item.id)} aria-pressed={activeId === item.id} className={activeId === item.id ? "selected" : ""}>
-            <span className="instrument-dot" style={{ backgroundColor: item.color }} />{item.title}
-          </button>)}
+          {series.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              onClick={() => setActiveId(item.id)}
+              aria-pressed={activeId === item.id}
+              className={activeId === item.id ? "selected" : ""}
+            >
+              <span className="instrument-dot" style={{ backgroundColor: activeId === item.id ? "#D97706" : "#94A3B8" }} />
+              {item.title}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="history-toolbar">
         <div className="history-summary" aria-live="polite">
-          <div className="history-stat"><span>Nilai terakhir</span><strong>{formatValue(latest?.close, activeSeries)}</strong></div>
-          <div className="history-stat"><span>{changeLabel}</span><strong>{formatPeriodChange(data, activeSeries)}</strong></div>
-          <div className="history-stat history-stat-observation"><span>Observasi terakhir</span><strong>{latest ? formatObservationDate(latest.dates) : "—"}</strong><small>{data.length} dari {points.length} observasi</small></div>
+          <div className="history-stat">
+            <span>Nilai terakhir</span>
+            <strong>{formatValue(latest?.close, activeSeries)}</strong>
+          </div>
+          <div className="history-stat">
+            <span>{changeLabel}</span>
+            <strong>{formatPeriodChange(data, activeSeries)}</strong>
+          </div>
+          <div className="history-stat history-stat-observation">
+            <span>Observasi</span>
+            <strong>{latest ? formatObservationDate(latest.dates) : "—"}</strong>
+          </div>
         </div>
         <div className="range-control" role="group" aria-label="Rentang grafik">
           {ranges.map((item) => {
             const available = rangeAvailable(points, item);
-            return <button type="button" key={item.id} onClick={() => setSelectedRange(item.id)} aria-pressed={activeRange === item.id} aria-label={item.id === "all" ? "Semua data" : `${item.summaryLabel} terakhir`} title={available ? item.summaryLabel : `Data ${item.summaryLabel} belum tersedia`} disabled={!available} className={activeRange === item.id ? "selected" : ""}>{item.label}</button>;
+            return (
+              <button
+                type="button"
+                key={item.id}
+                onClick={() => setSelectedRange(item.id)}
+                aria-pressed={activeRange === item.id}
+                aria-label={item.id === "all" ? "Semua data" : `${item.summaryLabel} terakhir`}
+                title={available ? item.summaryLabel : `Data ${item.summaryLabel} belum tersedia`}
+                disabled={!available}
+                className={activeRange === item.id ? "selected" : ""}
+              >
+                {item.label}
+              </button>
+            );
           })}
         </div>
       </div>

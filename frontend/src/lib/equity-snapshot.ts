@@ -14,6 +14,8 @@ export type EquitySnapshot = {
   foreign_flow: { net_idr: number | null; net_usd_mn: number | null; date: string | null; source?: string; stale?: boolean };
   coal: { mtd_pct: number | null; date: string | null; source?: string; source_name?: string; stale?: boolean };
   foreign_flow_rows: { country: string; date: string | null; daily: number | null; wtd?: number | null; mtd?: number | null; qtd?: number | null; ytd?: number | null; "12m"?: number | null; latest?: number | null; frequency?: string; source?: string; source_url?: string; methodology?: string; period_start?: string }[];
+  narrative_status?: string;
+  narrative_frozen?: boolean;
 };
 
 export function formatValue(value: number | null | undefined, decimals = 2, signed = false, locale = "en-US") {

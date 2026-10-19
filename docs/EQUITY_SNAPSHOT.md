@@ -2,7 +2,7 @@
 
 Halaman `/equity-snapshot` membaca snapshot terakhir melalui Next.js `/api/equity/snapshot` dan API internal `/api/v1/equity/latest`. Token baca tetap di server. Backend mengambil data dengan Python yfinance; browser tidak mengunduh ratusan saham.
 
-Refresh pipeline/worker yang sudah ada kini mengambil data equity juga. Scheduler memakai `REFRESH_TIMES` dan `REFRESH_TIMEZONE` yang sudah tersedia; gunakan slot sesudah 17:00 Asia/Jakarta untuk laporan sesi yang baru selesai. Sebelum 17:00, candle hari ini dikecualikan. Pada hari libur, tanggal laporan mengikuti sesi IHSG terakhir yang tersedia. Indeks luar negeri memakai dua sesi terakhir hingga tanggal laporan, dengan tanggal masing-masing di payload.
+Refresh pipeline/worker yang sudah ada kini mengambil data equity juga. Scheduler memakai `REFRESH_TIMES` dan `REFRESH_TIMEZONE` yang sudah tersedia. Sesi dokumen equity mengikuti tanggal observasi IHSG pada laporan/dashboard yang dibentuk pada refresh yang sama, sehingga angka equity tidak tertinggal satu sesi dibanding halaman lain. Bila dijalankan tanpa petunjuk laporan (mis. mode standalone), candle hari berjalan dipakai hanya setelah lelang penutupan IDX (~16:15 WIB); sebelum itu sesi terakhir yang selesai dipakai. Pada hari libur, tanggal laporan mengikuti sesi IHSG terakhir yang tersedia. Indeks luar negeri memakai dua sesi terakhir hingga tanggal laporan, dengan tanggal masing-masing di payload.
 
 Untuk refresh equity saja dari root proyek (PowerShell):
 
