@@ -22,7 +22,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: Inte
 a { color: inherit; text-decoration: none; }
 button { font: inherit; }
 
-.workspace { min-height: 100vh; }
+.workspace { min-height: 100vh; background: var(--paper); }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 2; display: flex; width: 248px; flex-direction: column; padding: 29px 18px 22px; background: #142338; color: #e2e8f0; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 9px; color: #fff; font-size: 17px; font-weight: 700; letter-spacing: -.5px; }
 .brand-light { color: #8faecf; font-weight: 400; }
@@ -44,7 +44,7 @@ button { font: inherit; }
 .sidebar-bottom p { margin: 0 0 2px; color: #f1f5f9; font-size: 11px; font-weight: 650; }
 .sidebar-bottom small { color: #8faecf; font-size: 10px; }
 
-.main-content { margin-left: 236px; width: calc(100% - 236px); min-height: 100vh; box-sizing: border-box; padding: 0 40px 48px; background: #F3F5F8; }
+.main-content { margin-left: 236px; width: calc(100% - 236px); min-height: 100vh; box-sizing: border-box; padding: 0 40px 48px; background: var(--paper); }
 .dashboard-container { width: 100%; box-sizing: border-box; }
 .main-content.monitor-main { width: min(1240px, calc(100% - 64px)); margin: 0 auto; padding: 0 0 32px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 68px; border-bottom: 1px solid var(--line); color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 1.3px; }
@@ -339,61 +339,134 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --ink: #e3ecea;
-  --muted: #a1b2b1;
-  --line: #34484c;
-  --paper: #101b20;
-  --white: #19272d;
-  --navy: #0b151a;
-  --teal: #58b9a7;
-  --teal-soft: #1d3938;
-  --shadow: 0 14px 36px rgb(0 0 0 / 15%);
+  --ink: #F1F5F9;
+  --muted: #94A3B8;
+  --line: #1E2C3D;
+  --paper: #0B131E;
+  --white: #14202E;
+  --navy: #070D16;
+  --slate-blue: #4A739C;
+  --btn-primary: #3B6B9B;
+  --btn-primary-hover: #4C7DAE;
+  --insight-bg: #101B28;
+  --teal: #4A739C;
+  --teal-soft: #101B28;
+  --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
 }
-[data-theme="dark"] body { color: var(--ink); }
-[data-theme="dark"] .topbar, [data-theme="dark"] .report-date span, [data-theme="dark"] .report-date small,
-[data-theme="dark"] .metric-heading, [data-theme="dark"] .metric-name, [data-theme="dark"] .metric-date,
-[data-theme="dark"] .section-heading > p, [data-theme="dark"] .reference-panel .eyebrow,
-[data-theme="dark"] .empty-section, [data-theme="dark"] .page-footer { color: #9aadaa; }
-[data-theme="dark"] .page-intro h1, [data-theme="dark"] .report-date strong,
-[data-theme="dark"] .metric-value, [data-theme="dark"] .reference-panel h2, [data-theme="dark"] .reference-item strong,
-[data-theme="dark"] .section-heading h2, [data-theme="dark"] .section-heading h3, [data-theme="dark"] tbody th, [data-theme="dark"] .table-value,
-[data-theme="dark"] .insight-card h3, [data-theme="dark"] .impact-card h3 { color: #e2ece9; }
-[data-theme="dark"] .intro-copy, [data-theme="dark"] .metric-change,
-[data-theme="dark"] .reference-item span, [data-theme="dark"] tbody td, [data-theme="dark"] .summary-copy,
-[data-theme="dark"] .insight-card p, [data-theme="dark"] .impact-card p, [data-theme="dark"] .insight-card small,
-  [data-theme="dark"] .guide-note { color: #adbcba; }
-[data-theme="dark"] .reference-panel, [data-theme="dark"] .market-section, [data-theme="dark"] .reader-section,
-  [data-theme="dark"] .metric-card, [data-theme="dark"] .history-panel,
-[data-theme="dark"] .insight-card, [data-theme="dark"] .impact-card, [data-theme="dark"] .bottom-export { border-color: #34484c; background: #19272d; }
-[data-theme="dark"] .bottom-export-copy h2 { color: #e2ece9; }
-[data-theme="dark"] .bottom-export-copy > p:last-child { color: #adbcba; }
-[data-theme="dark"] .insight-card small { border-color: #34484c; }
-[data-theme="dark"] .sticky-instrument, [data-theme="dark"] .market-table thead th:first-child { background: var(--white); }
-[data-theme="dark"] .reference-item, [data-theme="dark"] .reference-item:first-child { border-color: #34484c; }
-[data-theme="dark"] thead th, [data-theme="dark"] tbody th, [data-theme="dark"] tbody td { border-color: #2b3c41; }
-[data-theme="dark"] .range-control, [data-theme="dark"] .instrument-switcher { border-color: #34484c; background: #111e23; }
-[data-theme="dark"] .range-control button { color: #a6b5b4; }
-[data-theme="dark"] .range-control button.selected, [data-theme="dark"] .instrument-switcher button.selected { background: #263a3e; color: #8ad0bf; }
-[data-theme="dark"] .instrument-switcher button { color: #adbcba; }
-[data-theme="dark"] .history-summary { border-color: #34484c; background: #152329; }
-[data-theme="dark"] .history-stat { border-color: #34484c; }
-[data-theme="dark"] .history-stat strong { color: #e2ece9; }
-[data-theme="dark"] .history-stat > span, [data-theme="dark"] .history-stat small,
-  [data-theme="dark"] .chart-y-labels, [data-theme="dark"] .chart-x-labels { color: #9aadaa; }
-[data-theme="dark"] .appearance-button { border-color: #3a5053; background: #1a2a30; color: #dce8e5; }
-[data-theme="dark"] .view-switcher { border-color: #3a5053; background: #1a2a30; }
-[data-theme="dark"] .view-switcher a { color: #adbcba; }
-[data-theme="dark"] .view-switcher a.view-switch-active { background: #1d3938; color: #9dd5c4; }
-[data-theme="dark"] .nav-category-group > summary { color: #b8c8c8; }
-[data-theme="dark"] .market-category-picker button { border-color: #34484c; background: #19272d; }
-[data-theme="dark"] .market-category-picker button strong { color: #d1dedb; }
-[data-theme="dark"] .market-category-picker button.market-category-active { border-color: #4b8a7d; background: #1d3938; }
-[data-theme="dark"] .market-category-picker button.market-category-active strong { color: #9dd5c4; }
-[data-theme="dark"] .metric-card-supporting { background: #17242a; }
-[data-theme="dark"] .status-pill { border-color: #31574e; background: #1a332e; color: #9dd5c4; }
-[data-theme="dark"] .status-pill-demo { border-color: #665237; background: #352b1c; color: #e8c888; }
-[data-theme="dark"] .chart-gridline { stroke: #34484c; }
-[data-theme="dark"] .chart-empty { color: #9aadaa; }
+
+html[data-theme="dark"],
+[data-theme="dark"] body,
+[data-theme="dark"] .workspace,
+[data-theme="dark"] .main-content {
+  background: #0B131E !important;
+  color: #F1F5F9;
+}
+
+[data-theme="dark"] .sidebar {
+  background: #070D16;
+  border-right: 1px solid #1E2C3D;
+}
+
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .report-date span,
+[data-theme="dark"] .report-date small,
+[data-theme="dark"] .metric-heading,
+[data-theme="dark"] .metric-name,
+[data-theme="dark"] .metric-date,
+[data-theme="dark"] .section-heading > p,
+[data-theme="dark"] .reference-panel .eyebrow,
+[data-theme="dark"] .empty-section,
+[data-theme="dark"] .page-footer {
+  color: #94A3B8;
+}
+
+[data-theme="dark"] .page-intro h1,
+[data-theme="dark"] .report-date strong,
+[data-theme="dark"] .metric-value,
+[data-theme="dark"] .reference-panel h2,
+[data-theme="dark"] .reference-item strong,
+[data-theme="dark"] .section-heading h2,
+[data-theme="dark"] .section-heading h3,
+[data-theme="dark"] tbody th,
+[data-theme="dark"] .table-value,
+[data-theme="dark"] .insight-card h3,
+[data-theme="dark"] .impact-card h3 {
+  color: #F1F5F9;
+}
+
+[data-theme="dark"] .intro-copy,
+[data-theme="dark"] .metric-change,
+[data-theme="dark"] .reference-item span,
+[data-theme="dark"] tbody td,
+[data-theme="dark"] .summary-copy,
+[data-theme="dark"] .insight-card p,
+[data-theme="dark"] .impact-card p,
+[data-theme="dark"] .insight-card small,
+[data-theme="dark"] .guide-note {
+  color: #94A3B8;
+}
+
+[data-theme="dark"] .reference-panel,
+[data-theme="dark"] .market-section,
+[data-theme="dark"] .reader-section,
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .history-panel,
+[data-theme="dark"] .insight-card,
+[data-theme="dark"] .impact-card,
+[data-theme="dark"] .bottom-export {
+  border-color: #1E2C3D;
+  background: #14202E;
+}
+
+[data-theme="dark"] .bottom-export-copy h2 { color: #F1F5F9; }
+[data-theme="dark"] .bottom-export-copy > p:last-child { color: #94A3B8; }
+[data-theme="dark"] .insight-card small { border-color: #1E2C3D; }
+[data-theme="dark"] .sticky-instrument,
+[data-theme="dark"] .market-table thead th:first-child { background: var(--white); }
+[data-theme="dark"] .reference-item,
+[data-theme="dark"] .reference-item:first-child { border-color: #1E2C3D; }
+[data-theme="dark"] thead th,
+[data-theme="dark"] tbody th,
+[data-theme="dark"] tbody td { border-color: #1E2C3D; }
+
+[data-theme="dark"] .appearance-button {
+  border-color: #1E2C3D;
+  background: #14202E;
+  color: #F1F5F9;
+}
+
+[data-theme="dark"] .appearance-button:hover {
+  border-color: #4A739C;
+}
+
+[data-theme="dark"] .view-switcher {
+  border-color: #1E2C3D;
+  background: #14202E;
+}
+
+[data-theme="dark"] .view-switcher a {
+  color: #94A3B8;
+}
+
+[data-theme="dark"] .view-switcher a.view-switch-active {
+  background: #1E2C3D;
+  color: #9BC5EE;
+}
+
+[data-theme="dark"] .status-pill {
+  border-color: #2B496D;
+  background: #172C42;
+  color: #9BC5EE;
+}
+
+[data-theme="dark"] .status-pill-demo {
+  border-color: #665237;
+  background: #352b1c;
+  color: #e8c888;
+}
+
+[data-theme="dark"] .chart-gridline { stroke: #1E2C3D; }
+[data-theme="dark"] .chart-empty { color: #94A3B8; }
 [data-theme="dark"] .live-card, [data-theme="dark"] .operator-control { border-color: #34484c; background: #19272d; }
 [data-theme="dark"] .live-card-title strong, [data-theme="dark"] .live-value, [data-theme="dark"] .operator-heading h2 { color: #e2ece9; }
 [data-theme="dark"] .live-card-title span, [data-theme="dark"] .live-card-meta, [data-theme="dark"] .live-footnote,
@@ -2067,188 +2140,200 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 
 /* Dark Mode Overrides for Google Chart Card */
 [data-theme="dark"] .google-chart-card {
-  background: #19272d;
-  border-color: #34484c;
+  background: #14202E;
+  border-color: #1E2C3D;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] .google-nav-chip {
-  background: #15242b;
-  border-color: #2b3d42;
-  color: #a1b2b1;
+  background: #101B28;
+  border-color: #1E2C3D;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .google-nav-chip:hover {
-  background: #1d333a;
-  border-color: #3d585f;
-  color: #e2ece9;
+  background: #172C42;
+  border-color: #2B496D;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .google-nav-chip.active {
-  background: #2dd4bf;
-  border-color: #2dd4bf;
-  color: #0d1e23;
+  background: #3B6B9B;
+  border-color: #3B6B9B;
+  color: #ffffff;
 }
 
 [data-theme="dark"] .google-card-title {
-  color: #e2ece9;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .google-main-price {
-  color: #f1f5f9;
+  color: #F1F5F9;
+}
+
+[data-theme="dark"] .google-change-pill.change-up {
+  background-color: rgba(22, 163, 74, 0.22) !important;
+  color: #4ade80 !important;
+}
+
+[data-theme="dark"] .google-change-pill.change-down {
+  background-color: rgba(220, 38, 38, 0.22) !important;
+  color: #f87171 !important;
 }
 
 [data-theme="dark"] .google-card-timestamp {
-  color: #94a3b8;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .google-gridline-h,
 [data-theme="dark"] .google-gridline-v {
-  stroke: #263c42;
+  stroke: #1E2C3D;
 }
 
 [data-theme="dark"] .google-axis-y-text,
 [data-theme="dark"] .google-x-label,
 [data-theme="dark"] .google-range-date-text {
-  fill: #94a3b8;
-  color: #94a3b8;
+  fill: #94A3B8;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .google-floating-tooltip {
-  background: #142229;
-  border-color: #2c444a;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  background: #0D1724;
+  border-color: #2B496D;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme="dark"] .google-floating-tooltip .tip-val {
-  color: #f1f5f9;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .google-floating-tooltip .tip-sep,
 [data-theme="dark"] .google-floating-tooltip .tip-date {
-  color: #94a3b8;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .google-calendar-btn {
-  background: #19272d;
-  border-color: #34484c;
-  color: #adbcba;
+  background: #101B28;
+  border-color: #1E2C3D;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .google-calendar-btn:hover {
-  background: #20353d;
-  border-color: #3d585f;
-  color: #e2ece9;
+  background: #172C42;
+  border-color: #2B496D;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .google-calendar-btn.active {
-  background: #176f63;
-  border-color: #176f63;
+  background: #3B6B9B;
+  border-color: #3B6B9B;
   color: #ffffff;
 }
 
 [data-theme="dark"] .calendar-popover {
-  background: #19272d;
-  border-color: #34484c;
+  background: #14202E;
+  border-color: #1E2C3D;
   box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.6);
 }
 
 [data-theme="dark"] .calendar-popover-header,
 [data-theme="dark"] .calendar-actions {
-  border-color: #2b3d42;
+  border-color: #1E2C3D;
 }
 
 [data-theme="dark"] .calendar-popover-title {
-  color: #e2ece9;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .calendar-close-btn {
-  color: #94a3b8;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .calendar-close-btn:hover {
-  background: #20353d;
-  color: #e2ece9;
+  background: #172C42;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .calendar-field label,
 [data-theme="dark"] .calendar-presets-label {
-  color: #94a3b8;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .calendar-date-input {
-  background: #142229;
-  border-color: #2e444a;
-  color: #e2ece9;
+  background: #0D1724;
+  border-color: #1E2C3D;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .calendar-date-input:focus {
-  border-color: #2dd4bf;
-  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.2);
+  border-color: #4A739C;
+  box-shadow: 0 0 0 2px rgba(74, 115, 156, 0.25);
 }
 
 [data-theme="dark"] .calendar-preset-chip {
-  background: #15242b;
-  border-color: #2b3d42;
-  color: #a1b2b1;
+  background: #0D1724;
+  border-color: #1E2C3D;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .calendar-preset-chip:hover {
-  background: #1d333a;
-  border-color: #2dd4bf;
-  color: #2dd4bf;
+  background: #172C42;
+  border-color: #4A739C;
+  color: #9BC5EE;
 }
 
 [data-theme="dark"] .calendar-reset-btn {
-  background: #142229;
-  border-color: #2e444a;
-  color: #94a3b8;
+  background: #0D1724;
+  border-color: #1E2C3D;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .calendar-reset-btn:hover {
-  background: #20353d;
-  color: #e2ece9;
+  background: #172C42;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .calendar-apply-btn {
-  background: #176f63;
-  border-color: #176f63;
+  background: #3B6B9B;
+  border-color: #3B6B9B;
   color: #ffffff;
 }
 
 [data-theme="dark"] .calendar-apply-btn:hover {
-  background: #135d53;
-  border-color: #135d53;
+  background: #2B496D;
+  border-color: #2B496D;
 }
 
 [data-theme="dark"] .google-tf-btn {
-  color: #94a3b8;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .google-tf-btn:hover {
-  background: #20353d;
-  color: #e2ece9;
+  background: #172C42;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .google-tf-btn.selected {
-  background: #153230;
-  border-color: #264a47;
-  color: #2dd4bf;
+  background: #1C2E44;
+  border-color: #2D3E53;
+  color: #9BC5EE;
+  box-shadow: inset 0 0 0 1px rgba(74, 115, 156, 0.3);
 }
 
 [data-theme="dark"] .google-stats-grid {
-  border-color: #2c444a;
+  border-color: #1E2C3D;
 }
 
 [data-theme="dark"] .google-stat-row {
-  border-color: #263c42;
+  border-color: #1E2C3D;
 }
 
 [data-theme="dark"] .google-stat-label {
-  color: #94a3b8;
+  color: #94A3B8;
 }
 
 [data-theme="dark"] .google-stat-value {
-  color: #e2ece9;
+  color: #F1F5F9;
 }
 
 /* Monetary & Spread Strip */
@@ -2674,9 +2759,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 [data-theme="dark"] .insight-treasury-grid,
 [data-theme="dark"] .monetary-spread-strip,
 [data-theme="dark"] .market-data-card,
+[data-theme="dark"] .narrative-panel,
 [data-theme="dark"] .bottom-export-card {
-  background: #19272d;
-  border-color: #34484c;
+  background: #14202E;
+  border-color: #1E2C3D;
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
 }
 
@@ -2689,7 +2775,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 [data-theme="dark"] .report-main-date,
 [data-theme="dark"] .cell-bold,
 [data-theme="dark"] .cell-instrument {
-  color: #e2ece9;
+  color: #F1F5F9;
 }
 
 [data-theme="dark"] .kpi-subtitle,
@@ -2705,12 +2791,27 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 [data-theme="dark"] .source-desc,
 [data-theme="dark"] .date-cell,
 [data-theme="dark"] .col-date-header {
-  color: #8da6aa;
+  color: #94A3B8;
+}
+
+[data-theme="dark"] .eyebrow,
+[data-theme="dark"] .page-intro .eyebrow,
+[data-theme="dark"] .bottom-export-card .eyebrow,
+[data-theme="dark"] .export-text .eyebrow,
+[data-theme="dark"] .title-today,
+[data-theme="dark"] .title-teal,
+[data-theme="dark"] .intro-title .title-today,
+[data-theme="dark"] .page-intro h1 span,
+[data-theme="dark"] .topbar-kicker,
+[data-theme="dark"] .sidebar-label,
+[data-theme="dark"] .treasury-panel-eyebrow,
+[data-theme="dark"] .narrative-panel .eyebrow {
+  color: #8faecf !important;
 }
 
 [data-theme="dark"] .treasury-card {
-  background: #142338;
-  border-color: #2D3E53;
+  background: #101B28;
+  border-color: #1E2C3D;
 }
 
 [data-theme="dark"] .treasury-title {
@@ -2722,8 +2823,12 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 }
 
 [data-theme="dark"] .treasury-icon-box {
-  background: #1e334d;
-  color: #7ea5cb;
+  background: #172C42;
+  color: #9BC5EE;
+}
+
+[data-theme="dark"] .treasury-link {
+  color: #9BC5EE;
 }
 
 [data-theme="dark"] .market-data-table thead th {

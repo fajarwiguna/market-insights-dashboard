@@ -771,7 +771,7 @@ export function HistoryCharts({
           </span>
 
           <span
-            className="google-change-pill"
+            className={`google-change-pill ${isUp ? "change-up" : "change-down"}`}
             style={{ backgroundColor: badgeBg, color: badgeText }}
             title={`Perubahan ${changePct >= 0 ? "+" : ""}${percentFormat.format(changePct)}%`}
           >

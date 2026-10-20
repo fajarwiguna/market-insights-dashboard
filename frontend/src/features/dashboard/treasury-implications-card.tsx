@@ -125,7 +125,7 @@ export function TreasuryImplicationsCard({ report }: { report: MarketReport }) {
                 </svg>
               </div>
               <div>
-                <p className="eyebrow" style={{ color: "#365779", marginBottom: "2px" }}>ANALISIS INTERNAL TREASURY</p>
+                <p className="eyebrow treasury-panel-eyebrow" style={{ marginBottom: "2px" }}>ANALISIS INTERNAL TREASURY</p>
                 <h2 id="treasury-inline-title" className="treasury-panel-heading">
                   Implikasi Pasar &amp; Panduan Posisi Treasury
                 </h2>
