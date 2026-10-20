@@ -72,32 +72,36 @@ export function TreasuryImplicationsCard({ report }: { report: MarketReport }) {
         aria-controls="treasury-inline-panel"
         aria-label="Buka narasi implikasi bagi Treasury"
       >
-        <div className="treasury-icon-box" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-            <line x1="10" y1="9" x2="8" y2="9" />
-          </svg>
-        </div>
-        <div className="treasury-content">
-          <h3 className="treasury-title">Implikasi bagi Treasury</h3>
-          <p className="treasury-desc">
-            Pantau pergerakan rupiah, spread obligasi, dan kondisi likuiditas dalam penetapan posisi pasar.
-          </p>
-          <button
-            type="button"
-            className="treasury-link"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleOpen();
-            }}
-            aria-label={isOpen ? "Tutup analisis treasury" : "Baca analisis lengkap treasury"}
-          >
-            <span>{isOpen ? "Tutup analisis" : "Baca analisis lengkap"}</span>
-            <span aria-hidden="true">{isOpen ? "▲" : "▼"}</span>
-          </button>
+        <div className="treasury-card-inner">
+          <div className="treasury-icon-box" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <line x1="10" y1="9" x2="8" y2="9" />
+            </svg>
+          </div>
+          <div className="treasury-content">
+            <h3 className="treasury-title">Implikasi bagi Treasury</h3>
+            <p className="treasury-desc">
+              Pantau pergerakan rupiah, spread obligasi, dan kondisi likuiditas dalam penetapan posisi pasar.
+            </p>
+            <button
+              type="button"
+              className="treasury-link"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleOpen();
+              }}
+              aria-label={isOpen ? "Tutup analisis treasury" : "Baca analisis lengkap treasury"}
+            >
+              <span>{isOpen ? "Tutup analisis" : "Baca analisis lengkap"}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "transform 0.2s ease", transform: isOpen ? "rotate(180deg)" : "none" }} aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          </div>
         </div>
       </article>
 
@@ -121,7 +125,7 @@ export function TreasuryImplicationsCard({ report }: { report: MarketReport }) {
                 </svg>
               </div>
               <div>
-                <p className="eyebrow" style={{ color: "#0d9488", marginBottom: "2px" }}>ANALISIS INTERNAL TREASURY</p>
+                <p className="eyebrow" style={{ color: "#365779", marginBottom: "2px" }}>ANALISIS INTERNAL TREASURY</p>
                 <h2 id="treasury-inline-title" className="treasury-panel-heading">
                   Implikasi Pasar &amp; Panduan Posisi Treasury
                 </h2>
@@ -134,7 +138,6 @@ export function TreasuryImplicationsCard({ report }: { report: MarketReport }) {
               aria-label="Tutup panel analisis treasury"
             >
               <span>Tutup</span>
-              <span aria-hidden="true">▲</span>
             </button>
           </div>
 
@@ -324,7 +327,6 @@ export function TreasuryImplicationsCard({ report }: { report: MarketReport }) {
               onClick={handleClose}
             >
               <span>Sembunyikan Analisis Treasury</span>
-              <span aria-hidden="true">▲</span>
             </button>
           </div>
         </section>

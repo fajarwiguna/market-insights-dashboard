@@ -284,10 +284,10 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
         <DashboardNav />
         <div className="sidebar-bottom">
           <div className="sidebar-radar">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" strokeWidth="1.8" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4A739C" strokeWidth="1.8" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <circle cx="12" cy="12" r="6" />
-              <circle cx="12" cy="12" r="2" fill="#2DD4BF" />
+              <circle cx="12" cy="12" r="2" fill="#4A739C" />
             </svg>
           </div>
           <div className="sidebar-bottom-texts">
@@ -315,7 +315,7 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
           <section className="page-intro">
             <div className="intro-main">
               <p className="eyebrow">PASAR KEUANGAN · INDONESIA & GLOBAL</p>
-              <h1 className="intro-title">Market <span className="title-teal">Today</span></h1>
+              <h1 className="intro-title">Market <span className="title-today">Today</span></h1>
               <p className="intro-copy">Ringkasan pasar keuangan Indonesia dan global.</p>
             </div>
             <div className="report-date-box">
@@ -338,8 +338,8 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
           {/* Narasi pasar (teks laporan terbit; tidak tersedia untuk data demo) */}
           {!report.is_demo && <NarrativePanel report={report} />}
 
-          {/* Pergerakan Pasar (Chart Section) */}
-          {!report.is_demo && <HistoryCharts histories={histories} />}
+          {/* Pergerakan Pasar */}
+          {!report.is_demo && <HistoryCharts histories={histories} report={report} />}
 
           {/* Monetary & Spread Strip */}
           <MarketReferences report={report} />
@@ -367,11 +367,6 @@ export function Dashboard({ report, histories = {} }: { report: MarketReport; hi
             </div>
             <ExportReportButton reportId={report.report_id} />
           </section>
-
-          {/* Bottom Disclaimer */}
-          <footer className="dashboard-bottom-disclaimer">
-            <span>*Grafik ilustratif, bukan riwayat pasar aktual.</span>
-          </footer>
         </div>
       </main>
     </div>
